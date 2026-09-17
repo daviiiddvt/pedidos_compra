@@ -1,0 +1,68 @@
+# ============================================================================
+#  pubspec.yaml  —  LA "FICHA TÉCNICA" DEL PROYECTO FLUTTER
+# ============================================================================
+#
+#  ¿Qué es?
+#  --------
+#  Este archivo es como el "DNI" de la app: dice cómo se llama, qué versión
+#  es y QUÉ BIBLIOTECAS EXTERNAS (paquetes) usa. Es el primer archivo que lee
+#  Flutter al crear el proyecto y al hacer "flutter pub get" (que lo deja todo
+#  instalado).
+#
+#  Aquí NO se toca nada en condiciones normales. Solo si queremos añadir una
+#  librería nueva (una "dependencia"). YO MISMO (opencode) la añadiría por ti.
+# ============================================================================
+
+# Nombre del "paquete" (identificador técnico). Sin mayúsculas ni espacios.
+name: pedidos_compra
+
+# Descripción corta del proyecto (informativa).
+description: "Aplicacion movil de pedidos de compra conectada a VELNEO."
+
+# publish_to: 'none' → no publicar esto en pub.dev (el repositorio de paquetes).
+publish_to: 'none'
+
+# Versión de la app: 1.0.0 (la parte visual) + 1 (versión interna de build).
+version: 1.0.0+1
+
+# Versión de Dart que necesita esta app.
+environment:
+  sdk: ^3.13.3
+
+# ---- DEPENDENCIAS (las librerías que usa la app en producción) ----
+dependencies:
+  # El "núcleo" de Flutter (obligatorio siempre).
+  flutter:
+    sdk: flutter
+
+  # Icons de Apple (Cupertino). Se incluye por convención del proyecto nuevo.
+  cupertino_icons: ^1.0.8
+  # "http": la librería que hace las llamadas HTTP al servidor VELNEO.
+  #   Se usa en lib/core/api_client.dart.
+  http: ^1.2.2
+  # "provider": la librería que comparte el estado global (la sesión).
+  #   Se usa en lib/main.dart y en las pantallas (context.watch / read).
+  provider: ^6.1.2
+  # "intl": utilidades de fechas/números internacionales (añadida para compatibilidad).
+  intl: ^0.20.2
+  flutter_bloc: ^9.1.1
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.12.0
+  diacritic: ^0.1.6
+
+# ---- DEV DEPENDENCIAS (solo para DESARROLLO, no van en la app final) ----
+dev_dependencies:
+  # El marco de TESTS de Flutter (flutter test). Se usa en test/widget_test.dart.
+  flutter_test:
+    sdk: flutter
+
+  # Reglas de estilo y buenas prácticas ("linters"). Las aplica "flutter analyze".
+  flutter_lints: ^6.0.0
+  build_runner: ^2.16.1
+  freezed: ^4.0.1
+  json_serializable: ^6.14.1
+
+# ---- CONFIGURACIÓN DE FLUTTER ----
+flutter:
+  # Habilita los iconos del sistema de Material Design (obligatorio).
+  uses-material-design: true
