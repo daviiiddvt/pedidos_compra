@@ -39,7 +39,7 @@ class CabeceraView extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            if (pedido.codigo != null)
+            if (pedido.codigo != 0)
               Text(
                 'Código: ${pedido.codigo}',
                 style: const TextStyle(
@@ -57,7 +57,7 @@ class CabeceraView extends StatelessWidget {
         // ---- Sección 1: DATOS GENERALES ----
         const _Seccion('Datos generales'),
         _Campo('N° pedido', pedido.nPedido),
-        _Campo('N° documento', pedido.nDocumento),
+        _Campo('N° documento', pedido.nDocumento.toString()),
         // Mostramos el nombre del cliente; si no, su código.
         _Campo('Cliente',
             pedido.clienteNombre.isNotEmpty ? pedido.clienteNombre : pedido.cliente),

@@ -23,12 +23,20 @@ class OrderCubit extends Cubit<OrderState> {
   void loadClientes(List<Cliente> clientes) {
     _repository.setClientes(clientes);
     // Tras enriquecer, volvemos a filtrar con el estado actual para refrescar la vista
-    final filtered = _repository.filterOrders(query: state.query, statusFilter: state.statusFilter);
+    final filtered = _repository.filterOrders(
+      query: state.query,
+      statusFilter: state.statusFilter,
+      currentUser: null,
+    );
     emit(OrderState(filteredOrders: filtered, query: state.query, statusFilter: state.statusFilter));
   }
 
   void filter(String query, String? statusFilter) {
-    final filtered = _repository.filterOrders(query: query, statusFilter: statusFilter);
+    final filtered = _repository.filterOrders(
+      query: query,
+      statusFilter: statusFilter,
+      currentUser: null,
+    );
     emit(OrderState(filteredOrders: filtered, query: query, statusFilter: statusFilter));
   }
 }

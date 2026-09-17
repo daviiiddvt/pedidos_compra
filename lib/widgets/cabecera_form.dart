@@ -140,7 +140,7 @@ class _CabeceraFormState extends State<CabeceraForm> {
         // N° documento (bloqueado: se lo pone el sistema).
         CampoForm(
           label: 'N° documento',
-          value: p.nDocumento,
+          value: p.nDocumento.toString(),
           enabled: false,
           placeholder: 'Número de documento',
         ),

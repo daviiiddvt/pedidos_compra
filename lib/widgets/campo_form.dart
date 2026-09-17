@@ -39,6 +39,7 @@ class CampoForm extends StatefulWidget {
   final TextInputType keyboardType; // Qué teclado sale (texto, número, URL...).
   final bool enabled; // false = campo bloqueado (no se puede escribir).
   final bool multiline; // true = campo de varias líneas (textarea).
+  final bool obscureText;
   final bool required; // true = muestra un "*" rojo al lado de la etiqueta.
   final String? error; // Mensaje de error a mostrar bajo el campo.
   final int? maxLength; // Máximo de caracteres.
@@ -54,6 +55,7 @@ class CampoForm extends StatefulWidget {
     this.keyboardType = TextInputType.text,
     this.enabled = true,
     this.multiline = false,
+    this.obscureText = false,
     this.required = false,
     this.error,
     this.maxLength,
@@ -126,6 +128,7 @@ class _CampoFormState extends State<CampoForm> {
         onChanged: _onChanged,
         decoration: decoration,
         keyboardType: widget.keyboardType,
+        obscureText: widget.obscureText,
         maxLines: widget.multiline ? null : 1, // null = líneas infinitas.
         minLines: widget.multiline ? 3 : 1,
         maxLength: widget.maxLength,
@@ -138,6 +141,7 @@ class _CampoFormState extends State<CampoForm> {
         onChanged: _onChanged,
         decoration: decoration,
         keyboardType: widget.keyboardType,
+        obscureText: widget.obscureText,
         maxLines: widget.multiline ? null : 1,
         minLines: widget.multiline ? 3 : 1,
         maxLength: widget.maxLength,

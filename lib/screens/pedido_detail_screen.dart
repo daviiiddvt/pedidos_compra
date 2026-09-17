@@ -75,7 +75,7 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
       appBar: AppBar(
         // Título: "Pedido 123" si tiene código, si no simplemente "Pedido".
         title: Text(
-          pedido != null && pedido.codigo != null
+          pedido != null && pedido.codigo != 0
               ? 'Pedido ${pedido.codigo}'
               : 'Pedido',
         ),
@@ -168,7 +168,7 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  'Código ${pedido.codigo ?? ''}',
+                  'Código ${pedido.codigo == 0 ? '' : pedido.codigo}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,

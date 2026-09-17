@@ -30,6 +30,8 @@ class AuthState extends ChangeNotifier {
   Future<bool> conectar({
     required String baseUrl,
     required String apiKey,
+    required String username,
+    required String password,
   }) async {
     _connecting = true;
     _error = null;
@@ -43,19 +45,11 @@ class AuthState extends ChangeNotifier {
 
       // Llamada de prueba al API. Si falla, salta al catch.
       await PedidosService.checkConnection();
-
-      // Todo correcto -> conectado.
-      _connected = true;
-      
-      // 3. INSTANCIAR EL USUARIO AQUÍ (Después de confirmar que el API funciona)
-      // Nota: En un caso real, aquí harías una llamada a tu API para obtener los datos del comercial.
-      // Por ahora, simulamos que ha entrado un Comercial con permisos restringidos.
-      _currentUser = const User(
-        id: '1', 
-        name: 'Comercial Demo', 
-        role: 'Comercial', 
-        assignedCustomerIds: ['10', '15'] // Solo verá pedidos de los clientes 10 y 15
+      _currentUser = await PedidosService.authenticateUser(
+        username: username,
+        password: password,
       );
+      _connected = true;
 
       return true;
     } catch (e) {

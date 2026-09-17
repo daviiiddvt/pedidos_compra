@@ -63,7 +63,7 @@ class FilaPedido extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      '${pedido.codigo ?? pedido.id ?? '—'}',
+                      '${pedido.codigo != 0 ? pedido.codigo : (pedido.id ?? '—')}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,

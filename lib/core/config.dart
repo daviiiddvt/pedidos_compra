@@ -40,6 +40,7 @@ class AppConfig {
   // --------------------------------------------------------------------------
   static const endpoints = {
     'pedidos': 'TecERPv7_dat_dat/v1/VTA_PED_G',     // Cabeceras de pedidos de VENTA.
+    'usuarios': 'TecERPv7_dat_dat/v1/USR_M',        // Usuarios de acceso.
     'lineas': 'TecERPv7_dat_dat/v1/VTA_PED_LIN_G',   // Líneas de pedido de venta.
     'clientes': 'TecERPv7_dat_dat/v1/ENT_M',         // Entidades (clientes de venta).
     'comerciales': 'TecERPv7_dat_dat/v1/ENT_M',      // Entidades (comerciales).
@@ -51,6 +52,13 @@ class AppConfig {
 
   // Número de resultados que se piden por página (parámetro page[size]).
   static const pageSize = 50;
+
+  static const usuarioField = 'usr';
+  static const passwordField = 'pwd';
+  static const usuarioContactoField = 'ent';
+  static const usuarioRolField = 'rol';
+  static const contactoComercialField = 'es_cmr';
+  static const clienteComercialField = 'cmr';
 
   // --------------------------------------------------------------------------
   // Devuelve la ruta de un recurso, o lanza un error claro si no está

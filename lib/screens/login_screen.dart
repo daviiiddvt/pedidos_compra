@@ -41,6 +41,8 @@ class _LoginScreenState extends State<LoginScreen> {
   // Los dos "muñecos" que guardan lo escrito en los campos de texto.
   late final TextEditingController _server; // Lo escrito en "URL del servidor".
   late final TextEditingController _apiKey; // Lo escrito en "API Key".
+  late final TextEditingController _username;
+  late final TextEditingController _password;
 
   /// initState: se ejecuta UNA vez, justo cuando la pantalla nace.
   /// Aquí rellenamos los campos con lo que ya haya en la configuración
@@ -50,6 +52,8 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _server = TextEditingController(text: AppConfig.baseUrl);
     _apiKey = TextEditingController(text: AppConfig.apiKey);
+    _username = TextEditingController();
+    _password = TextEditingController();
   }
 
   /// dispose: se ejecuta cuando la pantalla muere. Libera la memoria de los
@@ -58,6 +62,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _server.dispose();
     _apiKey.dispose();
+    _username.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -68,6 +74,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final ok = await auth.conectar(
       baseUrl: _server.text.trim(),
       apiKey: _apiKey.text.trim(),
+      username: _username.text.trim(),
+      password: _password.text,
     );
     // Si falló y la pantalla sigue viva (mounted), enseñamos el error.
     if (!ok && mounted) {
@@ -161,6 +169,21 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _server,
                             placeholder: 'http://localhost:39543/v1',
                             keyboardType: TextInputType.url,
+                          ),
+                          const SizedBox(height: 14),
+
+                          CampoForm(
+                            label: 'Usuario',
+                            controller: _username,
+                            placeholder: 'Usuario de Velneo',
+                          ),
+                          const SizedBox(height: 14),
+
+                          CampoForm(
+                            label: 'Contraseña',
+                            controller: _password,
+                            placeholder: 'Contraseña de Velneo',
+                            obscureText: true,
                           ),
                           const SizedBox(height: 14),
 

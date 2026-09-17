@@ -28,6 +28,13 @@ import 'core/config.dart'; // AppConfig (para saber a qué endpoint llamar).
 import 'models.dart'; // Nuestros modelos (Pedido, OpcionMaestra).
 import 'theme/app_theme.dart'; // AppColors (para traducir el estado a código VELNEO).
 
+String regIvaCodigo(double tipoIva) {
+  if (tipoIva >= 20) return 'G';
+  if (tipoIva >= 10) return 'R';
+  if (tipoIva > 0) return 'S';
+  return 'E';
+}
+
 /// ResultadoLista: "paquete" que devuelve listar pedidos.
 /// No es solo la lista: también trae el TOTAL de pedidos que hay (para saber
 /// cuántas páginas hay) y la página actual.
@@ -43,6 +50,86 @@ class ResultadoLista<T> {
 class PedidosService {
   // El mensajero único que hará las llamadas HTTP.
   static final _api = ApiClient.instance;
+
+  static String _referenceId(Map<String, dynamic> record, String field) {
+    final value = record.raw(field);
+    if (value is Map) {
+      return '${value['id'] ?? value['value'] ?? ''}';
+    }
+    return value == null ? '' : '$value';
+  }
+
+  static Future<User> authenticateUser({
+    required String username,
+    required String password,
+  }) async {
+    final json = await _api.get(
+      AppConfig.endpoint('usuarios'),
+      params: {
+        'filter[${AppConfig.usuarioField}]': username,
+        'page[size]': 10,
+      },
+    );
+    final users = payloadLista(json);
+    Map<String, dynamic>? user;
+    for (final candidate in users) {
+      if (candidate.s(AppConfig.usuarioField) == username &&
+          candidate.s(AppConfig.passwordField) == password) {
+        user = candidate;
+        break;
+      }
+    }
+    if (user == null) {
+      throw ApiException('Usuario o contraseña incorrectos.');
+    }
+
+    final contactId = _referenceId(user, AppConfig.usuarioContactoField);
+    if (contactId.isEmpty) {
+      throw ApiException('El usuario no tiene un contacto asociado.');
+    }
+    final contact = await _getContact(contactId);
+    final roleValue = user.s(AppConfig.usuarioRolField).toLowerCase();
+    final isAdmin = roleValue == 'admin' || roleValue == 'administrador';
+    if (!isAdmin && !contact.b(AppConfig.contactoComercialField)) {
+      throw ApiException('El contacto asociado no está marcado como comercial.');
+    }
+
+    return User(
+      id: user.s('id'),
+      name: user.s('name').isEmpty ? username : user.s('name'),
+      role: isAdmin ? 'Administrador' : 'Comercial',
+      contactId: contactId,
+      assignedCustomerIds: isAdmin
+          ? const []
+          : await getAssignedCustomerIds(contactId),
+    );
+  }
+
+  static Future<Map<String, dynamic>> _getContact(String id) async {
+    final json = await _api.get(
+      AppConfig.endpoint('clientes'),
+      params: {'filter[id]': id, 'page[size]': 1},
+    );
+    final contacts = payloadLista(json);
+    if (contacts.isEmpty) {
+      throw ApiException('No se encontró el contacto asociado al usuario.');
+    }
+    return contacts.first;
+  }
+
+  static Future<List<String>> getAssignedCustomerIds(String commercialId) async {
+    final json = await _api.get(
+      AppConfig.endpoint('clientes'),
+      params: {
+        'filter[${AppConfig.clienteComercialField}]': commercialId,
+        'page[size]': 1000,
+      },
+    );
+    return payloadLista(json)
+        .where((record) => record.i('id') != 0)
+        .map((record) => record.i('id').toString())
+        .toList();
+  }
 
   /// list: pide una página de pedidos al servidor.
   ///
@@ -85,6 +172,26 @@ class PedidosService {
     final total = payloadTotal(json) != 0 ? payloadTotal(json) : items.length;
 
     return ResultadoLista<Pedido>(items: items, total: total, page: page);
+  }
+
+  /// Descarga todos los pedidos por páginas sin bloquear el hilo de Flutter.
+  static Future<List<Pedido>> listAll() async {
+    final all = <Pedido>[];
+    var page = 1;
+    var total = 0;
+    var lastPageSize = 0;
+
+    do {
+      final result = await list(page: page);
+      all.addAll(result.items);
+      lastPageSize = result.items.length;
+      total = result.total;
+      page++;
+      if (result.items.isEmpty) break;
+      if (total > 0 && all.length >= total) break;
+    } while (lastPageSize >= AppConfig.pageSize);
+
+    return all;
   }
 
   /// getById: pide UN pedido concreto al servidor por su id, junto con sus

@@ -19,14 +19,20 @@ _LineaPedido _$LineaPedidoFromJson(Map<String, dynamic> json) => _LineaPedido(
   id: (json['id'] as num?)?.toInt(),
   codigo: (json['codigo'] as num?)?.toInt(),
   articulo: json['articulo'] as String? ?? '',
+  articuloNombre: json['articuloNombre'] as String? ?? '',
   descripcion: json['descripcion'] as String? ?? '',
   nReferencia: json['nReferencia'] as String? ?? '',
+  referencia: json['referencia'] as String? ?? '',
+  referenciaProveedor: json['referenciaProveedor'] as String? ?? '',
   cantidad: (json['cantidad'] as num?)?.toDouble() ?? 1.0,
   pendiente: (json['pendiente'] as num?)?.toDouble() ?? 1.0,
   precio: (json['precio'] as num?)?.toDouble() ?? 0.0,
   dto: (json['dto'] as num?)?.toDouble() ?? 0.0,
   importe: (json['importe'] as num?)?.toDouble() ?? 0.0,
   tipoIva: (json['tipoIva'] as num?)?.toDouble() ?? 21.0,
+  retencionIrpf: (json['retencionIrpf'] as num?)?.toDouble() ?? 0.0,
+  retencionAlquiler: (json['retencionAlquiler'] as num?)?.toDouble() ?? 0.0,
+  clienteVenta: json['clienteVenta'] as String? ?? '',
   estado: json['estado'] as String? ?? 'Pendiente',
   cancelado: json['cancelado'] as bool? ?? false,
   previstoPara: json['previstoPara'] as String? ?? '',
@@ -37,14 +43,20 @@ Map<String, dynamic> _$LineaPedidoToJson(_LineaPedido instance) =>
       'id': instance.id,
       'codigo': instance.codigo,
       'articulo': instance.articulo,
+      'articuloNombre': instance.articuloNombre,
       'descripcion': instance.descripcion,
       'nReferencia': instance.nReferencia,
+      'referencia': instance.referencia,
+      'referenciaProveedor': instance.referenciaProveedor,
       'cantidad': instance.cantidad,
       'pendiente': instance.pendiente,
       'precio': instance.precio,
       'dto': instance.dto,
       'importe': instance.importe,
       'tipoIva': instance.tipoIva,
+      'retencionIrpf': instance.retencionIrpf,
+      'retencionAlquiler': instance.retencionAlquiler,
+      'clienteVenta': instance.clienteVenta,
       'estado': instance.estado,
       'cancelado': instance.cancelado,
       'previstoPara': instance.previstoPara,
@@ -54,48 +66,51 @@ _User _$UserFromJson(Map<String, dynamic> json) => _User(
   id: json['id'] as String,
   name: json['name'] as String,
   role: json['role'] as String,
+  contactId: json['contactId'] as String? ?? '',
   assignedCustomerIds:
       (json['assignedCustomerIds'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList() ??
-      const [],
+      const <String>[],
 );
 
 Map<String, dynamic> _$UserToJson(_User instance) => <String, dynamic>{
   'id': instance.id,
   'name': instance.name,
   'role': instance.role,
+  'contactId': instance.contactId,
   'assignedCustomerIds': instance.assignedCustomerIds,
 };
 
 _Cliente _$ClienteFromJson(Map<String, dynamic> json) => _Cliente(
   id: (json['id'] as num).toInt(),
-  nombreComercial: json['nom_com'] as String? ?? '',
+  nombreComercial: json['nombreComercial'] as String? ?? '',
   cif: json['cif'] as String? ?? '',
-  telefono: json['tlf'] as String? ?? '',
+  telefono: json['telefono'] as String? ?? '',
 );
 
 Map<String, dynamic> _$ClienteToJson(_Cliente instance) => <String, dynamic>{
   'id': instance.id,
-  'nom_com': instance.nombreComercial,
+  'nombreComercial': instance.nombreComercial,
   'cif': instance.cif,
-  'tlf': instance.telefono,
+  'telefono': instance.telefono,
 };
 
 _Pedido _$PedidoFromJson(Map<String, dynamic> json) => _Pedido(
   id: (json['id'] as num?)?.toInt(),
   numeroPedido: json['num_ped'] as String? ?? '',
-  clienteId: (json['clt'] as num).toInt(),
+  clienteId: (json['clt'] as num?)?.toInt() ?? 0,
   estado: json['est'] as String? ?? 'S',
   total: (json['tot_ped'] as num?)?.toDouble() ?? 0.0,
   lineas:
       (json['lineas'] as List<dynamic>?)
           ?.map((e) => LineaPedido.fromJson(e as Map<String, dynamic>))
           .toList() ??
-      const [],
+      const <LineaPedido>[],
   clienteNombre: json['clienteNombre'] as String? ?? '',
   clienteTelefono: json['clienteTelefono'] as String? ?? '',
   clienteCif: json['clienteCif'] as String? ?? '',
+  cliente: json['cliente'] as String? ?? '',
   codigo: (json['codigo'] as num?)?.toInt() ?? 0,
   nDocumento: (json['nDocumento'] as num?)?.toInt() ?? 0,
   serie: json['serie'] as String? ?? '',
@@ -123,6 +138,7 @@ Map<String, dynamic> _$PedidoToJson(_Pedido instance) => <String, dynamic>{
   'clienteNombre': instance.clienteNombre,
   'clienteTelefono': instance.clienteTelefono,
   'clienteCif': instance.clienteCif,
+  'cliente': instance.cliente,
   'codigo': instance.codigo,
   'nDocumento': instance.nDocumento,
   'serie': instance.serie,

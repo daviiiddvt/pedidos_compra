@@ -140,7 +140,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   }
 
   /// _anadirLinea: abre el modal vacío para añadir UNA línea nueva.
-  Future<void>  () async {
+  Future<void> _anadirLinea() async {
     final resultado = await mostrarLineaForm(context);
     if (resultado != null) {
       setState(() => _lineas = [..._lineas, resultado]); // La añadimos al final.

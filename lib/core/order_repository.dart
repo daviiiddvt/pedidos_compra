@@ -5,6 +5,8 @@ class OrderRepository {
   List<Pedido> _allOrders = [];
   Map<int, Cliente> _clienteCache = {};
 
+  List<Pedido> get cachedOrders => List.unmodifiable(_allOrders);
+
   void setOrders(List<Pedido> orders) {
     _allOrders = orders;
     _enrichOrders();
@@ -41,16 +43,21 @@ class OrderRepository {
   }) {
     final normalizedQuery = removeDiacritics(query.toLowerCase());
         
+    final role = currentUser?.role.toLowerCase();
+    final assignedIds = currentUser?.assignedCustomerIds.toSet() ?? {};
+
     return _allOrders.where((order) {
-      // 1. Filtro de Rol (Seguridad)
-      if (currentUser != null && currentUser.role == 'Comercial') {
-        if (!currentUser.assignedCustomerIds.contains(order.clienteId.toString())) {
-          return false; // El comercial no puede ver este pedido
-        }
+      if (role != 'administrador' && role != 'admin' && role != 'comercial') {
+        return false;
+      }
+      if (role == 'comercial' &&
+          !assignedIds.contains(order.clienteId.toString())) {
+        return false;
       }
 
-      // 2. Filtro de Estado
-      final matchesStatus = statusFilter == null || statusFilter.isEmpty || order.estado == statusFilter;
+        final matchesStatus = statusFilter == null ||
+          statusFilter.isEmpty ||
+          order.estado.toLowerCase() == statusFilter.toLowerCase();
       if (!matchesStatus) return false;
 
       // 3. Filtro de Texto (Cliente, Teléfono, CIF, Pedido)
