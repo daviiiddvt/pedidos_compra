@@ -3,6 +3,15 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'models.freezed.dart';
 part 'models.g.dart';
 
+String _referenceToString(dynamic value) {
+  if (value is Map) {
+    return '${value['id'] ?? value['value'] ?? ''}';
+  }
+  return value == null ? '' : '$value';
+}
+
+dynamic _referenceToJson(String value) => value;
+
 @freezed
 abstract class OpcionMaestra with _$OpcionMaestra {
   const factory OpcionMaestra({
@@ -54,7 +63,6 @@ abstract class User with _$User {
     required String name,
     required String role,
     @Default('') String contactId,
-    @Default(<String>[]) List<String> assignedCustomerIds,
   }) = _User;
 
   factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
@@ -92,6 +100,11 @@ abstract class Pedido with _$Pedido {
     @Default(0) int nDocumento,
     @Default('') String serie,
     @Default('') String serieNombre,
+    @JsonKey(
+      name: 'cmr',
+      fromJson: _referenceToString,
+      toJson: _referenceToJson,
+    )
     @Default('') String comercial,
     @Default('') String comercialNombre,
     @Default('') String almacen,

@@ -53,12 +53,11 @@ class AppConfig {
   // Número de resultados que se piden por página (parámetro page[size]).
   static const pageSize = 50;
 
-  static const usuarioField = 'usr';
+  static const usuarioField = 'name';
   static const passwordField = 'pwd';
   static const usuarioContactoField = 'ent';
   static const usuarioRolField = 'rol';
   static const contactoComercialField = 'es_cmr';
-  static const clienteComercialField = 'cmr';
 
   // --------------------------------------------------------------------------
   // Devuelve la ruta de un recurso, o lanza un error claro si no está

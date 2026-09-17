@@ -22,7 +22,7 @@
 
 import 'package:flutter_test/flutter_test.dart'; // El "marco" de tests de Flutter.
 
-import 'package:pedidos_compra/core/formatters.dart'; // Las funciones que probamos.
+import 'package:pedidos_venta/core/formatters.dart'; // Las funciones que probamos.
 
 void main() {
   // ------ Test 1: formatNumber -------

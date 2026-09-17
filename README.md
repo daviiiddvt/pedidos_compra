@@ -1,4 +1,4 @@
-# pedidos_compra
+# pedidos_venta
 
 A new Flutter project.
 

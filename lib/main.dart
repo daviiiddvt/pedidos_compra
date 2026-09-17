@@ -48,17 +48,17 @@ void main() {
         Provider(create: (_) => OrderRepository()),
       ],
       child: const AppLifecycleManager(
-        child: PedidosCompraApp(),
+        child: PedidosVentaApp(),
       ),
     ),
   );
 }
 
-/// PedidosCompraApp es el widget RAÍZ de toda la aplicación.
+/// PedidosVentaApp es el widget RAÍZ de toda la aplicación.
 /// Es StatelessWidget (sin estado) porque su única misión es definir la
 /// estética general y las rutas; no guarda ninguna variable.
-class PedidosCompraApp extends StatelessWidget {
-  const PedidosCompraApp({super.key});
+class PedidosVentaApp extends StatelessWidget {
+  const PedidosVentaApp({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -616,7 +616,7 @@ as String,
 /// @nodoc
 mixin _$User {
 
- String get id; String get name; String get role; String get contactId; List<String> get assignedCustomerIds;
+ String get id; String get name; String get role; String get contactId;
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -630,20 +630,20 @@ $UserCopyWith<User> get copyWith => _$UserCopyWithImpl<User>(this as User, _$ide
 @override
 bool operator ==(Object other) {
   final _this = this as User;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is User&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.role, _this.role) || other.role == _this.role)&&(identical(other.contactId, _this.contactId) || other.contactId == _this.contactId)&&const DeepCollectionEquality().equals(other.assignedCustomerIds, _this.assignedCustomerIds));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is User&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.role, _this.role) || other.role == _this.role)&&(identical(other.contactId, _this.contactId) || other.contactId == _this.contactId));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as User;
-  return Object.hash(runtimeType,_this.id,_this.name,_this.role,_this.contactId,const DeepCollectionEquality().hash(_this.assignedCustomerIds));
+  return Object.hash(runtimeType,_this.id,_this.name,_this.role,_this.contactId);
 }
 
 @override
 String toString() {
   final _this = this as User;
-  return 'User(id: ${_this.id}, name: ${_this.name}, role: ${_this.role}, contactId: ${_this.contactId}, assignedCustomerIds: ${_this.assignedCustomerIds})';
+  return 'User(id: ${_this.id}, name: ${_this.name}, role: ${_this.role}, contactId: ${_this.contactId})';
 }
 
 
@@ -654,7 +654,7 @@ abstract mixin class $UserCopyWith<$Res>  {
   factory $UserCopyWith(User value, $Res Function(User) _then) = _$UserCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, String role, String contactId, List<String> assignedCustomerIds
+ String id, String name, String role, String contactId
 });
 
 
@@ -671,14 +671,13 @@ class _$UserCopyWithImpl<$Res>
 
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? role = null,Object? contactId = null,Object? assignedCustomerIds = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? role = null,Object? contactId = null,}) {
   return _then(User(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
 as String,contactId: null == contactId ? _self.contactId : contactId // ignore: cast_nullable_to_non_nullable
-as String,assignedCustomerIds: null == assignedCustomerIds ? _self.assignedCustomerIds : assignedCustomerIds // ignore: cast_nullable_to_non_nullable
-as List<String>,
+as String,
   ));
 }
 
@@ -763,10 +762,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String role,  String contactId,  List<String> assignedCustomerIds)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String role,  String contactId)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _User() when $default != null:
-return $default(_that.id,_that.name,_that.role,_that.contactId,_that.assignedCustomerIds);case _:
+return $default(_that.id,_that.name,_that.role,_that.contactId);case _:
   return orElse();
 
 }
@@ -784,10 +783,10 @@ return $default(_that.id,_that.name,_that.role,_that.contactId,_that.assignedCus
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String role,  String contactId,  List<String> assignedCustomerIds)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String role,  String contactId)  $default,) {final _that = this;
 switch (_that) {
 case _User():
-return $default(_that.id,_that.name,_that.role,_that.contactId,_that.assignedCustomerIds);case _:
+return $default(_that.id,_that.name,_that.role,_that.contactId);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -804,10 +803,10 @@ return $default(_that.id,_that.name,_that.role,_that.contactId,_that.assignedCus
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String role,  String contactId,  List<String> assignedCustomerIds)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String role,  String contactId)?  $default,) {final _that = this;
 switch (_that) {
 case _User() when $default != null:
-return $default(_that.id,_that.name,_that.role,_that.contactId,_that.assignedCustomerIds);case _:
+return $default(_that.id,_that.name,_that.role,_that.contactId);case _:
   return null;
 
 }
@@ -819,20 +818,13 @@ return $default(_that.id,_that.name,_that.role,_that.contactId,_that.assignedCus
 @JsonSerializable()
 
 class _User implements User {
-  const _User({required this.id, required this.name, required this.role, this.contactId = '',  List<String> assignedCustomerIds = const <String>[]}): _assignedCustomerIds = assignedCustomerIds;
+  const _User({required this.id, required this.name, required this.role, this.contactId = ''});
   factory _User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
 
 @override final  String id;
 @override final  String name;
 @override final  String role;
 @override@JsonKey() final  String contactId;
- final  List<String> _assignedCustomerIds;
-@override@JsonKey() List<String> get assignedCustomerIds {
-  if (_assignedCustomerIds is EqualUnmodifiableListView) return _assignedCustomerIds;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(_assignedCustomerIds);
-}
-
 
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
@@ -847,18 +839,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _User&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.role, role) || other.role == role)&&(identical(other.contactId, contactId) || other.contactId == contactId)&&const DeepCollectionEquality().equals(other.assignedCustomerIds, _assignedCustomerIds));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _User&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.role, role) || other.role == role)&&(identical(other.contactId, contactId) || other.contactId == contactId));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,name,role,contactId,const DeepCollectionEquality().hash(_assignedCustomerIds));
+    return Object.hash(runtimeType,id,name,role,contactId);
 }
 
 @override
 String toString() {
-    return 'User(id: $id, name: $name, role: $role, contactId: $contactId, assignedCustomerIds: $assignedCustomerIds)';
+    return 'User(id: $id, name: $name, role: $role, contactId: $contactId)';
 }
 
 
@@ -869,7 +861,7 @@ abstract mixin class _$UserCopyWith<$Res> implements $UserCopyWith<$Res> {
   factory _$UserCopyWith(_User value, $Res Function(_User) _then) = __$UserCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, String role, String contactId, List<String> assignedCustomerIds
+ String id, String name, String role, String contactId
 });
 
 
@@ -886,14 +878,13 @@ class __$UserCopyWithImpl<$Res>
 
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? role = null,Object? contactId = null,Object? assignedCustomerIds = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? role = null,Object? contactId = null,}) {
   return _then(_User(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
 as String,contactId: null == contactId ? _self.contactId : contactId // ignore: cast_nullable_to_non_nullable
-as String,assignedCustomerIds: null == assignedCustomerIds ? _self._assignedCustomerIds : assignedCustomerIds // ignore: cast_nullable_to_non_nullable
-as List<String>,
+as String,
   ));
 }
 
@@ -1183,7 +1174,7 @@ as String,
 /// @nodoc
 mixin _$Pedido {
 
- int? get id;@JsonKey(name: 'num_ped') String get numeroPedido;@JsonKey(name: 'clt') int get clienteId;@JsonKey(name: 'est') String get estado;@JsonKey(name: 'tot_ped') double get total; List<LineaPedido> get lineas; String get clienteNombre; String get clienteTelefono; String get clienteCif; String get cliente; int get codigo; int get nDocumento; String get serie; String get serieNombre; String get comercial; String get comercialNombre; String get almacen; String get almacenNombre; String get fecha; String get previstoPara; String get formaPago; String get formaPagoNombre; String get direccionEnvio; String get email; String get observaciones;
+ int? get id;@JsonKey(name: 'num_ped') String get numeroPedido;@JsonKey(name: 'clt') int get clienteId;@JsonKey(name: 'est') String get estado;@JsonKey(name: 'tot_ped') double get total; List<LineaPedido> get lineas; String get clienteNombre; String get clienteTelefono; String get clienteCif; String get cliente; int get codigo; int get nDocumento; String get serie; String get serieNombre;@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String get comercial; String get comercialNombre; String get almacen; String get almacenNombre; String get fecha; String get previstoPara; String get formaPago; String get formaPagoNombre; String get direccionEnvio; String get email; String get observaciones;
 /// Create a copy of Pedido
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1221,7 +1212,7 @@ abstract mixin class $PedidoCopyWith<$Res>  {
   factory $PedidoCopyWith(Pedido value, $Res Function(Pedido) _then) = _$PedidoCopyWithImpl;
 @useResult
 $Res call({
- int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo, int nDocumento, String serie, String serieNombre, String comercial, String comercialNombre, String almacen, String almacenNombre, String fecha, String previstoPara, String formaPago, String formaPagoNombre, String direccionEnvio, String email, String observaciones
+ int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo, int nDocumento, String serie, String serieNombre,@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String comercial, String comercialNombre, String almacen, String almacenNombre, String fecha, String previstoPara, String formaPago, String formaPagoNombre, String direccionEnvio, String email, String observaciones
 });
 
 
@@ -1350,7 +1341,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo,  int nDocumento,  String serie,  String serieNombre,  String comercial,  String comercialNombre,  String almacen,  String almacenNombre,  String fecha,  String previstoPara,  String formaPago,  String formaPagoNombre,  String direccionEnvio,  String email,  String observaciones)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo,  int nDocumento,  String serie,  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial,  String comercialNombre,  String almacen,  String almacenNombre,  String fecha,  String previstoPara,  String formaPago,  String formaPagoNombre,  String direccionEnvio,  String email,  String observaciones)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Pedido() when $default != null:
 return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
@@ -1371,7 +1362,7 @@ return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.t
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo,  int nDocumento,  String serie,  String serieNombre,  String comercial,  String comercialNombre,  String almacen,  String almacenNombre,  String fecha,  String previstoPara,  String formaPago,  String formaPagoNombre,  String direccionEnvio,  String email,  String observaciones)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo,  int nDocumento,  String serie,  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial,  String comercialNombre,  String almacen,  String almacenNombre,  String fecha,  String previstoPara,  String formaPago,  String formaPagoNombre,  String direccionEnvio,  String email,  String observaciones)  $default,) {final _that = this;
 switch (_that) {
 case _Pedido():
 return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
@@ -1391,7 +1382,7 @@ return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.t
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo,  int nDocumento,  String serie,  String serieNombre,  String comercial,  String comercialNombre,  String almacen,  String almacenNombre,  String fecha,  String previstoPara,  String formaPago,  String formaPagoNombre,  String direccionEnvio,  String email,  String observaciones)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo,  int nDocumento,  String serie,  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial,  String comercialNombre,  String almacen,  String almacenNombre,  String fecha,  String previstoPara,  String formaPago,  String formaPagoNombre,  String direccionEnvio,  String email,  String observaciones)?  $default,) {final _that = this;
 switch (_that) {
 case _Pedido() when $default != null:
 return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
@@ -1406,7 +1397,7 @@ return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.t
 @JsonSerializable()
 
 class _Pedido extends Pedido {
-  const _Pedido({this.id, @JsonKey(name: 'num_ped') this.numeroPedido = '', @JsonKey(name: 'clt') this.clienteId = 0, @JsonKey(name: 'est') this.estado = 'S', @JsonKey(name: 'tot_ped') this.total = 0.0,  List<LineaPedido> lineas = const <LineaPedido>[], this.clienteNombre = '', this.clienteTelefono = '', this.clienteCif = '', this.cliente = '', this.codigo = 0, this.nDocumento = 0, this.serie = '', this.serieNombre = '', this.comercial = '', this.comercialNombre = '', this.almacen = '', this.almacenNombre = '', this.fecha = '', this.previstoPara = '', this.formaPago = '', this.formaPagoNombre = '', this.direccionEnvio = '', this.email = '', this.observaciones = ''}): _lineas = lineas,super._();
+  const _Pedido({this.id, @JsonKey(name: 'num_ped') this.numeroPedido = '', @JsonKey(name: 'clt') this.clienteId = 0, @JsonKey(name: 'est') this.estado = 'S', @JsonKey(name: 'tot_ped') this.total = 0.0,  List<LineaPedido> lineas = const <LineaPedido>[], this.clienteNombre = '', this.clienteTelefono = '', this.clienteCif = '', this.cliente = '', this.codigo = 0, this.nDocumento = 0, this.serie = '', this.serieNombre = '', @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) this.comercial = '', this.comercialNombre = '', this.almacen = '', this.almacenNombre = '', this.fecha = '', this.previstoPara = '', this.formaPago = '', this.formaPagoNombre = '', this.direccionEnvio = '', this.email = '', this.observaciones = ''}): _lineas = lineas,super._();
   factory _Pedido.fromJson(Map<String, dynamic> json) => _$PedidoFromJson(json);
 
 @override final  int? id;
@@ -1429,7 +1420,7 @@ class _Pedido extends Pedido {
 @override@JsonKey() final  int nDocumento;
 @override@JsonKey() final  String serie;
 @override@JsonKey() final  String serieNombre;
-@override@JsonKey() final  String comercial;
+@override@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) final  String comercial;
 @override@JsonKey() final  String comercialNombre;
 @override@JsonKey() final  String almacen;
 @override@JsonKey() final  String almacenNombre;
@@ -1476,7 +1467,7 @@ abstract mixin class _$PedidoCopyWith<$Res> implements $PedidoCopyWith<$Res> {
   factory _$PedidoCopyWith(_Pedido value, $Res Function(_Pedido) _then) = __$PedidoCopyWithImpl;
 @override @useResult
 $Res call({
- int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo, int nDocumento, String serie, String serieNombre, String comercial, String comercialNombre, String almacen, String almacenNombre, String fecha, String previstoPara, String formaPago, String formaPagoNombre, String direccionEnvio, String email, String observaciones
+ int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo, int nDocumento, String serie, String serieNombre,@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String comercial, String comercialNombre, String almacen, String almacenNombre, String fecha, String previstoPara, String formaPago, String formaPagoNombre, String direccionEnvio, String email, String observaciones
 });
 
 

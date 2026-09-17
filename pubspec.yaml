@@ -14,10 +14,10 @@
 # ============================================================================
 
 # Nombre del "paquete" (identificador técnico). Sin mayúsculas ni espacios.
-name: pedidos_compra
+name: pedidos_venta
 
 # Descripción corta del proyecto (informativa).
-description: "Aplicacion movil de pedidos de compra conectada a VELNEO."
+description: "Aplicacion movil de pedidos de venta conectada a VELNEO."
 
 # publish_to: 'none' → no publicar esto en pub.dev (el repositorio de paquetes).
 publish_to: 'none'

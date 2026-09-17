@@ -67,11 +67,6 @@ _User _$UserFromJson(Map<String, dynamic> json) => _User(
   name: json['name'] as String,
   role: json['role'] as String,
   contactId: json['contactId'] as String? ?? '',
-  assignedCustomerIds:
-      (json['assignedCustomerIds'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList() ??
-      const <String>[],
 );
 
 Map<String, dynamic> _$UserToJson(_User instance) => <String, dynamic>{
@@ -79,7 +74,6 @@ Map<String, dynamic> _$UserToJson(_User instance) => <String, dynamic>{
   'name': instance.name,
   'role': instance.role,
   'contactId': instance.contactId,
-  'assignedCustomerIds': instance.assignedCustomerIds,
 };
 
 _Cliente _$ClienteFromJson(Map<String, dynamic> json) => _Cliente(
@@ -115,7 +109,7 @@ _Pedido _$PedidoFromJson(Map<String, dynamic> json) => _Pedido(
   nDocumento: (json['nDocumento'] as num?)?.toInt() ?? 0,
   serie: json['serie'] as String? ?? '',
   serieNombre: json['serieNombre'] as String? ?? '',
-  comercial: json['comercial'] as String? ?? '',
+  comercial: json['cmr'] == null ? '' : _referenceToString(json['cmr']),
   comercialNombre: json['comercialNombre'] as String? ?? '',
   almacen: json['almacen'] as String? ?? '',
   almacenNombre: json['almacenNombre'] as String? ?? '',
@@ -143,7 +137,7 @@ Map<String, dynamic> _$PedidoToJson(_Pedido instance) => <String, dynamic>{
   'nDocumento': instance.nDocumento,
   'serie': instance.serie,
   'serieNombre': instance.serieNombre,
-  'comercial': instance.comercial,
+  'cmr': _referenceToJson(instance.comercial),
   'comercialNombre': instance.comercialNombre,
   'almacen': instance.almacen,
   'almacenNombre': instance.almacenNombre,

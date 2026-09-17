@@ -4,7 +4,7 @@
 //
 //  ¿Qué es?
 //  --------
-//  Es el "escritorio" de la app: una lista de pedidos de compra con:
+//  Es el "escritorio" de la app: una lista de pedidos de venta con:
 //     - Filtros por estado (Todos / Pendiente / Recibido / Cancelado).
 //     - Desplazamiento INFINITO: al llegar abajo, carga más pedidos solo.
 //     - Tirar hacia abajo para recargar (RefreshIndicator).
@@ -40,7 +40,7 @@ class PedidosListScreen extends StatefulWidget {
 /// _PedidosListScreenState: TODA la "memoria" de esta pantalla va aquí.
 class _PedidosListScreenState extends State<PedidosListScreen> {
   // Los estados que ofrecen los filtros (ChoiceChip).
-  static const _estados = ['Pendiente', 'Recibido', 'Cancelado'];
+  static const _estados = ['Pendiente', 'Servido', 'Cancelado'];
 
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
@@ -142,7 +142,7 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
     return Scaffold(
       // ---- Barra superior ----
       appBar: AppBar(
-        title: const Text('Pedidos de compra'),
+        title: const Text('Pedidos de venta'),
         actions: [
           // Botón "Salir": cierra la sesión → la app vuelve al login sola.
           IconButton(
@@ -194,7 +194,7 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
                 : _pedidos.isEmpty
                     ? const Center(
                         child: Text(
-                          'Sin pedidos de compra que mostrar.',
+                          'Sin pedidos de venta que mostrar.',
                           style: TextStyle(color: AppColors.textSecondary),
                         ),
                       )

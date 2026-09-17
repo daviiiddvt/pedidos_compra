@@ -1,5 +1,6 @@
 import 'package:diacritic/diacritic.dart';
 import '../models.dart';
+import '../theme/app_theme.dart';
 
 class OrderRepository {
   List<Pedido> _allOrders = [];
@@ -44,20 +45,20 @@ class OrderRepository {
     final normalizedQuery = removeDiacritics(query.toLowerCase());
         
     final role = currentUser?.role.toLowerCase();
-    final assignedIds = currentUser?.assignedCustomerIds.toSet() ?? {};
+    final commercialId = currentUser?.contactId ?? '';
 
     return _allOrders.where((order) {
       if (role != 'administrador' && role != 'admin' && role != 'comercial') {
         return false;
       }
-      if (role == 'comercial' &&
-          !assignedIds.contains(order.clienteId.toString())) {
+      if (role == 'comercial' && order.comercial != commercialId) {
         return false;
       }
 
-        final matchesStatus = statusFilter == null ||
-          statusFilter.isEmpty ||
-          order.estado.toLowerCase() == statusFilter.toLowerCase();
+          final matchesStatus = statusFilter == null ||
+            statusFilter.isEmpty ||
+            AppColors.estadoCodigo(order.estado) ==
+              AppColors.estadoCodigo(statusFilter);
       if (!matchesStatus) return false;
 
       // 3. Filtro de Texto (Cliente, Teléfono, CIF, Pedido)

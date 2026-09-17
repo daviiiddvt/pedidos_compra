@@ -28,6 +28,11 @@ import 'core/config.dart'; // AppConfig (para saber a qué endpoint llamar).
 import 'models.dart'; // Nuestros modelos (Pedido, OpcionMaestra).
 import 'theme/app_theme.dart'; // AppColors (para traducir el estado a código VELNEO).
 
+/// Convierte el porcentaje de IVA usado por la interfaz al código de registro
+/// que espera Velneo en `reg_iva_vta`.
+///
+/// La correspondencia actual es: 21% o más -> `G`, 10% o más -> `R`,
+/// cualquier porcentaje positivo -> `S` y 0% -> `E`.
 String regIvaCodigo(double tipoIva) {
   if (tipoIva >= 20) return 'G';
   if (tipoIva >= 10) return 'R';
@@ -35,14 +40,22 @@ String regIvaCodigo(double tipoIva) {
   return 'E';
 }
 
-/// ResultadoLista: "paquete" que devuelve listar pedidos.
-/// No es solo la lista: también trae el TOTAL de pedidos que hay (para saber
-/// cuántas páginas hay) y la página actual.
+/// Resultado de una petición paginada de pedidos.
+///
+/// [items] contiene únicamente la página solicitada. [total] procede de
+/// `total_count` o `meta.total` cuando Velneo lo devuelve; [page] es el número
+/// de página utilizado en la petición.
 class ResultadoLista<T> {
-  final List<T> items; // Los elementos de esta página.
-  final int total; // Cuántos pedidos hay en total.
-  final int page; // Página actual (1 = primera).
+  /// Registros recibidos en la página actual.
+  final List<T> items;
 
+  /// Número total de registros informado por Velneo.
+  final int total;
+
+  /// Número de página de esta respuesta, empezando en 1.
+  final int page;
+
+  /// Crea el resultado de una página.
   ResultadoLista({required this.items, required this.total, required this.page});
 }
 
@@ -51,6 +64,11 @@ class PedidosService {
   // El mensajero único que hará las llamadas HTTP.
   static final _api = ApiClient.instance;
 
+  /// Extrae el identificador de una referencia Velneo.
+  ///
+  /// Una referencia puede llegar como valor plano (`"25"`) o como objeto con
+  /// id/value. Este método unifica ambos formatos para poder reutilizar el
+  /// identificador en un filtro posterior.
   static String _referenceId(Map<String, dynamic> record, String field) {
     final value = record.raw(field);
     if (value is Map) {
@@ -59,6 +77,18 @@ class PedidosService {
     return value == null ? '' : '$value';
   }
 
+  /// Valida las credenciales de un usuario y construye su sesión.
+  ///
+  /// Flujo de autorización:
+  /// 1. Busca el usuario en `USR_M` usando [AppConfig.usuarioField].
+  /// 2. Comprueba la contraseña contra [AppConfig.passwordField].
+  /// 3. Obtiene el contacto referenciado por [AppConfig.usuarioContactoField].
+  /// 4. Para usuarios no administradores exige `ES_CMR` en `ENT_M`.
+  /// 5. Los pedidos se filtran posteriormente comparando `VTA_PED_G.CMR` con
+  ///    el contacto comercial autenticado.
+  ///
+  /// La API key ya debe estar configurada en [ApiClient]. Lanza [ApiException]
+  /// si las credenciales, la relación o los permisos no son válidos.
   static Future<User> authenticateUser({
     required String username,
     required String password,
@@ -99,12 +129,13 @@ class PedidosService {
       name: user.s('name').isEmpty ? username : user.s('name'),
       role: isAdmin ? 'Administrador' : 'Comercial',
       contactId: contactId,
-      assignedCustomerIds: isAdmin
-          ? const []
-          : await getAssignedCustomerIds(contactId),
     );
   }
 
+  /// Lee un contacto de `ENT_M` por identificador.
+  ///
+  /// Se utiliza para resolver el campo `ENT` de `USR_M` y comprobar si el
+  /// contacto representa a un comercial mediante `ES_CMR`.
   static Future<Map<String, dynamic>> _getContact(String id) async {
     final json = await _api.get(
       AppConfig.endpoint('clientes'),
@@ -117,26 +148,16 @@ class PedidosService {
     return contacts.first;
   }
 
-  static Future<List<String>> getAssignedCustomerIds(String commercialId) async {
-    final json = await _api.get(
-      AppConfig.endpoint('clientes'),
-      params: {
-        'filter[${AppConfig.clienteComercialField}]': commercialId,
-        'page[size]': 1000,
-      },
-    );
-    return payloadLista(json)
-        .where((record) => record.i('id') != 0)
-        .map((record) => record.i('id').toString())
-        .toList();
-  }
-
-  /// list: pide una página de pedidos al servidor.
+  /// Solicita una página de cabeceras de pedido a `VTA_PED_G`.
   ///
   /// Filtros opcionales:
-  ///  - estado   : solo pedidos en ese estado ("Pendiente", "Servido"...).
-  ///  - cliente  : solo pedidos de ese cliente (código).
-  ///  - search   : búsqueda libre por texto.
+  /// [estado] se transforma de texto de interfaz a código Velneo mediante
+  /// [AppColors.estadoCodigo]. [cliente] filtra por `CLT` y [search] se envía
+  /// como `filter[words]` cuando se utiliza este método directamente.
+  ///
+  /// La pantalla principal usa normalmente [listAll] y filtra en memoria.
+  /// Devuelve [ResultadoLista] con los pedidos deserializados mediante
+  /// `Pedido.fromJson`.
   static Future<ResultadoLista<Pedido>> list({
     int page = 1, // Página que queremos (por defecto la primera).
     String? estado,
@@ -174,7 +195,11 @@ class PedidosService {
     return ResultadoLista<Pedido>(items: items, total: total, page: page);
   }
 
-  /// Descarga todos los pedidos por páginas sin bloquear el hilo de Flutter.
+  /// Descarga todas las cabeceras de pedido por páginas.
+  ///
+  /// Repite peticiones a [list] hasta alcanzar el total informado o recibir
+  /// una página incompleta/vacía. Cada petición contiene un `await`, por lo
+  /// que el event loop de Flutter conserva el control mientras se descarga.
   static Future<List<Pedido>> listAll() async {
     final all = <Pedido>[];
     var page = 1;
@@ -194,9 +219,12 @@ class PedidosService {
     return all;
   }
 
-  /// getById: pide UN pedido concreto al servidor por su id, junto con sus
-  /// líneas. Si el API no deja leer líneas (permisos), el detalle igualmente
-  /// se muestra con la cabecera (las líneas quedan vacías, sin romper nada).
+  /// Obtiene un pedido de `VTA_PED_G` junto con sus líneas.
+  ///
+  /// Primero consulta la cabecera por [id] y después `VTA_PED_LIN_G` usando
+  /// `filter[vta_ped]`. Si la lectura de líneas falla por permisos, devuelve
+  /// la cabecera con la lista de líneas que tuviera el pedido, en lugar de
+  /// descartar todo el detalle.
   static Future<Pedido> getById(dynamic id) async {
     final json = await _api.get('${AppConfig.endpoint('pedidos')}/$id');
     final data = payloadData(json);
@@ -221,7 +249,11 @@ class PedidosService {
     }
   }
 
-  /// create: crea un pedido nuevo enviando sus datos (payload) al API.
+  /// Crea una cabecera de pedido mediante `POST VTA_PED_G`.
+  ///
+  /// [payload] debe contener las claves publicadas por Velneo. Normalmente se
+  /// obtiene con `pedido.copyWith(lineas: lineas).toJson()` desde el formulario.
+  /// Las líneas se guardan separadamente mediante [enviarLineas].
   static Future<Pedido> create(Map<String, dynamic> payload) async {
     final json = await _api.post(AppConfig.endpoint('pedidos'), body: payload);
     final data = payloadData(json);
@@ -231,9 +263,10 @@ class PedidosService {
     throw ApiException('No se pudo crear el pedido.');
   }
 
-  /// update: guarda los cambios de un pedido existente.
-  /// VELNEO NO permite PUT; la actualización se hace con POST a la URL del
-  /// recurso (por ejemplo /COM_PED_G/3197). Verificado contra el API real.
+  /// Actualiza una cabecera existente mediante `POST VTA_PED_G/{id}`.
+  ///
+  /// Aunque conceptualmente es una actualización, esta instalación de Velneo
+  /// no utiliza `PUT` para este recurso.
   static Future<Pedido> update(dynamic id, Map<String, dynamic> payload) async {
     final json = await _api.post(
       '${AppConfig.endpoint('pedidos')}/$id',
@@ -246,7 +279,7 @@ class PedidosService {
     throw ApiException('No se pudo actualizar el pedido.');
   }
 
-  /// enviarLineas: guarda las líneas de un pedido en la tabla VTA_PED_LIN_G.
+  /// Crea o actualiza las líneas de un pedido en `VTA_PED_LIN_G`.
   ///
   /// Las líneas NO se envían dentro de la cabecera: viven en una tabla aparte
   /// y se crean UNA POR UNA con POST (verificado contra el API real):
@@ -287,21 +320,20 @@ class PedidosService {
     }
   }
 
-  /// eliminarLinea: borra una línea de un pedido en la tabla VTA_PED_LIN_G.
-  /// VELNEO acepta DELETE a /VTA_PED_LIN_G/{id} y devuelve "Eliminado(s) con éxito".
+  /// Elimina una línea mediante `DELETE VTA_PED_LIN_G/{id}`.
   static Future<void> eliminarLinea(dynamic id) async {
     await _api.delete('${AppConfig.endpoint('lineas')}/$id');
   }
 
-  /// remove: borra un pedido del servidor. No devuelve nada (void).
+  /// Elimina una cabecera mediante `DELETE VTA_PED_G/{id}`.
   static Future<void> remove(dynamic id) async {
     await _api.delete('${AppConfig.endpoint('pedidos')}/$id');
   }
 
-  /// _maestros: método INTERNO (empieza por _) que carga CUALQUIER lista maestro.
-  /// Las funciones públicas de abajo son huecos que usan este mismo código
-  /// cambiando solo qué endpoint se pide. Pedimos hasta 1000 items para tener
-  /// la lista completa en los desplegables.
+  /// Carga una lista maestra genérica como [OpcionMaestra].
+  ///
+  /// [key] debe existir en `AppConfig.endpoints`. Se utiliza para artículos,
+  /// almacenes y formas de pago, solicitando hasta [size] registros.
   static Future<List<OpcionMaestra>> _maestros(String key, {int size = 1000}) async {
     final json = await _api.get(
       AppConfig.endpoint(key),
@@ -310,12 +342,10 @@ class PedidosService {
     return payloadLista(json).map(OpcionMaestra.fromJson).toList();
   }
 
-  /// getClientes: los CLIENTES de venta (entidad con es_clt = true).
+  /// Carga los clientes de [ids] desde `ENT_M`.
   ///
-  /// ⚠️ VELNEO no filtra bien por booleano en ENT_M (filter[es_clt=true] da 0),
-  /// así que bajamos las entidades y nos quedamos con las que son clientes,
-  /// filtrando aquí en memoria. El selector de clientes también busca por
-  /// nombre en memoria (ModalSelector).
+  /// Se utiliza para enriquecer los pedidos de la caché con nombre comercial,
+  /// teléfono y CIF. Si [ids] está vacío no realiza ninguna petición.
   static Future<List<Cliente>> getClientesByIds(List<int> ids) async {
     if (ids.isEmpty) return [];
     final json = await _api.get(
@@ -333,9 +363,10 @@ class PedidosService {
         .toList();
   }
 
-  /// getComerciales: los COMERCIALES (entidad con es_cmr = true). Igual que
-  /// los clientes: filtramos en memoria porque el filtro booleano del API no
-  /// funciona (filter[es_cmr=true] → 0 resultados).
+  /// Carga los contactos comerciales de `ENT_M`.
+  ///
+  /// El filtro final por `ES_CMR` se aplica en Dart para tolerar instalaciones
+  /// donde Velneo no interpreta correctamente filtros booleanos.
   static Future<List<OpcionMaestra>> getComerciales() async {
     final json = await _api.get(
       AppConfig.endpoint('comerciales'),
@@ -347,14 +378,16 @@ class PedidosService {
         .toList();
   }
 
-  // Otras operaciones "maestro" (para los desplegables del formulario de venta).
+  /// Carga artículos desde `ART_M`.
   static Future<List<OpcionMaestra>> getArticulos() => _maestros('articulos');
+
+  /// Carga almacenes desde `ALM_M`.
   static Future<List<OpcionMaestra>> getAlmacenes() => _maestros('almacenes');
+
+  /// Carga formas de pago desde `FPG_M`.
   static Future<List<OpcionMaestra>> getFormasPago() => _maestros('formasPago');
 
-  /// getSeries: las SERIES DE VENTA (ser_tip = "V") para la numeración del
-  /// pedido. VELNEO escribe el tipo en el campo "ser_tip"; los filtramos para
-  /// no ofrecer series de compra.
+  /// Carga únicamente series de venta (`ser_tip == 'V'`) desde `SER_M`.
   static Future<List<OpcionMaestra>> getSeries() async {
     final json = await _api.get(
       AppConfig.endpoint('series'),
@@ -366,17 +399,20 @@ class PedidosService {
         .toList();
   }
 
-  /// checkConnection: comprueba si el servidor responde Y la api_key tiene
-  /// acceso a los pedidos. Se llama al pulsar "Conectar" en el login.
+  /// Comprueba que la API key puede leer `VTA_PED_G`.
   ///
-  /// Pedimos la PRIMERA página de pedidos (con un dato solo). Si el servidor
-  /// responde, hay conexión; si no, lanza ApiException (con mensaje claro).
+  /// No autentica a un usuario funcional; esa responsabilidad corresponde a
+  /// [authenticateUser]. Lanza [ApiException] si Velneo rechaza la petición.
   static Future<bool> checkConnection() async {
     await _api.get(AppConfig.endpoint('pedidos'), params: {'page[size]': 1});
     return true; // Respondió sin error → conexión OK.
   }
 
-  // Añade este método al final de la clase PedidosService
+  /// Devuelve opciones de clientes para el selector del formulario.
+  ///
+  /// Actualmente es un punto de extensión y devuelve una lista vacía. La
+  /// autorización de pedidos no depende de este método: se realiza mediante
+  /// `VTA_PED_G.CMR` y el contacto comercial de la sesión.
   static Future<List<OpcionMaestra>> getClientes() async {
     // Implementación básica para que compile
     // En un caso real, llamarías a tu API de Velneo aquí.

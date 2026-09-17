@@ -38,9 +38,9 @@ class AppColors {
   static const estadoRecibido = Color(0xFF388E3C); // Verde (servido).
   static const estadoCancelado = Color(0xFF9E9E9E); // Gris (cancelado).
 
-  /// estadoCodigo: traduce un TEXTO bonito ("Pendiente", "Servido"...) al
-  /// CÓDIGO que usa VELNEO en el campo "est" (P = Pendiente, S = Servido,
-  /// C = Cancelado). Si ya es un código (P/S/C) lo devuelve tal cual.
+  /// estadoCodigo: traduce el texto o código del estado al código Velneo.
+  /// Acepta "Recibido" como alias heredado de la interfaz, pero los estados
+  /// de pedidos de venta se muestran como Pendiente, Servido y Cancelado.
   /// Se usa al filtrar la lista y al guardar pedidos.
   static String estadoCodigo(String? estado) {
     switch ((estado ?? '').toUpperCase().replaceAll(' ', '_')) {
@@ -50,8 +50,10 @@ class AppColors {
         return 'P';
       case 'S':
       case 'SERVIDO':
+      case 'RECIBIDO':
         return 'S';
       case 'C':
+      case 'A':
       case 'CANCELADO':
       case 'ANULADO':
         return 'C';
