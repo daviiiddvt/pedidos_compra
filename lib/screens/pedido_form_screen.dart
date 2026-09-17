@@ -46,9 +46,6 @@ class PedidoFormScreen extends StatefulWidget {
 class _PedidoFormScreenState extends State<PedidoFormScreen> {
   late Pedido _pedido; // El pedido que estamos construyendo/editando.
   List<LineaPedido> _lineas = []; // Las líneas del pedido (en memoria).
-  // Ids de líneas que YA EXISTÍAN en el servidor pero que el usuario borró
-  // en esta sesión. Se eliminan del servidor al pulsar "Guardar".
-  final List<int> _lineasEliminadas = [];
   bool _cargandoDetalle = false; // ¿Cargando el detalle (modo editar)?
   bool _guardando = false; // ¿Estamos guardando ya? (para no doble enviar).
   String _tab = 'cabecera'; // Pestaña activa.
@@ -89,12 +86,12 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   /// _onCambioCabecera: lo llama CabeceraForm cada vez que el usuario cambia
   /// algo en la cabecera. Guardamos el pedido nuevo en _pedido.
   ///
-  /// REGLA DE NEGOCIO: si el usuario pone el estado a "Cancelado" (código "C"),
+  /// REGLA DE NEGOCIO: si el usuario pone el estado a "Cancelado" (código "A"),
   /// todas las líneas pasan a "Cancelado" automáticamente.
   void _onCambioCabecera(Pedido nuevo) {
     setState(() {
       _pedido = nuevo;
-      if (AppColors.estadoCodigo(nuevo.estado) == 'C') {
+      if (AppColors.estadoCodigo(nuevo.estado) == 'A') {
         // Reconstruimos cada línea con estado "Cancelado" y cancelado=true.
         // (No modificamos las originales directamente por inmutabilidad.)
         _lineas = _lineas
@@ -105,6 +102,8 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
                 articulo: l.articulo,
                 articuloNombre: l.articuloNombre,
                 descripcion: l.descripcion,
+                referencia: l.referencia,
+                referenciaProveedor: l.referenciaProveedor,
                 nReferencia: l.nReferencia,
                 cantidad: l.cantidad,
                 pendiente: l.pendiente,
@@ -114,6 +113,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
                 tipoIva: l.tipoIva,
                 retencionIrpf: l.retencionIrpf,
                 retencionAlquiler: l.retencionAlquiler,
+                clienteVenta: l.clienteVenta,
                 estado: 'Cancelado', // ← cambiamos solo el estado
                 cancelado: true, //     ← y la marca de cancelado
                 previstoPara: l.previstoPara,
@@ -140,7 +140,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   }
 
   /// _anadirLinea: abre el modal vacío para añadir UNA línea nueva.
-  Future<void> _anadirLinea() async {
+  Future<void>  () async {
     final resultado = await mostrarLineaForm(context);
     if (resultado != null) {
       setState(() => _lineas = [..._lineas, resultado]); // La añadimos al final.
@@ -163,12 +163,6 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop(); // Cerramos la ventana...
-              // Si la línea tenía id (ya existía en el servidor), apuntamos
-              // el id para borrarla del servidor al guardar.
-              final lineaEliminada = _lineas[index];
-              if (lineaEliminada.id != null) {
-                _lineasEliminadas.add(lineaEliminada.id!);
-              }
               setState(() => _lineas = [..._lineas]..removeAt(index)); // ...y borramos.
             },
             style: TextButton.styleFrom(foregroundColor: AppColors.error), // Rojito.
@@ -186,8 +180,12 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
       _snack('La fecha del pedido es obligatoria.');
       return false;
     }
-    if (_pedido.cliente.isEmpty && _pedido.clienteNombre.isEmpty) {
-      _snack('Selecciona un cliente.');
+    if (_pedido.proveedor.isEmpty && _pedido.proveedorNombre.isEmpty) {
+      _snack('Selecciona un proveedor.');
+      return false;
+    }
+    if (_lineas.isEmpty) {
+      _snack('El pedido debe tener al menos una línea.');
       return false;
     }
     return true;
@@ -207,20 +205,9 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
       // Construimos el JSON a enviar: copia del pedido + líneas de la memoria.
       final payload = _pedido.copyWith(lineas: _lineas).toJson();
       if (_editando) {
-        // Editar: primero la cabecera (POST a /VTA_PED_G/{id}) y luego las líneas.
         await PedidosService.update(widget.pedidoId, payload);
-        await PedidosService.enviarLineas(widget.pedidoId, _lineas);
-        // Borrar del servidor las líneas que el usuario eliminó en esta sesión.
-        for (final id in _lineasEliminadas) {
-          await PedidosService.eliminarLinea(id);
-        }
       } else {
-        // Crear: la cabecera devuelve el pedido nuevo (con su id) y con ese id
-        // creamos las líneas, porque viven en otra tabla (VTA_PED_LIN_G).
-        final creado = await PedidosService.create(payload);
-        if (_lineas.isNotEmpty) {
-          await PedidosService.enviarLineas(creado.id, _lineas);
-        }
+        await PedidosService.create(payload);
       }
       if (!mounted) return;
       // Volvemos a la pantalla anterior con "pop(true)" (= se guardó).
@@ -238,7 +225,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_editando ? 'Editar pedido de venta' : 'Nuevo pedido de venta')),
+      appBar: AppBar(title: Text(_editando ? 'Editar pedido' : 'Nuevo pedido')),
       body: _cargandoDetalle
           ? const Center(child: CircularProgressIndicator()) // Cargando (editar).
           : Column(

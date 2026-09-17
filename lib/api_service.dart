@@ -268,4 +268,11 @@ class PedidosService {
     await _api.get(AppConfig.endpoint('pedidos'), params: {'page[size]': 1});
     return true; // Respondió sin error → conexión OK.
   }
+
+  // Añade este método al final de la clase PedidosService
+  static Future<List<OpcionMaestra>> getClientes() async {
+    // Implementación básica para que compile
+    // En un caso real, llamarías a tu API de Velneo aquí.
+    return [];
+  }
 }

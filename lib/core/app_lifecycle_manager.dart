@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'order_repository.dart';
+import '../state/auth_state.dart';
 
 class AppLifecycleManager extends StatefulWidget {
   final Widget child;
@@ -26,10 +27,14 @@ class _AppLifecycleManagerState extends State<AppLifecycleManager> with WidgetsB
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.detached) {
-      // Clear cache here
+      // Forzar limpieza de seguridad
       final repository = Provider.of<OrderRepository>(context, listen: false);
+      final authState = Provider.of<AuthState>(context, listen: false);
+      
       repository.clearCache();
-      print("Application detached, cache cleared.");
+      authState.desconectar();
+      
+      debugPrint("Application detached: Cache y sesión limpiadas por seguridad.");
     }
   }
 

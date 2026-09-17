@@ -9,7 +9,7 @@ class OrderRepository {
     _allOrders = orders;
     _enrichOrders();
   }
-  
+
   void setClientes(List<Cliente> clientes) {
     _clienteCache = {for (var c in clientes) c.id: c};
     _enrichOrders();
@@ -17,11 +17,10 @@ class OrderRepository {
 
   void _enrichOrders() {
     if (_clienteCache.isEmpty) return;
-    
+        
     _allOrders = _allOrders.map((order) {
       final cliente = _clienteCache[order.clienteId];
       if (cliente == null) return order;
-
       return order.copyWith(
         clienteNombre: cliente.nombreComercial,
         clienteTelefono: cliente.telefono,
@@ -38,20 +37,27 @@ class OrderRepository {
   List<Pedido> filterOrders({
     required String query,
     String? statusFilter,
+    required User? currentUser,
   }) {
     final normalizedQuery = removeDiacritics(query.toLowerCase());
-    
+        
     return _allOrders.where((order) {
-      // Filtro de Estado
+      // 1. Filtro de Rol (Seguridad)
+      if (currentUser != null && currentUser.role == 'Comercial') {
+        if (!currentUser.assignedCustomerIds.contains(order.clienteId.toString())) {
+          return false; // El comercial no puede ver este pedido
+        }
+      }
+
+      // 2. Filtro de Estado
       final matchesStatus = statusFilter == null || statusFilter.isEmpty || order.estado == statusFilter;
       if (!matchesStatus) return false;
 
-      // Filtro de Texto (Cliente, Teléfono, CIF, Pedido)
+      // 3. Filtro de Texto (Cliente, Teléfono, CIF, Pedido)
       final searchableText = removeDiacritics(
         '${order.clienteNombre} ${order.clienteTelefono} ${order.clienteCif} ${order.numeroPedido}'
             .toLowerCase(),
       );
-
       return normalizedQuery.isEmpty || searchableText.contains(normalizedQuery);
     }).toList();
   }
