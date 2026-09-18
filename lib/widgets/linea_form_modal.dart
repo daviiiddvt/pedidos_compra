@@ -86,8 +86,11 @@ class _LineaFormModalState extends State<LineaFormModal> {
     _cantidad = TextEditingController(
       text: l != null ? formatNumber(l.cantidad, decimals: 2) : '1', // 1 por defecto.
     );
+    final pendienteBase = l != null
+        ? (l.pendiente > 0 ? l.pendiente : l.pendienteCalculada)
+        : 1.0;
     _pendiente = TextEditingController(
-      text: l != null ? formatNumber(l.pendiente, decimals: 2) : '1',
+      text: formatNumber(pendienteBase, decimals: 2),
     );
     _precio = TextEditingController(
       text: l != null ? formatNumber(l.precio, decimals: 2) : '0',
@@ -177,6 +180,12 @@ class _LineaFormModalState extends State<LineaFormModal> {
     // Si no pasa la validación (ej. cantidad 0), no hacemos nada.
     if (!_formKey.currentState!.validate()) return;
 
+    final cantidad = parseNumber(_cantidad.text);
+    final cantidadServida = widget.linea?.cantidadServida ?? 0.0;
+    final pendiente = widget.linea != null
+        ? (widget.linea!.pendiente > 0 ? widget.linea!.pendiente : widget.linea!.pendienteCalculada)
+        : (cantidad - cantidadServida);
+
     final linea = LineaPedido(
       // Conservamos id/código si venían de una línea ya existente.
       id: widget.linea?.id,
@@ -186,8 +195,9 @@ class _LineaFormModalState extends State<LineaFormModal> {
       articuloNombre: _articulo.text, // El nombre es lo que se muestra.
       descripcion: _descripcion.text.trim(),
       nReferencia: _nReferencia.text.trim(),
-      cantidad: parseNumber(_cantidad.text), // "2,5" → 2.5
-      pendiente: parseNumber(_pendiente.text),
+      cantidad: cantidad,
+      cantidadServida: cantidadServida,
+      pendiente: pendiente,
       precio: parseNumber(_precio.text),
       dto: parseNumber(_dto.text),
       importe: _importeCalculado, // El importe calculado en vivo.

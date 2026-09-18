@@ -44,6 +44,8 @@ class AppConfig {
     'lineas': 'TecERPv7_dat_dat/v1/VTA_PED_LIN_G',   // Líneas de pedido de venta.
     'clientes': 'TecERPv7_dat_dat/v1/ENT_M',         // Entidades (clientes de venta).
     'comerciales': 'TecERPv7_dat_dat/v1/ENT_M',      // Entidades (comerciales).
+    'direcciones': 'TecERPv7_dat_dat/v1/DIR_M',      // Direcciones de clientes.
+    'empresa': 'TecERPv7_dat_dat/v1/EMP_M',          // Datos de empresa/defaults.
     'articulos': 'TecERPv7_dat_dat/v1/ART_M',        // Catálogo de artículos.
     'almacenes': 'TecERPv7_dat_dat/v1/ALM_M',        // Lista de almacenes.
     'series': 'TecERPv7_dat_dat/v1/SER_M',           // Numeración de documentos.

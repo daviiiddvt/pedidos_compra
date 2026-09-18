@@ -289,7 +289,7 @@ as String,
 /// @nodoc
 mixin _$LineaPedido {
 
- int? get id; int? get codigo; String get articulo; String get articuloNombre; String get descripcion; String get nReferencia; String get referencia; String get referenciaProveedor; double get cantidad; double get pendiente; double get precio; double get dto; double get importe; double get tipoIva; double get retencionIrpf; double get retencionAlquiler; String get clienteVenta; String get estado; bool get cancelado; String get previstoPara;
+ int? get id; int? get codigo; String get articulo; String get articuloNombre; String get descripcion; String get nReferencia; String get referencia; String get referenciaProveedor; double get cantidad; double get cantidadServida; double get pendiente; double get precio; double get dto; double get importe; double get tipoIva; double get retencionIrpf; double get retencionAlquiler; String get clienteVenta; String get estado; bool get cancelado; String get previstoPara;
 /// Create a copy of LineaPedido
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -303,20 +303,20 @@ $LineaPedidoCopyWith<LineaPedido> get copyWith => _$LineaPedidoCopyWithImpl<Line
 @override
 bool operator ==(Object other) {
   final _this = this as LineaPedido;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is LineaPedido&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.codigo, _this.codigo) || other.codigo == _this.codigo)&&(identical(other.articulo, _this.articulo) || other.articulo == _this.articulo)&&(identical(other.articuloNombre, _this.articuloNombre) || other.articuloNombre == _this.articuloNombre)&&(identical(other.descripcion, _this.descripcion) || other.descripcion == _this.descripcion)&&(identical(other.nReferencia, _this.nReferencia) || other.nReferencia == _this.nReferencia)&&(identical(other.referencia, _this.referencia) || other.referencia == _this.referencia)&&(identical(other.referenciaProveedor, _this.referenciaProveedor) || other.referenciaProveedor == _this.referenciaProveedor)&&(identical(other.cantidad, _this.cantidad) || other.cantidad == _this.cantidad)&&(identical(other.pendiente, _this.pendiente) || other.pendiente == _this.pendiente)&&(identical(other.precio, _this.precio) || other.precio == _this.precio)&&(identical(other.dto, _this.dto) || other.dto == _this.dto)&&(identical(other.importe, _this.importe) || other.importe == _this.importe)&&(identical(other.tipoIva, _this.tipoIva) || other.tipoIva == _this.tipoIva)&&(identical(other.retencionIrpf, _this.retencionIrpf) || other.retencionIrpf == _this.retencionIrpf)&&(identical(other.retencionAlquiler, _this.retencionAlquiler) || other.retencionAlquiler == _this.retencionAlquiler)&&(identical(other.clienteVenta, _this.clienteVenta) || other.clienteVenta == _this.clienteVenta)&&(identical(other.estado, _this.estado) || other.estado == _this.estado)&&(identical(other.cancelado, _this.cancelado) || other.cancelado == _this.cancelado)&&(identical(other.previstoPara, _this.previstoPara) || other.previstoPara == _this.previstoPara));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is LineaPedido&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.codigo, _this.codigo) || other.codigo == _this.codigo)&&(identical(other.articulo, _this.articulo) || other.articulo == _this.articulo)&&(identical(other.articuloNombre, _this.articuloNombre) || other.articuloNombre == _this.articuloNombre)&&(identical(other.descripcion, _this.descripcion) || other.descripcion == _this.descripcion)&&(identical(other.nReferencia, _this.nReferencia) || other.nReferencia == _this.nReferencia)&&(identical(other.referencia, _this.referencia) || other.referencia == _this.referencia)&&(identical(other.referenciaProveedor, _this.referenciaProveedor) || other.referenciaProveedor == _this.referenciaProveedor)&&(identical(other.cantidad, _this.cantidad) || other.cantidad == _this.cantidad)&&(identical(other.cantidadServida, _this.cantidadServida) || other.cantidadServida == _this.cantidadServida)&&(identical(other.pendiente, _this.pendiente) || other.pendiente == _this.pendiente)&&(identical(other.precio, _this.precio) || other.precio == _this.precio)&&(identical(other.dto, _this.dto) || other.dto == _this.dto)&&(identical(other.importe, _this.importe) || other.importe == _this.importe)&&(identical(other.tipoIva, _this.tipoIva) || other.tipoIva == _this.tipoIva)&&(identical(other.retencionIrpf, _this.retencionIrpf) || other.retencionIrpf == _this.retencionIrpf)&&(identical(other.retencionAlquiler, _this.retencionAlquiler) || other.retencionAlquiler == _this.retencionAlquiler)&&(identical(other.clienteVenta, _this.clienteVenta) || other.clienteVenta == _this.clienteVenta)&&(identical(other.estado, _this.estado) || other.estado == _this.estado)&&(identical(other.cancelado, _this.cancelado) || other.cancelado == _this.cancelado)&&(identical(other.previstoPara, _this.previstoPara) || other.previstoPara == _this.previstoPara));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as LineaPedido;
-  return Object.hashAll([runtimeType,_this.id,_this.codigo,_this.articulo,_this.articuloNombre,_this.descripcion,_this.nReferencia,_this.referencia,_this.referenciaProveedor,_this.cantidad,_this.pendiente,_this.precio,_this.dto,_this.importe,_this.tipoIva,_this.retencionIrpf,_this.retencionAlquiler,_this.clienteVenta,_this.estado,_this.cancelado,_this.previstoPara]);
+  return Object.hashAll([runtimeType,_this.id,_this.codigo,_this.articulo,_this.articuloNombre,_this.descripcion,_this.nReferencia,_this.referencia,_this.referenciaProveedor,_this.cantidad,_this.cantidadServida,_this.pendiente,_this.precio,_this.dto,_this.importe,_this.tipoIva,_this.retencionIrpf,_this.retencionAlquiler,_this.clienteVenta,_this.estado,_this.cancelado,_this.previstoPara]);
 }
 
 @override
 String toString() {
   final _this = this as LineaPedido;
-  return 'LineaPedido(id: ${_this.id}, codigo: ${_this.codigo}, articulo: ${_this.articulo}, articuloNombre: ${_this.articuloNombre}, descripcion: ${_this.descripcion}, nReferencia: ${_this.nReferencia}, referencia: ${_this.referencia}, referenciaProveedor: ${_this.referenciaProveedor}, cantidad: ${_this.cantidad}, pendiente: ${_this.pendiente}, precio: ${_this.precio}, dto: ${_this.dto}, importe: ${_this.importe}, tipoIva: ${_this.tipoIva}, retencionIrpf: ${_this.retencionIrpf}, retencionAlquiler: ${_this.retencionAlquiler}, clienteVenta: ${_this.clienteVenta}, estado: ${_this.estado}, cancelado: ${_this.cancelado}, previstoPara: ${_this.previstoPara})';
+  return 'LineaPedido(id: ${_this.id}, codigo: ${_this.codigo}, articulo: ${_this.articulo}, articuloNombre: ${_this.articuloNombre}, descripcion: ${_this.descripcion}, nReferencia: ${_this.nReferencia}, referencia: ${_this.referencia}, referenciaProveedor: ${_this.referenciaProveedor}, cantidad: ${_this.cantidad}, cantidadServida: ${_this.cantidadServida}, pendiente: ${_this.pendiente}, precio: ${_this.precio}, dto: ${_this.dto}, importe: ${_this.importe}, tipoIva: ${_this.tipoIva}, retencionIrpf: ${_this.retencionIrpf}, retencionAlquiler: ${_this.retencionAlquiler}, clienteVenta: ${_this.clienteVenta}, estado: ${_this.estado}, cancelado: ${_this.cancelado}, previstoPara: ${_this.previstoPara})';
 }
 
 
@@ -327,7 +327,7 @@ abstract mixin class $LineaPedidoCopyWith<$Res>  {
   factory $LineaPedidoCopyWith(LineaPedido value, $Res Function(LineaPedido) _then) = _$LineaPedidoCopyWithImpl;
 @useResult
 $Res call({
- int? id, int? codigo, String articulo, String articuloNombre, String descripcion, String nReferencia, String referencia, String referenciaProveedor, double cantidad, double pendiente, double precio, double dto, double importe, double tipoIva, double retencionIrpf, double retencionAlquiler, String clienteVenta, String estado, bool cancelado, String previstoPara
+ int? id, int? codigo, String articulo, String articuloNombre, String descripcion, String nReferencia, String referencia, String referenciaProveedor, double cantidad, double cantidadServida, double pendiente, double precio, double dto, double importe, double tipoIva, double retencionIrpf, double retencionAlquiler, String clienteVenta, String estado, bool cancelado, String previstoPara
 });
 
 
@@ -344,7 +344,7 @@ class _$LineaPedidoCopyWithImpl<$Res>
 
 /// Create a copy of LineaPedido
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = freezed,Object? codigo = freezed,Object? articulo = null,Object? articuloNombre = null,Object? descripcion = null,Object? nReferencia = null,Object? referencia = null,Object? referenciaProveedor = null,Object? cantidad = null,Object? pendiente = null,Object? precio = null,Object? dto = null,Object? importe = null,Object? tipoIva = null,Object? retencionIrpf = null,Object? retencionAlquiler = null,Object? clienteVenta = null,Object? estado = null,Object? cancelado = null,Object? previstoPara = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = freezed,Object? codigo = freezed,Object? articulo = null,Object? articuloNombre = null,Object? descripcion = null,Object? nReferencia = null,Object? referencia = null,Object? referenciaProveedor = null,Object? cantidad = null,Object? cantidadServida = null,Object? pendiente = null,Object? precio = null,Object? dto = null,Object? importe = null,Object? tipoIva = null,Object? retencionIrpf = null,Object? retencionAlquiler = null,Object? clienteVenta = null,Object? estado = null,Object? cancelado = null,Object? previstoPara = null,}) {
   return _then(LineaPedido(
 id: freezed == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int?,codigo: freezed == codigo ? _self.codigo : codigo // ignore: cast_nullable_to_non_nullable
@@ -355,6 +355,7 @@ as String,nReferencia: null == nReferencia ? _self.nReferencia : nReferencia // 
 as String,referencia: null == referencia ? _self.referencia : referencia // ignore: cast_nullable_to_non_nullable
 as String,referenciaProveedor: null == referenciaProveedor ? _self.referenciaProveedor : referenciaProveedor // ignore: cast_nullable_to_non_nullable
 as String,cantidad: null == cantidad ? _self.cantidad : cantidad // ignore: cast_nullable_to_non_nullable
+as double,cantidadServida: null == cantidadServida ? _self.cantidadServida : cantidadServida // ignore: cast_nullable_to_non_nullable
 as double,pendiente: null == pendiente ? _self.pendiente : pendiente // ignore: cast_nullable_to_non_nullable
 as double,precio: null == precio ? _self.precio : precio // ignore: cast_nullable_to_non_nullable
 as double,dto: null == dto ? _self.dto : dto // ignore: cast_nullable_to_non_nullable
@@ -451,10 +452,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double cantidadServida,  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _LineaPedido() when $default != null:
-return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
+return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.cantidadServida,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
   return orElse();
 
 }
@@ -472,10 +473,10 @@ return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double cantidadServida,  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)  $default,) {final _that = this;
 switch (_that) {
 case _LineaPedido():
-return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
+return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.cantidadServida,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -492,10 +493,10 @@ return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double cantidadServida,  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)?  $default,) {final _that = this;
 switch (_that) {
 case _LineaPedido() when $default != null:
-return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
+return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.cantidadServida,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
   return null;
 
 }
@@ -507,7 +508,7 @@ return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.
 @JsonSerializable()
 
 class _LineaPedido extends LineaPedido {
-  const _LineaPedido({this.id, this.codigo, this.articulo = '', this.articuloNombre = '', this.descripcion = '', this.nReferencia = '', this.referencia = '', this.referenciaProveedor = '', this.cantidad = 1.0, this.pendiente = 1.0, this.precio = 0.0, this.dto = 0.0, this.importe = 0.0, this.tipoIva = 21.0, this.retencionIrpf = 0.0, this.retencionAlquiler = 0.0, this.clienteVenta = '', this.estado = 'Pendiente', this.cancelado = false, this.previstoPara = ''}): super._();
+  const _LineaPedido({this.id, this.codigo, this.articulo = '', this.articuloNombre = '', this.descripcion = '', this.nReferencia = '', this.referencia = '', this.referenciaProveedor = '', this.cantidad = 1.0, this.cantidadServida = 0.0, this.pendiente = 1.0, this.precio = 0.0, this.dto = 0.0, this.importe = 0.0, this.tipoIva = 21.0, this.retencionIrpf = 0.0, this.retencionAlquiler = 0.0, this.clienteVenta = '', this.estado = 'Pendiente', this.cancelado = false, this.previstoPara = ''}): super._();
   factory _LineaPedido.fromJson(Map<String, dynamic> json) => _$LineaPedidoFromJson(json);
 
 @override final  int? id;
@@ -519,6 +520,7 @@ class _LineaPedido extends LineaPedido {
 @override@JsonKey() final  String referencia;
 @override@JsonKey() final  String referenciaProveedor;
 @override@JsonKey() final  double cantidad;
+@override@JsonKey() final  double cantidadServida;
 @override@JsonKey() final  double pendiente;
 @override@JsonKey() final  double precio;
 @override@JsonKey() final  double dto;
@@ -544,18 +546,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _LineaPedido&&(identical(other.id, id) || other.id == id)&&(identical(other.codigo, codigo) || other.codigo == codigo)&&(identical(other.articulo, articulo) || other.articulo == articulo)&&(identical(other.articuloNombre, articuloNombre) || other.articuloNombre == articuloNombre)&&(identical(other.descripcion, descripcion) || other.descripcion == descripcion)&&(identical(other.nReferencia, nReferencia) || other.nReferencia == nReferencia)&&(identical(other.referencia, referencia) || other.referencia == referencia)&&(identical(other.referenciaProveedor, referenciaProveedor) || other.referenciaProveedor == referenciaProveedor)&&(identical(other.cantidad, cantidad) || other.cantidad == cantidad)&&(identical(other.pendiente, pendiente) || other.pendiente == pendiente)&&(identical(other.precio, precio) || other.precio == precio)&&(identical(other.dto, dto) || other.dto == dto)&&(identical(other.importe, importe) || other.importe == importe)&&(identical(other.tipoIva, tipoIva) || other.tipoIva == tipoIva)&&(identical(other.retencionIrpf, retencionIrpf) || other.retencionIrpf == retencionIrpf)&&(identical(other.retencionAlquiler, retencionAlquiler) || other.retencionAlquiler == retencionAlquiler)&&(identical(other.clienteVenta, clienteVenta) || other.clienteVenta == clienteVenta)&&(identical(other.estado, estado) || other.estado == estado)&&(identical(other.cancelado, cancelado) || other.cancelado == cancelado)&&(identical(other.previstoPara, previstoPara) || other.previstoPara == previstoPara));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _LineaPedido&&(identical(other.id, id) || other.id == id)&&(identical(other.codigo, codigo) || other.codigo == codigo)&&(identical(other.articulo, articulo) || other.articulo == articulo)&&(identical(other.articuloNombre, articuloNombre) || other.articuloNombre == articuloNombre)&&(identical(other.descripcion, descripcion) || other.descripcion == descripcion)&&(identical(other.nReferencia, nReferencia) || other.nReferencia == nReferencia)&&(identical(other.referencia, referencia) || other.referencia == referencia)&&(identical(other.referenciaProveedor, referenciaProveedor) || other.referenciaProveedor == referenciaProveedor)&&(identical(other.cantidad, cantidad) || other.cantidad == cantidad)&&(identical(other.cantidadServida, cantidadServida) || other.cantidadServida == cantidadServida)&&(identical(other.pendiente, pendiente) || other.pendiente == pendiente)&&(identical(other.precio, precio) || other.precio == precio)&&(identical(other.dto, dto) || other.dto == dto)&&(identical(other.importe, importe) || other.importe == importe)&&(identical(other.tipoIva, tipoIva) || other.tipoIva == tipoIva)&&(identical(other.retencionIrpf, retencionIrpf) || other.retencionIrpf == retencionIrpf)&&(identical(other.retencionAlquiler, retencionAlquiler) || other.retencionAlquiler == retencionAlquiler)&&(identical(other.clienteVenta, clienteVenta) || other.clienteVenta == clienteVenta)&&(identical(other.estado, estado) || other.estado == estado)&&(identical(other.cancelado, cancelado) || other.cancelado == cancelado)&&(identical(other.previstoPara, previstoPara) || other.previstoPara == previstoPara));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hashAll([runtimeType,id,codigo,articulo,articuloNombre,descripcion,nReferencia,referencia,referenciaProveedor,cantidad,pendiente,precio,dto,importe,tipoIva,retencionIrpf,retencionAlquiler,clienteVenta,estado,cancelado,previstoPara]);
+    return Object.hashAll([runtimeType,id,codigo,articulo,articuloNombre,descripcion,nReferencia,referencia,referenciaProveedor,cantidad,cantidadServida,pendiente,precio,dto,importe,tipoIva,retencionIrpf,retencionAlquiler,clienteVenta,estado,cancelado,previstoPara]);
 }
 
 @override
 String toString() {
-    return 'LineaPedido(id: $id, codigo: $codigo, articulo: $articulo, articuloNombre: $articuloNombre, descripcion: $descripcion, nReferencia: $nReferencia, referencia: $referencia, referenciaProveedor: $referenciaProveedor, cantidad: $cantidad, pendiente: $pendiente, precio: $precio, dto: $dto, importe: $importe, tipoIva: $tipoIva, retencionIrpf: $retencionIrpf, retencionAlquiler: $retencionAlquiler, clienteVenta: $clienteVenta, estado: $estado, cancelado: $cancelado, previstoPara: $previstoPara)';
+    return 'LineaPedido(id: $id, codigo: $codigo, articulo: $articulo, articuloNombre: $articuloNombre, descripcion: $descripcion, nReferencia: $nReferencia, referencia: $referencia, referenciaProveedor: $referenciaProveedor, cantidad: $cantidad, cantidadServida: $cantidadServida, pendiente: $pendiente, precio: $precio, dto: $dto, importe: $importe, tipoIva: $tipoIva, retencionIrpf: $retencionIrpf, retencionAlquiler: $retencionAlquiler, clienteVenta: $clienteVenta, estado: $estado, cancelado: $cancelado, previstoPara: $previstoPara)';
 }
 
 
@@ -566,7 +568,7 @@ abstract mixin class _$LineaPedidoCopyWith<$Res> implements $LineaPedidoCopyWith
   factory _$LineaPedidoCopyWith(_LineaPedido value, $Res Function(_LineaPedido) _then) = __$LineaPedidoCopyWithImpl;
 @override @useResult
 $Res call({
- int? id, int? codigo, String articulo, String articuloNombre, String descripcion, String nReferencia, String referencia, String referenciaProveedor, double cantidad, double pendiente, double precio, double dto, double importe, double tipoIva, double retencionIrpf, double retencionAlquiler, String clienteVenta, String estado, bool cancelado, String previstoPara
+ int? id, int? codigo, String articulo, String articuloNombre, String descripcion, String nReferencia, String referencia, String referenciaProveedor, double cantidad, double cantidadServida, double pendiente, double precio, double dto, double importe, double tipoIva, double retencionIrpf, double retencionAlquiler, String clienteVenta, String estado, bool cancelado, String previstoPara
 });
 
 
@@ -583,7 +585,7 @@ class __$LineaPedidoCopyWithImpl<$Res>
 
 /// Create a copy of LineaPedido
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = freezed,Object? codigo = freezed,Object? articulo = null,Object? articuloNombre = null,Object? descripcion = null,Object? nReferencia = null,Object? referencia = null,Object? referenciaProveedor = null,Object? cantidad = null,Object? pendiente = null,Object? precio = null,Object? dto = null,Object? importe = null,Object? tipoIva = null,Object? retencionIrpf = null,Object? retencionAlquiler = null,Object? clienteVenta = null,Object? estado = null,Object? cancelado = null,Object? previstoPara = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = freezed,Object? codigo = freezed,Object? articulo = null,Object? articuloNombre = null,Object? descripcion = null,Object? nReferencia = null,Object? referencia = null,Object? referenciaProveedor = null,Object? cantidad = null,Object? cantidadServida = null,Object? pendiente = null,Object? precio = null,Object? dto = null,Object? importe = null,Object? tipoIva = null,Object? retencionIrpf = null,Object? retencionAlquiler = null,Object? clienteVenta = null,Object? estado = null,Object? cancelado = null,Object? previstoPara = null,}) {
   return _then(_LineaPedido(
 id: freezed == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int?,codigo: freezed == codigo ? _self.codigo : codigo // ignore: cast_nullable_to_non_nullable
@@ -594,6 +596,7 @@ as String,nReferencia: null == nReferencia ? _self.nReferencia : nReferencia // 
 as String,referencia: null == referencia ? _self.referencia : referencia // ignore: cast_nullable_to_non_nullable
 as String,referenciaProveedor: null == referenciaProveedor ? _self.referenciaProveedor : referenciaProveedor // ignore: cast_nullable_to_non_nullable
 as String,cantidad: null == cantidad ? _self.cantidad : cantidad // ignore: cast_nullable_to_non_nullable
+as double,cantidadServida: null == cantidadServida ? _self.cantidadServida : cantidadServida // ignore: cast_nullable_to_non_nullable
 as double,pendiente: null == pendiente ? _self.pendiente : pendiente // ignore: cast_nullable_to_non_nullable
 as double,precio: null == precio ? _self.precio : precio // ignore: cast_nullable_to_non_nullable
 as double,dto: null == dto ? _self.dto : dto // ignore: cast_nullable_to_non_nullable

@@ -56,6 +56,8 @@ class _CabeceraFormState extends State<CabeceraForm> {
   List<OpcionMaestra> _comerciales = [];
   List<OpcionMaestra> _almacenes = [];
   List<OpcionMaestra> _formasPago = [];
+  List<OpcionMaestra> _direccionesCliente = [];
+  bool _cargandoCliente = false;
 
   @override
   void initState() {
@@ -100,6 +102,70 @@ class _CabeceraFormState extends State<CabeceraForm> {
     final nuevo = transform(widget.pedido);
     widget.onChanged(nuevo); // Avisamos: "el pedido ahora es así".
     return nuevo;
+  }
+
+  Future<void> _cargarDatosCliente(int clienteId) async {
+    if (clienteId <= 0) {
+      setState(() {
+        _direccionesCliente = [];
+        _cargandoCliente = false;
+      });
+      return;
+    }
+
+    setState(() => _cargandoCliente = true);
+    try {
+      final defaults = await PedidosService.getClienteDefaults(clienteId);
+      final direcciones = await PedidosService.getDireccionesCliente(clienteId);
+      if (!mounted) return;
+
+      setState(() {
+        _direccionesCliente = direcciones;
+        _cargandoCliente = false;
+      });
+
+      final serieDefault = defaults['serie'];
+      if (serieDefault is String && serieDefault.isNotEmpty &&
+          (widget.pedido.serie.isEmpty || !_series.any((s) => s.codigo == widget.pedido.serie))) {
+        final serieOpcion = _series.firstWhere(
+          (s) => s.codigo == serieDefault,
+          orElse: () => OpcionMaestra(codigo: serieDefault, nombre: serieDefault),
+        );
+        widget.onChanged(widget.pedido.copyWith(
+          serie: serieOpcion.codigo,
+          serieNombre: serieOpcion.nombre,
+        ));
+      }
+
+      final direccionDefault = defaults['direccion'];
+      if (direccionDefault is String &&
+          direccionDefault.isNotEmpty &&
+          widget.pedido.direccionEnvio.isEmpty) {
+        widget.onChanged(widget.pedido.copyWith(direccionEnvio: direccionDefault));
+      }
+
+      final emailDefault = defaults['email'];
+      if (emailDefault is String &&
+          emailDefault.isNotEmpty &&
+          widget.pedido.email.isEmpty) {
+        widget.onChanged(widget.pedido.copyWith(email: emailDefault));
+      }
+
+      final almacenDefault = defaults['almacen'];
+      if (almacenDefault is String &&
+          almacenDefault.isNotEmpty &&
+          widget.pedido.almacen.isEmpty) {
+        widget.onChanged(widget.pedido.copyWith(almacen: almacenDefault));
+      }
+
+      if (_direccionesCliente.length > 1 && widget.pedido.direccionEnvio.isEmpty) {
+        final direccionElegida = _direccionesCliente.first;
+        widget.onChanged(widget.pedido.copyWith(direccionEnvio: direccionElegida.codigo));
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cargandoCliente = false);
+    }
   }
 
   /// _elegir: abre el selector de una lista maestro y guarda la elección.
@@ -163,15 +229,39 @@ class _CabeceraFormState extends State<CabeceraForm> {
           onTap: () => _elegir(
             'Seleccionar cliente',
             _clientes,
-            (o) => _actualizar(
-              (x) => x.copyWith(
-                clienteId: int.tryParse(o.codigo) ?? x.clienteId,
-                cliente: o.codigo,
-                clienteNombre: o.nombre,
-              ),
-            ),
+            (o) async {
+              final clienteId = int.tryParse(o.codigo) ?? 0;
+              final nuevoPedido = _actualizar(
+                (x) => x.copyWith(
+                  clienteId: clienteId,
+                  cliente: o.codigo,
+                  clienteNombre: o.nombre,
+                ),
+              );
+              if (clienteId > 0) {
+                await _cargarDatosCliente(clienteId);
+                        if (mounted) {
+                  widget.onChanged(
+                    nuevoPedido.copyWith(
+                      serie: widget.pedido.serie,
+                      direccionEnvio: widget.pedido.direccionEnvio,
+                      email: widget.pedido.email,
+                      almacen: widget.pedido.almacen,
+                    ),
+                  );
+                }
+              }
+            },
           ),
         ),
+        if (_cargandoCliente)
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'Cargando datos del cliente...',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ),
 
         // Serie de ventas (selector).
         CampoSelect(

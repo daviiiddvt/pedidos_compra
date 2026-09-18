@@ -68,7 +68,8 @@ Map<String, dynamic> _normalizeLineaJson(Map<String, dynamic> json) {
     'referencia': ['ref', 'referencia'],
     'referenciaProveedor': ['ref_prov', 'referenciaProveedor'],
     'cantidad': ['can_ped', 'cantidad'],
-    'pendiente': ['can_pdt', 'pendiente'],
+    'cantidadServida': ['can_srv', 'can_ser', 'cantidadServida', 'servida'],
+    'pendiente': ['can_pte', 'can_pdt', 'pendiente', 'cantidadPendiente'],
     'precio': ['pre', 'precio'],
     'dto': ['por_dto', 'dto'],
     'importe': ['imp', 'importe'],
@@ -160,6 +161,7 @@ abstract class LineaPedido with _$LineaPedido {
     @Default('') String referencia,
     @Default('') String referenciaProveedor,
     @Default(1.0) double cantidad,
+    @Default(0.0) double cantidadServida,
     @Default(1.0) double pendiente,
     @Default(0.0) double precio,
     @Default(0.0) double dto,
@@ -181,6 +183,8 @@ abstract class LineaPedido with _$LineaPedido {
     final base = cantidad * precio;
     return base - base * (dto / 100);
   }
+
+  double get pendienteCalculada => cantidad - cantidadServida;
 }
 
 @freezed

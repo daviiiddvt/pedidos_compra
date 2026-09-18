@@ -365,7 +365,10 @@ class PedidosService {
       'fch_ent': pedido.previstoPara,
       'fpg': pedido.formaPago,
       'dir_env': pedido.direccionEnvio,
+      'email': pedido.email,
       'obs': pedido.observaciones,
+      'emp': 1,
+      'emp_div': 1,
     };
   }
 
@@ -501,6 +504,63 @@ class PedidosService {
               telefono: r.s('tlf'),
             ))
         .toList();
+  }
+
+  static Future<Map<String, dynamic>> getClienteDefaults(int clienteId) async {
+    if (clienteId <= 0) {
+      return {'serie': '', 'direccion': '', 'email': '', 'almacen': ''};
+    }
+
+    try {
+      final clienteJson = await _api.get(
+        AppConfig.endpoint('clientes'),
+        params: {'filter[id]': '$clienteId', 'page[size]': 1},
+      );
+      final clientes = payloadLista(clienteJson);
+      if (clientes.isEmpty) {
+        return {'serie': '', 'direccion': '', 'email': '', 'almacen': ''};
+      }
+      final cliente = clientes.first;
+
+      final serie = cliente.s('ser_ven').isNotEmpty
+          ? cliente.s('ser_ven')
+          : (cliente.s('serie').isNotEmpty ? cliente.s('serie') : cliente.s('ser'));
+      final direccion = cliente.s('dir_env').isNotEmpty
+          ? cliente.s('dir_env')
+          : (cliente.s('direccion').isNotEmpty ? cliente.s('direccion') : cliente.s('dir'));
+      final email = cliente.s('EMAIL_DE_ENVIO_CLT').isNotEmpty
+          ? cliente.s('EMAIL_DE_ENVIO_CLT')
+          : (cliente.s('email').isNotEmpty ? cliente.s('email') : cliente.s('mail'));
+
+      return {
+        'serie': serie,
+        'direccion': direccion,
+        'email': email,
+        'almacen': cliente.s('alm').isNotEmpty ? cliente.s('alm') : cliente.s('almacen'),
+      };
+    } catch (_) {
+      return {'serie': '', 'direccion': '', 'email': '', 'almacen': ''};
+    }
+  }
+
+  static Future<List<OpcionMaestra>> getDireccionesCliente(int clienteId) async {
+    if (clienteId <= 0) return [];
+    try {
+      final json = await _api.get(
+        AppConfig.endpoint('direcciones'),
+        params: {'filter[clt]': '$clienteId', 'page[size]': 100},
+      );
+      return payloadLista(json)
+          .map(
+            (r) => OpcionMaestra(
+              codigo: r.s('id'),
+              nombre: r.s('dir').isNotEmpty ? r.s('dir') : r.s('direccion'),
+            ),
+          )
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   /// Carga los contactos comerciales de `ENT_M`.
