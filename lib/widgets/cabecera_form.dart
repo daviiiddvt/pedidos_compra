@@ -74,7 +74,17 @@ class _CabeceraFormState extends State<CabeceraForm> {
       if (almacenDefault is String &&
           almacenDefault.isNotEmpty &&
           widget.pedido.almacen.isEmpty) {
-        widget.onChanged(widget.pedido.copyWith(almacen: almacenDefault));
+        final almacenOpcion = _almacenes.firstWhere(
+          (almacen) => almacen.codigo == almacenDefault,
+          orElse: () => OpcionMaestra(
+            codigo: almacenDefault,
+            nombre: almacenDefault,
+          ),
+        );
+        widget.onChanged(widget.pedido.copyWith(
+          almacen: almacenOpcion.codigo,
+          almacenNombre: almacenOpcion.nombre,
+        ));
       }
     } catch (_) {
       // Silencio: si la empresa no expone ese valor, el usuario puede elegirlo.
@@ -120,7 +130,10 @@ class _CabeceraFormState extends State<CabeceraForm> {
     return nuevo;
   }
 
-  Future<void> _cargarDatosCliente(int clienteId) async {
+  Future<void> _cargarDatosCliente(
+    int clienteId, {
+    required Pedido basePedido,
+  }) async {
     if (clienteId <= 0) {
       setState(() {
         _direccionesCliente = [];
@@ -135,48 +148,58 @@ class _CabeceraFormState extends State<CabeceraForm> {
       final direcciones = await PedidosService.getDireccionesCliente(clienteId);
       if (!mounted) return;
 
+      final direccionDefault = defaults['direccion'];
+      final direccionesDisponibles = [...direcciones];
+      if (direccionesDisponibles.isEmpty &&
+          direccionDefault is String &&
+          direccionDefault.isNotEmpty) {
+        direccionesDisponibles.add(
+          OpcionMaestra(codigo: direccionDefault, nombre: direccionDefault),
+        );
+      }
+
       setState(() {
-        _direccionesCliente = direcciones;
+        _direccionesCliente = direccionesDisponibles;
         _cargandoCliente = false;
       });
 
+      var pedidoActualizado = basePedido;
       final serieDefault = defaults['serie'];
       if (serieDefault is String && serieDefault.isNotEmpty &&
-          (widget.pedido.serie.isEmpty || !_series.any((s) => s.codigo == widget.pedido.serie))) {
+          serieDefault != basePedido.serie) {
         final serieOpcion = _series.firstWhere(
           (s) => s.codigo == serieDefault,
           orElse: () => OpcionMaestra(codigo: serieDefault, nombre: serieDefault),
         );
-        widget.onChanged(widget.pedido.copyWith(
+        pedidoActualizado = pedidoActualizado.copyWith(
           serie: serieOpcion.codigo,
           serieNombre: serieOpcion.nombre,
-        ));
+        );
       }
 
-      final direccionDefault = defaults['direccion'];
       if (direccionDefault is String &&
           direccionDefault.isNotEmpty &&
-          widget.pedido.direccionEnvio.isEmpty) {
-        widget.onChanged(widget.pedido.copyWith(direccionEnvio: direccionDefault));
+          direccionDefault != basePedido.direccionEnvio) {
+        pedidoActualizado = pedidoActualizado.copyWith(direccionEnvio: direccionDefault);
       }
 
       final emailDefault = defaults['email'];
       if (emailDefault is String &&
           emailDefault.isNotEmpty &&
-          widget.pedido.email.isEmpty) {
-        widget.onChanged(widget.pedido.copyWith(email: emailDefault));
+          emailDefault != basePedido.email) {
+        pedidoActualizado = pedidoActualizado.copyWith(email: emailDefault);
       }
 
-      final almacenDefault = defaults['almacen'];
-      if (almacenDefault is String &&
-          almacenDefault.isNotEmpty &&
-          widget.pedido.almacen.isEmpty) {
-        widget.onChanged(widget.pedido.copyWith(almacen: almacenDefault));
+      if (direccionesDisponibles.isNotEmpty &&
+          (direccionDefault is! String || direccionDefault.isEmpty)) {
+        final direccionElegida = direccionesDisponibles.first;
+        pedidoActualizado = pedidoActualizado.copyWith(
+          direccionEnvio: direccionElegida.codigo,
+        );
       }
 
-      if (_direccionesCliente.length > 1 && widget.pedido.direccionEnvio.isEmpty) {
-        final direccionElegida = _direccionesCliente.first;
-        widget.onChanged(widget.pedido.copyWith(direccionEnvio: direccionElegida.codigo));
+      if (pedidoActualizado != basePedido) {
+        widget.onChanged(pedidoActualizado);
       }
     } catch (_) {
       if (!mounted) return;
@@ -255,17 +278,7 @@ class _CabeceraFormState extends State<CabeceraForm> {
                 ),
               );
               if (clienteId > 0) {
-                await _cargarDatosCliente(clienteId);
-                        if (mounted) {
-                  widget.onChanged(
-                    nuevoPedido.copyWith(
-                      serie: widget.pedido.serie,
-                      direccionEnvio: widget.pedido.direccionEnvio,
-                      email: widget.pedido.email,
-                      almacen: widget.pedido.almacen,
-                    ),
-                  );
-                }
+                await _cargarDatosCliente(clienteId, basePedido: nuevoPedido);
               }
             },
           ),
@@ -375,32 +388,22 @@ class _CabeceraFormState extends State<CabeceraForm> {
         // ================= ENVÍO =================
         const _Seccion('Envío'),
 
-        // Dirección de envío (selector con las direcciones del cliente cuando existen).
-        if (_direccionesCliente.isNotEmpty)
-          CampoSelect(
-            label: 'Dirección de envío',
-            value: _direccionesCliente.any((d) => d.codigo == p.direccionEnvio)
-                ? _direccionesCliente
-                    .firstWhere((d) => d.codigo == p.direccionEnvio,
-                        orElse: () => OpcionMaestra(codigo: p.direccionEnvio, nombre: p.direccionEnvio))
-                    .nombre
-                : p.direccionEnvio,
-            onTap: () => _elegir(
-              'Seleccionar dirección de envío',
-              _direccionesCliente,
-              (o) => _actualizar(
-                (x) => x.copyWith(direccionEnvio: o.codigo),
-              ),
+        // Dirección de envío: siempre se muestra como selector.
+        CampoSelect(
+          label: 'Dirección de envío',
+          value: _direccionesCliente.any((d) => d.codigo == p.direccionEnvio)
+              ? _direccionesCliente
+                  .firstWhere((d) => d.codigo == p.direccionEnvio)
+                  .nombre
+              : p.direccionEnvio,
+          onTap: () => _elegir(
+            'Seleccionar dirección de envío',
+            _direccionesCliente,
+            (o) => _actualizar(
+              (x) => x.copyWith(direccionEnvio: o.codigo),
             ),
-          )
-        else
-          CampoForm(
-            label: 'Dirección de envío',
-            value: p.direccionEnvio,
-            onChanged: (v) => _actualizar((x) => x.copyWith(direccionEnvio: v)),
-            placeholder: 'Dirección de entrega',
-            multiline: true,
           ),
+        ),
 
         // Email: Velneo lo devuelve, pero esta API no permite modificarlo.
         CampoForm(

@@ -61,6 +61,8 @@ bool _boolValue(dynamic value) {
 Map<String, dynamic> _normalizeLineaJson(Map<String, dynamic> json) {
   final normalized = Map<String, dynamic>.from(json);
   final aliases = <String, List<String>>{
+    'id': ['id', 'id_reg'],
+    'codigo': ['codigo', 'cod'],
     'articulo': ['art', 'articulo'],
     'articuloNombre': ['art_nom', 'art_name', 'nombre_articulo', 'articuloNombre'],
     'descripcion': ['dsc', 'descripcion'],
@@ -84,12 +86,14 @@ Map<String, dynamic> _normalizeLineaJson(Map<String, dynamic> json) {
   for (final entry in aliases.entries) {
     final value = _firstValue(json, entry.value);
     if (value == null) continue;
-    if (['cantidad', 'pendiente', 'precio', 'dto', 'importe', 'retencionIrpf',
-        'retencionAlquiler', 'tipoIva']
+    if (['cantidad', 'cantidadServida', 'pendiente', 'precio', 'dto', 'importe',
+        'retencionIrpf', 'retencionAlquiler', 'tipoIva']
         .contains(entry.key)) {
       normalized[entry.key] = entry.key == 'tipoIva'
         ? _ivaValue(value)
         : _doubleValue(value);
+    } else if (entry.key == 'id' || entry.key == 'codigo') {
+      normalized[entry.key] = _intValue(value);
     } else if (entry.key == 'cancelado') {
       normalized[entry.key] = _boolValue(value);
     } else {
@@ -105,6 +109,8 @@ Map<String, dynamic> _normalizePedidoJson(Map<String, dynamic> json) {
     'id': ['id', 'id_reg', 'codigo'],
     'n_doc': ['n_doc', 'num_doc', 'nDocumento'],
     'cliente': ['clt', 'cliente'],
+    'clt': ['clt', 'clienteId'],
+    'tot_ped': ['tot_ped', 'total'],
     'clienteNombre': ['clt_nom', 'clt_name', 'nom_com', 'clienteNombre'],
     'ser': ['ser', 'serie'],
     'ser_nom': ['ser_nom', 'serieNombre'],
@@ -123,9 +129,13 @@ Map<String, dynamic> _normalizePedidoJson(Map<String, dynamic> json) {
   for (final entry in aliases.entries) {
     final value = _firstValue(json, entry.value);
     if (value != null) {
-        normalized[entry.key] = entry.key == 'id' || entry.key == 'n_doc'
-          ? _intValue(value)
-          : _textValue(value);
+      if (['id', 'n_doc', 'clt', 'codigo'].contains(entry.key)) {
+        normalized[entry.key] = _intValue(value);
+      } else if (entry.key == 'tot_ped') {
+        normalized[entry.key] = _doubleValue(value);
+      } else {
+        normalized[entry.key] = _textValue(value);
+      }
     }
   }
   return normalized;
@@ -227,7 +237,7 @@ abstract class Pedido with _$Pedido {
     int? id,
     @JsonKey(name: 'num_ped') @Default('') String numeroPedido,
     @JsonKey(name: 'clt') @Default(0) int clienteId,
-    @JsonKey(name: 'est') @Default('S') String estado,
+    @JsonKey(name: 'est') @Default('P') String estado,
     @JsonKey(name: 'tot_ped') @Default(0.0) double total,
     @Default(<LineaPedido>[]) List<LineaPedido> lineas,
     @Default('') String clienteNombre,

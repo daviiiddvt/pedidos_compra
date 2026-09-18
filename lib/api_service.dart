@@ -64,6 +64,14 @@ class PedidosService {
   // El mensajero único que hará las llamadas HTTP.
   static final _api = ApiClient.instance;
 
+  static String _firstNonEmpty(Map<String, dynamic> record, List<String> fields) {
+    for (final field in fields) {
+      final value = record.s(field);
+      if (value.isNotEmpty) return value;
+    }
+    return '';
+  }
+
   /// Extrae el identificador de una referencia Velneo.
   ///
   /// Una referencia puede llegar como valor plano (`"25"`) o como objeto con
@@ -523,14 +531,29 @@ class PedidosService {
       }
       final cliente = clientes.first;
 
-      final serie = cliente.s('ser_ven').isNotEmpty
-          ? cliente.s('ser_ven')
-          : (cliente.s('serie').isNotEmpty ? cliente.s('serie') : cliente.s('ser'));
-      final direccion = cliente.s('dir_env').isNotEmpty
-          ? cliente.s('dir_env')
-          : (cliente.s('dir').isNotEmpty
-              ? cliente.s('dir')
-              : (cliente.s('direccion').isNotEmpty ? cliente.s('direccion') : cliente.s('DIR_ENV')));
+      final serie = _firstNonEmpty(cliente, [
+        'ser_vta',
+      ]);
+      var direccion = cliente.s('DIR_M_VTA_PED_ENV');
+      if (direccion.isEmpty) {
+        final direccionPrimariaId = _referenceId(cliente, 'DIR_PRI').isNotEmpty
+            ? _referenceId(cliente, 'DIR_PRI')
+            : _referenceId(cliente, 'DIR_PRI.ID');
+        if (direccionPrimariaId.isNotEmpty) {
+          try {
+            final direccionJson = await _api.get(
+              '${AppConfig.endpoint('direcciones')}/$direccionPrimariaId',
+            );
+            final direccionData = payloadData(direccionJson);
+            if (direccionData is Map) {
+              final direccionPrimaria = Map<String, dynamic>.from(direccionData);
+              direccion = direccionPrimaria.s('DIR');
+            }
+          } on ApiException {
+            // Se mantiene vacío si la dirección referenciada no es accesible.
+          }
+        }
+      }
       final email = cliente.s('EMAIL_DE_ENVIO_CLT').isNotEmpty
           ? cliente.s('EMAIL_DE_ENVIO_CLT')
           : (cliente.s('email').isNotEmpty
@@ -541,7 +564,7 @@ class PedidosService {
         'serie': serie,
         'direccion': direccion,
         'email': email,
-        'almacen': cliente.s('alm').isNotEmpty ? cliente.s('alm') : cliente.s('almacen'),
+        'almacen': '',
       };
     } catch (_) {
       return {'serie': '', 'direccion': '', 'email': '', 'almacen': ''};
@@ -553,17 +576,27 @@ class PedidosService {
     try {
       final json = await _api.get(
         AppConfig.endpoint('direcciones'),
-        params: {'filter[clt]': '$clienteId', 'page[size]': 100},
+        params: {'page[size]': 1000},
       );
       return payloadLista(json)
+          .where((r) {
+            final cliente = <String>[
+              _referenceId(r, 'clt'),
+              _referenceId(r, 'CLT'),
+              _referenceId(r, 'ent'),
+              _referenceId(r, 'ENT'),
+              _referenceId(r, 'cliente'),
+              _referenceId(r, 'clienteId'),
+            ].firstWhere((value) => value.isNotEmpty, orElse: () => '');
+            return cliente.isEmpty || cliente == '$clienteId';
+          })
           .map(
-            (r) => OpcionMaestra(
+            (r) =>             OpcionMaestra(
               codigo: r.s('id').isNotEmpty ? r.s('id') : r.s('codigo'),
-              nombre: r.s('dir').isNotEmpty
-                  ? r.s('dir')
-                  : (r.s('direccion').isNotEmpty ? r.s('direccion') : r.s('nom_com')),
+              nombre: r.s('DIR'),
             ),
           )
+          .where((opcion) => opcion.codigo.isNotEmpty && opcion.nombre.isNotEmpty)
           .toList();
     } catch (_) {
       return [];
@@ -572,17 +605,37 @@ class PedidosService {
 
   static Future<Map<String, dynamic>> getEmpresaDefaults() async {
     try {
-      final json = await _api.get(
-        AppConfig.endpoint('empresa'),
-        params: {'page[size]': 1},
-      );
-      final empresas = payloadLista(json);
-      if (empresas.isEmpty) {
+      Map<String, dynamic>? empresa;
+      try {
+        final detalle = payloadData(
+          await _api.get('${AppConfig.endpoint('empresa')}/1'),
+        );
+        if (detalle is Map) {
+          empresa = Map<String, dynamic>.from(detalle);
+        }
+      } on ApiException {
+        // Algunas instalaciones no exponen el recurso por ID.
+      }
+
+      if (empresa == null) {
+        final json = await _api.get(
+          AppConfig.endpoint('empresa'),
+          params: {'page[size]': 1000},
+        );
+        final empresas = payloadLista(json)
+            .where((item) => _firstNonEmpty(item, ['id', 'codigo']) == '1')
+            .toList();
+        if (empresas.isNotEmpty) {
+          empresa = empresas.first;
+        }
+      }
+      if (empresa == null) {
         return {'almacen': ''};
       }
-      final empresa = empresas.first;
       return {
-        'almacen': empresa.s('alm').isNotEmpty ? empresa.s('alm') : empresa.s('almacen'),
+        'almacen': _firstNonEmpty(empresa, [
+          'ALM',
+        ]),
       };
     } catch (_) {
       return {'almacen': ''};

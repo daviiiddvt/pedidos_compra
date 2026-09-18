@@ -182,9 +182,7 @@ class _LineaFormModalState extends State<LineaFormModal> {
 
     final cantidad = parseNumber(_cantidad.text);
     final cantidadServida = widget.linea?.cantidadServida ?? 0.0;
-    final pendiente = widget.linea != null
-        ? (widget.linea!.pendiente > 0 ? widget.linea!.pendiente : widget.linea!.pendienteCalculada)
-        : (cantidad - cantidadServida);
+    final pendiente = cantidad - cantidadServida;
 
     final linea = LineaPedido(
       // Conservamos id/código si venían de una línea ya existente.

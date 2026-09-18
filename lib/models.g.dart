@@ -96,7 +96,7 @@ _Pedido _$PedidoFromJson(Map<String, dynamic> json) => _Pedido(
   id: (json['id'] as num?)?.toInt(),
   numeroPedido: json['num_ped'] as String? ?? '',
   clienteId: (json['clt'] as num?)?.toInt() ?? 0,
-  estado: json['est'] as String? ?? 'S',
+  estado: json['est'] as String? ?? 'P',
   total: (json['tot_ped'] as num?)?.toDouble() ?? 0.0,
   lineas:
       (json['lineas'] as List<dynamic>?)
