@@ -25,9 +25,11 @@
 // ============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../api_service.dart'; // PedidosService (cargar clientes, series, etc.).
 import '../models.dart'; // Pedido, OpcionMaestra.
+import '../state/auth_state.dart';
 import '../theme/app_theme.dart'; // Colores (para etiqueta de estado).
 import 'campo_form.dart'; // CampoForm (texto) y CampoSelect (selector).
 import 'campo_fecha.dart'; // CampoFecha (calendario).
@@ -63,27 +65,33 @@ class _CabeceraFormState extends State<CabeceraForm> {
 
   /// _cargarMaestros: pide las listas al servidor A LA VEZ.
   Future<void> _cargarMaestros() async {
-    try {
-      // Future.wait lanza las llamadas en paralelo y espera todas.
-      final resultados = await Future.wait([
-        PedidosService.getClientes(),
-        PedidosService.getSeries(),
-        PedidosService.getComerciales(),
-        PedidosService.getAlmacenes(),
-        PedidosService.getFormasPago(),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _clientes = resultados[0]; // El resultado 0 = clientes de venta.
-        _series = resultados[1]; // 1 = series de venta.
-        _comerciales = resultados[2]; // 2 = comerciales.
-        _almacenes = resultados[3]; // 3 = almacenes.
-        _formasPago = resultados[4]; // 4 = formas de pago.
-      });
-    } catch (e) {
-      // Si falla (endpoints sin configurar), no rompemos: solo lo anotamos.
-      debugPrint('No se pudieron cargar maestros: $e');
+    Future<List<OpcionMaestra>> cargar(
+      String nombre,
+      Future<List<OpcionMaestra>> Function() solicitud,
+    ) async {
+      try {
+        return await solicitud();
+      } catch (e) {
+        debugPrint('No se pudo cargar $nombre: $e');
+        return [];
+      }
     }
+
+    final resultados = await Future.wait([
+      cargar('clientes', PedidosService.getClientes),
+      cargar('series', PedidosService.getSeries),
+      cargar('comerciales', PedidosService.getComerciales),
+      cargar('almacenes', PedidosService.getAlmacenes),
+      cargar('formas de pago', PedidosService.getFormasPago),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _clientes = resultados[0];
+      _series = resultados[1];
+      _comerciales = resultados[2];
+      _almacenes = resultados[3];
+      _formasPago = resultados[4];
+    });
   }
 
   /// _actualizar: aplica un cambio al pedido y avisa a la pantalla madre.
@@ -123,27 +131,29 @@ class _CabeceraFormState extends State<CabeceraForm> {
   @override
   Widget build(BuildContext context) {
     final p = widget.pedido; // Atajo: "p" = pedido actual.
+    final currentUser = context.watch<AuthState>().currentUser;
+    final esComercial = currentUser?.role.toLowerCase() == 'comercial';
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         // ================= DATOS GENERALES =================
         const _Seccion('Datos generales'),
 
-        // N° pedido (bloqueado: lo autocompleta VELNEO al crear).
-        CampoForm(
-          label: 'N° pedido',
-          value: p.nPedido,
-          enabled: false,
-          placeholder: 'Se genera automáticamente',
-        ),
-
-        // N° documento (bloqueado: se lo pone el sistema).
-        CampoForm(
-          label: 'N° documento',
-          value: p.nDocumento.toString(),
-          enabled: false,
-          placeholder: 'Número de documento',
-        ),
+        if (p.id != null) ...[
+          // Velneo genera estos valores al crear el pedido.
+          CampoForm(
+            label: 'N° pedido',
+            value: p.nPedido,
+            enabled: false,
+            placeholder: 'Se genera automáticamente',
+          ),
+          CampoForm(
+            label: 'N° documento',
+            value: p.nDocumento.toString(),
+            enabled: false,
+            placeholder: 'Número de documento',
+          ),
+        ],
 
         // Cliente (selector; obligatorio).
         CampoSelect(
@@ -154,7 +164,11 @@ class _CabeceraFormState extends State<CabeceraForm> {
             'Seleccionar cliente',
             _clientes,
             (o) => _actualizar(
-              (x) => x.copyWith(cliente: o.codigo, clienteNombre: o.nombre),
+              (x) => x.copyWith(
+                clienteId: int.tryParse(o.codigo) ?? x.clienteId,
+                cliente: o.codigo,
+                clienteNombre: o.nombre,
+              ),
             ),
           ),
         ),
@@ -172,18 +186,18 @@ class _CabeceraFormState extends State<CabeceraForm> {
           ),
         ),
 
-        // Comercial (selector).
-        CampoSelect(
-          label: 'Comercial',
-          value: p.comercialNombre.isNotEmpty ? p.comercialNombre : p.comercial,
-          onTap: () => _elegir(
-            'Seleccionar comercial',
-            _comerciales,
-            (o) => _actualizar(
-              (x) => x.copyWith(comercial: o.codigo, comercialNombre: o.nombre),
+        if (!esComercial)
+          CampoSelect(
+            label: 'Comercial',
+            value: p.comercialNombre.isNotEmpty ? p.comercialNombre : p.comercial,
+            onTap: () => _elegir(
+              'Seleccionar comercial',
+              _comerciales,
+              (o) => _actualizar(
+                (x) => x.copyWith(comercial: o.codigo, comercialNombre: o.nombre),
+              ),
             ),
           ),
-        ),
 
         // Almacén (selector).
         CampoSelect(
@@ -264,13 +278,13 @@ class _CabeceraFormState extends State<CabeceraForm> {
           multiline: true,
         ),
 
-        // Email de envío de documentación.
+        // Email: Velneo lo devuelve, pero esta API no permite modificarlo.
         CampoForm(
           label: 'Email',
           value: p.email,
-          onChanged: (v) => _actualizar((x) => x.copyWith(email: v)),
           placeholder: 'correo@empresa.com',
           keyboardType: TextInputType.emailAddress,
+          enabled: false,
         ),
 
         // ================= OTROS =================

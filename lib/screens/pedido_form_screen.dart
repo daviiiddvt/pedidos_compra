@@ -21,9 +21,11 @@
 // ============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../api_service.dart'; // PedidosService (guardar + cargar detalle).
 import '../models.dart'; // Modelos y calcularTotales.
+import '../state/auth_state.dart';
 import '../theme/app_theme.dart'; // Colores.
 import '../core/formatters.dart'; // todayIso (fecha de hoy por defecto).
 import '../widgets/segment_tabs.dart'; // Pestañas.
@@ -46,6 +48,7 @@ class PedidoFormScreen extends StatefulWidget {
 class _PedidoFormScreenState extends State<PedidoFormScreen> {
   late Pedido _pedido; // El pedido que estamos construyendo/editando.
   List<LineaPedido> _lineas = []; // Las líneas del pedido (en memoria).
+  Set<int> _lineasOriginalesIds = {};
   bool _cargandoDetalle = false; // ¿Cargando el detalle (modo editar)?
   bool _guardando = false; // ¿Estamos guardando ya? (para no doble enviar).
   String _tab = 'cabecera'; // Pestaña activa.
@@ -73,6 +76,10 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
       setState(() {
         _pedido = detalle;
         _lineas = [...detalle.lineas]; // Copiamos las líneas.
+        _lineasOriginalesIds = detalle.lineas
+          .where((linea) => linea.id != null)
+          .map((linea) => linea.id!)
+          .toSet();
         _cargandoDetalle = false;
       });
     } catch (e) {
@@ -91,7 +98,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   void _onCambioCabecera(Pedido nuevo) {
     setState(() {
       _pedido = nuevo;
-      if (AppColors.estadoCodigo(nuevo.estado) == 'A') {
+      if (AppColors.estadoCodigo(nuevo.estado) == 'C') {
         // Reconstruimos cada línea con estado "Cancelado" y cancelado=true.
         // (No modificamos las originales directamente por inmutabilidad.)
         _lineas = _lineas
@@ -188,6 +195,12 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
       _snack('El pedido debe tener al menos una línea.');
       return false;
     }
+    final user = context.read<AuthState>().currentUser;
+    if (user?.role.toLowerCase() == 'comercial' &&
+        (user?.contactId.isEmpty ?? true)) {
+      _snack('El usuario comercial no tiene contacto asociado.');
+      return false;
+    }
     return true;
   }
 
@@ -202,12 +215,29 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
     setState(() => _guardando = true); // Bloqueamos el botón "Guardar".
 
     try {
-      // Construimos el JSON a enviar: copia del pedido + líneas de la memoria.
-      final payload = _pedido.copyWith(lineas: _lineas).toJson();
+      final removedLineIds = _lineasOriginalesIds
+          .difference(
+            _lineas
+                .where((linea) => linea.id != null)
+                .map((linea) => linea.id!)
+                .toSet(),
+          );
+      final user = context.read<AuthState>().currentUser;
+      final pedidoConComercial = user?.role.toLowerCase() == 'comercial'
+          ? _pedido.copyWith(
+              comercial: user!.contactId,
+              comercialNombre: user.name,
+            )
+          : _pedido;
+      final pedidoParaGuardar = pedidoConComercial.copyWith(lineas: _lineas);
       if (_editando) {
-        await PedidosService.update(widget.pedidoId, payload);
+        await PedidosService.updateComplete(
+          widget.pedidoId,
+          pedidoParaGuardar,
+          removedLineIds,
+        );
       } else {
-        await PedidosService.create(payload);
+        await PedidosService.createComplete(pedidoParaGuardar);
       }
       if (!mounted) return;
       // Volvemos a la pantalla anterior con "pop(true)" (= se guardó).

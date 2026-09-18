@@ -77,6 +77,19 @@ class PedidosService {
     return value == null ? '' : '$value';
   }
 
+  static OpcionMaestra _opcionFromRecord(Map<String, dynamic> record) {
+    return OpcionMaestra(
+      codigo: _referenceId(record, 'id').isNotEmpty
+          ? _referenceId(record, 'id')
+          : record.s('codigo'),
+      nombre: record.s('name').isNotEmpty
+          ? record.s('name')
+          : (record.s('nom_com').isNotEmpty
+              ? record.s('nom_com')
+              : record.s('descripcion')),
+    );
+  }
+
   /// Valida las credenciales de un usuario y construye su sesión.
   ///
   /// Flujo de autorización:
@@ -148,6 +161,54 @@ class PedidosService {
     return contacts.first;
   }
 
+  static Future<String> _getContactName(String id) async {
+    final contact = await _getContact(id);
+    final name = contact.s('name');
+    return name.isNotEmpty ? name : contact.s('nom_com');
+  }
+
+  static Future<String> _getArticleName(String id) async {
+    final json = await _api.get(
+      AppConfig.endpoint('articulos'),
+      params: {'filter[id]': id, 'page[size]': 1},
+    );
+    final records = payloadLista(json);
+    if (records.isEmpty) return '';
+    final record = records.first;
+    return record.s('name').isNotEmpty
+        ? record.s('name')
+        : record.s('descripcion');
+  }
+
+  static Future<List<LineaPedido>> _enrichLineArticleNames(
+    List<LineaPedido> lineas,
+  ) async {
+    final missing = lineas
+        .where((linea) => linea.articuloNombre.isEmpty && linea.articulo.isNotEmpty)
+        .map((linea) => linea.articulo)
+        .toSet();
+    if (missing.isEmpty) return lineas;
+
+    final names = <String, String>{};
+    await Future.wait(
+      missing.map((id) async {
+        try {
+          final name = await _getArticleName(id);
+          if (name.isNotEmpty) names[id] = name;
+        } on ApiException {
+          // El código del artículo sigue siendo un fallback válido.
+        }
+      }),
+    );
+    return lineas
+        .map(
+          (linea) => linea.copyWith(
+            articuloNombre: names[linea.articulo] ?? linea.articuloNombre,
+          ),
+        )
+        .toList();
+  }
+
   /// Solicita una página de cabeceras de pedido a `VTA_PED_G`.
   ///
   /// Filtros opcionales:
@@ -163,6 +224,7 @@ class PedidosService {
     String? estado,
     String? cliente,
     String? search,
+    String? comercial,
   }) async {
     // Parámetros de la petición. Los nombres son los del API REAL de VELNEO:
     //  - page[number] y page[size]  → paginación del API.
@@ -180,6 +242,7 @@ class PedidosService {
         'filter[est]': AppColors.estadoCodigo(estado),
       if (cliente != null && cliente.isNotEmpty) 'filter[clt]': cliente,
       if (search != null && search.isNotEmpty) 'filter[words]': search,
+      if (comercial != null && comercial.isNotEmpty) 'filter[cmr]': comercial,
     };
 
     // Hacemos la llamada GET y la respuesta se convierte en una lista de Pedido.
@@ -200,14 +263,14 @@ class PedidosService {
   /// Repite peticiones a [list] hasta alcanzar el total informado o recibir
   /// una página incompleta/vacía. Cada petición contiene un `await`, por lo
   /// que el event loop de Flutter conserva el control mientras se descarga.
-  static Future<List<Pedido>> listAll() async {
+  static Future<List<Pedido>> listAll({String? comercial}) async {
     final all = <Pedido>[];
     var page = 1;
     var total = 0;
     var lastPageSize = 0;
 
     do {
-      final result = await list(page: page);
+      final result = await list(page: page, comercial: comercial);
       all.addAll(result.items);
       lastPageSize = result.items.length;
       total = result.total;
@@ -232,17 +295,45 @@ class PedidosService {
       // Si el servidor responde algo que no es un mapa, avisamos con un error claro.
       throw ApiException('No se pudo leer el pedido.');
     }
-    final pedido = Pedido.fromJson(Map<String, dynamic>.from(data));
+    var pedido = Pedido.fromJson(Map<String, dynamic>.from(data));
 
-    // --- Líneas del pedido (tabla VTA_PED_LIN_G, filtrada por la cabecera) ---
+    // Las líneas y los datos auxiliares del cliente son independientes.
+    // Se solicitan a la vez para no sumar sus latencias.
+    final lineasFuture = _api.get(
+      AppConfig.endpoint('lineas'),
+      params: {'filter[vta_ped]': '$id', 'page[size]': 100},
+    );
+    final clienteFuture = getClientesByIds([pedido.clienteId]).catchError(
+      (_) => <Cliente>[],
+    );
+    final comercialFuture = pedido.comercial.isEmpty
+        ? Future.value('')
+        : _getContactName(pedido.comercial).catchError((_) => '');
+
     try {
-      final lin = await _api.get(
-        AppConfig.endpoint('lineas'),
-        params: {'filter[vta_ped]': '$id', 'page[size]': 1000},
-      );
-      return pedido.copyWith(
-        lineas: payloadLista(lin).map(LineaPedido.fromJson).toList(),
-      );
+      final results = await Future.wait([
+        lineasFuture,
+        clienteFuture,
+        comercialFuture,
+      ]);
+      final lineas = payloadLista(results[0])
+          .map(LineaPedido.fromJson)
+          .toList();
+      final clientes = results[1] as List<Cliente>;
+      final comercialNombre = results[2] as String;
+      if (clientes.isNotEmpty) {
+        final cliente = clientes.first;
+        pedido = pedido.copyWith(
+          clienteNombre: cliente.nombreComercial,
+          clienteTelefono: cliente.telefono,
+          clienteCif: cliente.cif,
+        );
+      }
+      if (comercialNombre.isNotEmpty) {
+        pedido = pedido.copyWith(comercialNombre: comercialNombre);
+      }
+      final enrichedLineas = await _enrichLineArticleNames(lineas);
+      return pedido.copyWith(lineas: enrichedLineas);
     } on ApiException {
       // Sin permiso sobre las líneas: devolvemos el pedido con las de vacío.
       return pedido;
@@ -261,6 +352,55 @@ class PedidosService {
       return Pedido.fromJson(Map<String, dynamic>.from(data)); // El pedido creado.
     }
     throw ApiException('No se pudo crear el pedido.');
+  }
+
+  static Map<String, dynamic> _pedidoPayload(Pedido pedido) {
+    return {
+      'clt': pedido.clienteId,
+      'est': AppColors.estadoCodigo(pedido.estado),
+      'ser': pedido.serie,
+      'cmr': pedido.comercial,
+      'alm': pedido.almacen,
+      'fch': pedido.fecha,
+      'fch_ent': pedido.previstoPara,
+      'fpg': pedido.formaPago,
+      'dir_env': pedido.direccionEnvio,
+      'obs': pedido.observaciones,
+    };
+  }
+
+  static Future<Pedido> createComplete(Pedido pedido) async {
+    late final Pedido created;
+    try {
+      created = await create(_pedidoPayload(pedido));
+    } on ApiException catch (error) {
+      throw ApiException('No se pudo crear la cabecera del pedido: $error');
+    }
+    final pedidoId = created.id ?? (created.codigo == 0 ? null : created.codigo);
+    if (pedidoId == null) {
+      throw ApiException('Velneo no devolvió el ID del pedido creado.');
+    }
+    try {
+      await enviarLineas(pedidoId, pedido.lineas);
+    } on ApiException catch (error) {
+      throw ApiException(
+        'La cabecera se creó, pero no se pudieron guardar las líneas: $error',
+      );
+    }
+    return created.copyWith(id: pedidoId, lineas: pedido.lineas);
+  }
+
+  static Future<Pedido> updateComplete(
+    dynamic id,
+    Pedido pedido,
+    Set<int> removedLineIds,
+  ) async {
+    final updated = await update(id, _pedidoPayload(pedido));
+    for (final lineId in removedLineIds) {
+      await eliminarLinea(lineId);
+    }
+    await enviarLineas(id, pedido.lineas);
+    return updated.copyWith(id: updated.id ?? pedido.id, lineas: pedido.lineas);
   }
 
   /// Actualiza una cabecera existente mediante `POST VTA_PED_G/{id}`.
@@ -339,7 +479,7 @@ class PedidosService {
       AppConfig.endpoint(key),
       params: {'page[size]': size},
     );
-    return payloadLista(json).map(OpcionMaestra.fromJson).toList();
+    return payloadLista(json).map(_opcionFromRecord).toList();
   }
 
   /// Carga los clientes de [ids] desde `ENT_M`.
@@ -374,7 +514,12 @@ class PedidosService {
     );
     return payloadLista(json)
         .where((r) => r.b('es_cmr') || r.b('cmr'))
-        .map((r) => OpcionMaestra(codigo: r.s('id'), nombre: r.s('name')))
+        .map(
+          (r) => OpcionMaestra(
+            codigo: r.s('id'),
+            nombre: r.s('name').isNotEmpty ? r.s('name') : r.s('nom_com'),
+          ),
+        )
         .toList();
   }
 
@@ -395,7 +540,7 @@ class PedidosService {
     );
     return payloadLista(json)
         .where((r) => r.s('ser_tip') == 'V')
-        .map(OpcionMaestra.fromJson)
+        .map(_opcionFromRecord)
         .toList();
   }
 
@@ -414,8 +559,17 @@ class PedidosService {
   /// autorización de pedidos no depende de este método: se realiza mediante
   /// `VTA_PED_G.CMR` y el contacto comercial de la sesión.
   static Future<List<OpcionMaestra>> getClientes() async {
-    // Implementación básica para que compile
-    // En un caso real, llamarías a tu API de Velneo aquí.
-    return [];
+    final json = await _api.get(
+      AppConfig.endpoint('clientes'),
+      params: {'page[size]': 1000},
+    );
+    return payloadLista(json)
+        .map(
+          (r) => OpcionMaestra(
+            codigo: r.s('id'),
+            nombre: r.s('nom_com').isNotEmpty ? r.s('nom_com') : r.s('name'),
+          ),
+        )
+        .toList();
   }
 }

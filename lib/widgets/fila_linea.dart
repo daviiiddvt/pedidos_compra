@@ -52,7 +52,9 @@ class FilaLinea extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      linea.articulo.isNotEmpty ? linea.articulo : '—',
+                        linea.articuloNombre.isNotEmpty
+                          ? linea.articuloNombre
+                          : (linea.articulo.isNotEmpty ? linea.articulo : '—'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

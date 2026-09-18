@@ -149,7 +149,7 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
     );
   }
 
-  /// _resumen: el bloque superior (código, estado, proveedor, fecha).
+  /// _resumen: el bloque superior (código, estado, cliente, fecha).
   Widget _resumen(Pedido pedido) {
     return Container(
       color: AppColors.surface,

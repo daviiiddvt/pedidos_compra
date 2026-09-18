@@ -74,21 +74,29 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
   /// - search: término de búsqueda.
   Future<void> _cargarInicial() async {
     try {
-      final pedidos = await PedidosService.listAll();
+      final auth = context.read<AuthState>();
+      final user = auth.currentUser;
+      final pedidos = await PedidosService.listAll(
+        comercial: user?.role.toLowerCase() == 'comercial'
+            ? user?.contactId
+            : null,
+      );
       if (!mounted) return; // Si la pantalla ya se cerró, no seguimos.
       final repository = context.read<OrderRepository>();
       repository.setOrders(pedidos);
+      _aplicarFiltros();
+      setState(() => _cargando = false);
+
+      // Los datos auxiliares no bloquean la primera pintura de la lista.
       try {
         final clienteIds = pedidos.map((pedido) => pedido.clienteId).toSet().toList();
         final clientes = await PedidosService.getClientesByIds(clienteIds);
+        if (!mounted) return;
         repository.setClientes(clientes);
+        _aplicarFiltros();
       } catch (_) {
         // Los pedidos siguen siendo utilizables si el endpoint de clientes no responde.
       }
-      _aplicarFiltros();
-      setState(() {
-        _cargando = false;
-      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _cargando = false);

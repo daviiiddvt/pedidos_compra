@@ -1174,7 +1174,7 @@ as String,
 /// @nodoc
 mixin _$Pedido {
 
- int? get id;@JsonKey(name: 'num_ped') String get numeroPedido;@JsonKey(name: 'clt') int get clienteId;@JsonKey(name: 'est') String get estado;@JsonKey(name: 'tot_ped') double get total; List<LineaPedido> get lineas; String get clienteNombre; String get clienteTelefono; String get clienteCif; String get cliente; int get codigo; int get nDocumento; String get serie; String get serieNombre;@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String get comercial; String get comercialNombre; String get almacen; String get almacenNombre; String get fecha; String get previstoPara; String get formaPago; String get formaPagoNombre; String get direccionEnvio; String get email; String get observaciones;
+ int? get id;@JsonKey(name: 'num_ped') String get numeroPedido;@JsonKey(name: 'clt') int get clienteId;@JsonKey(name: 'est') String get estado;@JsonKey(name: 'tot_ped') double get total; List<LineaPedido> get lineas; String get clienteNombre; String get clienteTelefono; String get clienteCif; String get cliente; int get codigo;@JsonKey(name: 'n_doc') int get nDocumento;@JsonKey(name: 'ser') String get serie;@JsonKey(name: 'ser_nom') String get serieNombre;@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String get comercial;@JsonKey(name: 'cmr_nom') String get comercialNombre;@JsonKey(name: 'alm') String get almacen;@JsonKey(name: 'alm_nom') String get almacenNombre;@JsonKey(name: 'fch') String get fecha;@JsonKey(name: 'fch_ent') String get previstoPara;@JsonKey(name: 'fpg') String get formaPago;@JsonKey(name: 'fpg_nom') String get formaPagoNombre;@JsonKey(name: 'dir_env') String get direccionEnvio;@JsonKey(name: 'email') String get email;@JsonKey(name: 'obs') String get observaciones;
 /// Create a copy of Pedido
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1212,7 +1212,7 @@ abstract mixin class $PedidoCopyWith<$Res>  {
   factory $PedidoCopyWith(Pedido value, $Res Function(Pedido) _then) = _$PedidoCopyWithImpl;
 @useResult
 $Res call({
- int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo, int nDocumento, String serie, String serieNombre,@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String comercial, String comercialNombre, String almacen, String almacenNombre, String fecha, String previstoPara, String formaPago, String formaPagoNombre, String direccionEnvio, String email, String observaciones
+ int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo,@JsonKey(name: 'n_doc') int nDocumento,@JsonKey(name: 'ser') String serie,@JsonKey(name: 'ser_nom') String serieNombre,@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String comercial,@JsonKey(name: 'cmr_nom') String comercialNombre,@JsonKey(name: 'alm') String almacen,@JsonKey(name: 'alm_nom') String almacenNombre,@JsonKey(name: 'fch') String fecha,@JsonKey(name: 'fch_ent') String previstoPara,@JsonKey(name: 'fpg') String formaPago,@JsonKey(name: 'fpg_nom') String formaPagoNombre,@JsonKey(name: 'dir_env') String direccionEnvio,@JsonKey(name: 'email') String email,@JsonKey(name: 'obs') String observaciones
 });
 
 
@@ -1341,7 +1341,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo,  int nDocumento,  String serie,  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial,  String comercialNombre,  String almacen,  String almacenNombre,  String fecha,  String previstoPara,  String formaPago,  String formaPagoNombre,  String direccionEnvio,  String email,  String observaciones)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo, @JsonKey(name: 'n_doc')  int nDocumento, @JsonKey(name: 'ser')  String serie, @JsonKey(name: 'ser_nom')  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial, @JsonKey(name: 'cmr_nom')  String comercialNombre, @JsonKey(name: 'alm')  String almacen, @JsonKey(name: 'alm_nom')  String almacenNombre, @JsonKey(name: 'fch')  String fecha, @JsonKey(name: 'fch_ent')  String previstoPara, @JsonKey(name: 'fpg')  String formaPago, @JsonKey(name: 'fpg_nom')  String formaPagoNombre, @JsonKey(name: 'dir_env')  String direccionEnvio, @JsonKey(name: 'email')  String email, @JsonKey(name: 'obs')  String observaciones)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Pedido() when $default != null:
 return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
@@ -1362,7 +1362,7 @@ return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.t
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo,  int nDocumento,  String serie,  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial,  String comercialNombre,  String almacen,  String almacenNombre,  String fecha,  String previstoPara,  String formaPago,  String formaPagoNombre,  String direccionEnvio,  String email,  String observaciones)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo, @JsonKey(name: 'n_doc')  int nDocumento, @JsonKey(name: 'ser')  String serie, @JsonKey(name: 'ser_nom')  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial, @JsonKey(name: 'cmr_nom')  String comercialNombre, @JsonKey(name: 'alm')  String almacen, @JsonKey(name: 'alm_nom')  String almacenNombre, @JsonKey(name: 'fch')  String fecha, @JsonKey(name: 'fch_ent')  String previstoPara, @JsonKey(name: 'fpg')  String formaPago, @JsonKey(name: 'fpg_nom')  String formaPagoNombre, @JsonKey(name: 'dir_env')  String direccionEnvio, @JsonKey(name: 'email')  String email, @JsonKey(name: 'obs')  String observaciones)  $default,) {final _that = this;
 switch (_that) {
 case _Pedido():
 return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
@@ -1382,7 +1382,7 @@ return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.t
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo,  int nDocumento,  String serie,  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial,  String comercialNombre,  String almacen,  String almacenNombre,  String fecha,  String previstoPara,  String formaPago,  String formaPagoNombre,  String direccionEnvio,  String email,  String observaciones)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo, @JsonKey(name: 'n_doc')  int nDocumento, @JsonKey(name: 'ser')  String serie, @JsonKey(name: 'ser_nom')  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial, @JsonKey(name: 'cmr_nom')  String comercialNombre, @JsonKey(name: 'alm')  String almacen, @JsonKey(name: 'alm_nom')  String almacenNombre, @JsonKey(name: 'fch')  String fecha, @JsonKey(name: 'fch_ent')  String previstoPara, @JsonKey(name: 'fpg')  String formaPago, @JsonKey(name: 'fpg_nom')  String formaPagoNombre, @JsonKey(name: 'dir_env')  String direccionEnvio, @JsonKey(name: 'email')  String email, @JsonKey(name: 'obs')  String observaciones)?  $default,) {final _that = this;
 switch (_that) {
 case _Pedido() when $default != null:
 return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
@@ -1397,7 +1397,7 @@ return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.t
 @JsonSerializable()
 
 class _Pedido extends Pedido {
-  const _Pedido({this.id, @JsonKey(name: 'num_ped') this.numeroPedido = '', @JsonKey(name: 'clt') this.clienteId = 0, @JsonKey(name: 'est') this.estado = 'S', @JsonKey(name: 'tot_ped') this.total = 0.0,  List<LineaPedido> lineas = const <LineaPedido>[], this.clienteNombre = '', this.clienteTelefono = '', this.clienteCif = '', this.cliente = '', this.codigo = 0, this.nDocumento = 0, this.serie = '', this.serieNombre = '', @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) this.comercial = '', this.comercialNombre = '', this.almacen = '', this.almacenNombre = '', this.fecha = '', this.previstoPara = '', this.formaPago = '', this.formaPagoNombre = '', this.direccionEnvio = '', this.email = '', this.observaciones = ''}): _lineas = lineas,super._();
+  const _Pedido({this.id, @JsonKey(name: 'num_ped') this.numeroPedido = '', @JsonKey(name: 'clt') this.clienteId = 0, @JsonKey(name: 'est') this.estado = 'S', @JsonKey(name: 'tot_ped') this.total = 0.0,  List<LineaPedido> lineas = const <LineaPedido>[], this.clienteNombre = '', this.clienteTelefono = '', this.clienteCif = '', this.cliente = '', this.codigo = 0, @JsonKey(name: 'n_doc') this.nDocumento = 0, @JsonKey(name: 'ser') this.serie = '', @JsonKey(name: 'ser_nom') this.serieNombre = '', @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) this.comercial = '', @JsonKey(name: 'cmr_nom') this.comercialNombre = '', @JsonKey(name: 'alm') this.almacen = '', @JsonKey(name: 'alm_nom') this.almacenNombre = '', @JsonKey(name: 'fch') this.fecha = '', @JsonKey(name: 'fch_ent') this.previstoPara = '', @JsonKey(name: 'fpg') this.formaPago = '', @JsonKey(name: 'fpg_nom') this.formaPagoNombre = '', @JsonKey(name: 'dir_env') this.direccionEnvio = '', @JsonKey(name: 'email') this.email = '', @JsonKey(name: 'obs') this.observaciones = ''}): _lineas = lineas,super._();
   factory _Pedido.fromJson(Map<String, dynamic> json) => _$PedidoFromJson(json);
 
 @override final  int? id;
@@ -1417,20 +1417,20 @@ class _Pedido extends Pedido {
 @override@JsonKey() final  String clienteCif;
 @override@JsonKey() final  String cliente;
 @override@JsonKey() final  int codigo;
-@override@JsonKey() final  int nDocumento;
-@override@JsonKey() final  String serie;
-@override@JsonKey() final  String serieNombre;
+@override@JsonKey(name: 'n_doc') final  int nDocumento;
+@override@JsonKey(name: 'ser') final  String serie;
+@override@JsonKey(name: 'ser_nom') final  String serieNombre;
 @override@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) final  String comercial;
-@override@JsonKey() final  String comercialNombre;
-@override@JsonKey() final  String almacen;
-@override@JsonKey() final  String almacenNombre;
-@override@JsonKey() final  String fecha;
-@override@JsonKey() final  String previstoPara;
-@override@JsonKey() final  String formaPago;
-@override@JsonKey() final  String formaPagoNombre;
-@override@JsonKey() final  String direccionEnvio;
-@override@JsonKey() final  String email;
-@override@JsonKey() final  String observaciones;
+@override@JsonKey(name: 'cmr_nom') final  String comercialNombre;
+@override@JsonKey(name: 'alm') final  String almacen;
+@override@JsonKey(name: 'alm_nom') final  String almacenNombre;
+@override@JsonKey(name: 'fch') final  String fecha;
+@override@JsonKey(name: 'fch_ent') final  String previstoPara;
+@override@JsonKey(name: 'fpg') final  String formaPago;
+@override@JsonKey(name: 'fpg_nom') final  String formaPagoNombre;
+@override@JsonKey(name: 'dir_env') final  String direccionEnvio;
+@override@JsonKey(name: 'email') final  String email;
+@override@JsonKey(name: 'obs') final  String observaciones;
 
 /// Create a copy of Pedido
 /// with the given fields replaced by the non-null parameter values.
@@ -1467,7 +1467,7 @@ abstract mixin class _$PedidoCopyWith<$Res> implements $PedidoCopyWith<$Res> {
   factory _$PedidoCopyWith(_Pedido value, $Res Function(_Pedido) _then) = __$PedidoCopyWithImpl;
 @override @useResult
 $Res call({
- int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo, int nDocumento, String serie, String serieNombre,@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String comercial, String comercialNombre, String almacen, String almacenNombre, String fecha, String previstoPara, String formaPago, String formaPagoNombre, String direccionEnvio, String email, String observaciones
+ int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo,@JsonKey(name: 'n_doc') int nDocumento,@JsonKey(name: 'ser') String serie,@JsonKey(name: 'ser_nom') String serieNombre,@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String comercial,@JsonKey(name: 'cmr_nom') String comercialNombre,@JsonKey(name: 'alm') String almacen,@JsonKey(name: 'alm_nom') String almacenNombre,@JsonKey(name: 'fch') String fecha,@JsonKey(name: 'fch_ent') String previstoPara,@JsonKey(name: 'fpg') String formaPago,@JsonKey(name: 'fpg_nom') String formaPagoNombre,@JsonKey(name: 'dir_env') String direccionEnvio,@JsonKey(name: 'email') String email,@JsonKey(name: 'obs') String observaciones
 });
 
 

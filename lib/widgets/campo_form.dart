@@ -88,6 +88,20 @@ class _CampoFormState extends State<CampoForm> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant CampoForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_propioController && widget.value != oldWidget.value &&
+        widget.value != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: widget.value ?? '',
+        selection: TextSelection.collapsed(
+          offset: (widget.value ?? '').length,
+        ),
+      );
+    }
+  }
+
   /// Puente: cuando el usuario escribe, avisamos al onChanged externo (si existe).
   void _onChanged(String value) {
     widget.onChanged?.call(value);
