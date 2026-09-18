@@ -63,6 +63,22 @@ class _CabeceraFormState extends State<CabeceraForm> {
   void initState() {
     super.initState();
     _cargarMaestros(); // Al nacer, bajamos todas las listas.
+    _cargarEmpresaDefaults();
+  }
+
+  Future<void> _cargarEmpresaDefaults() async {
+    try {
+      final defaults = await PedidosService.getEmpresaDefaults();
+      if (!mounted) return;
+      final almacenDefault = defaults['almacen'];
+      if (almacenDefault is String &&
+          almacenDefault.isNotEmpty &&
+          widget.pedido.almacen.isEmpty) {
+        widget.onChanged(widget.pedido.copyWith(almacen: almacenDefault));
+      }
+    } catch (_) {
+      // Silencio: si la empresa no expone ese valor, el usuario puede elegirlo.
+    }
   }
 
   /// _cargarMaestros: pide las listas al servidor A LA VEZ.
@@ -359,14 +375,32 @@ class _CabeceraFormState extends State<CabeceraForm> {
         // ================= ENVÍO =================
         const _Seccion('Envío'),
 
-        // Dirección de envío (multilínea; se guarda como dir_env_man).
-        CampoForm(
-          label: 'Dirección de envío',
-          value: p.direccionEnvio,
-          onChanged: (v) => _actualizar((x) => x.copyWith(direccionEnvio: v)),
-          placeholder: 'Dirección de entrega',
-          multiline: true,
-        ),
+        // Dirección de envío (selector con las direcciones del cliente cuando existen).
+        if (_direccionesCliente.isNotEmpty)
+          CampoSelect(
+            label: 'Dirección de envío',
+            value: _direccionesCliente.any((d) => d.codigo == p.direccionEnvio)
+                ? _direccionesCliente
+                    .firstWhere((d) => d.codigo == p.direccionEnvio,
+                        orElse: () => OpcionMaestra(codigo: p.direccionEnvio, nombre: p.direccionEnvio))
+                    .nombre
+                : p.direccionEnvio,
+            onTap: () => _elegir(
+              'Seleccionar dirección de envío',
+              _direccionesCliente,
+              (o) => _actualizar(
+                (x) => x.copyWith(direccionEnvio: o.codigo),
+              ),
+            ),
+          )
+        else
+          CampoForm(
+            label: 'Dirección de envío',
+            value: p.direccionEnvio,
+            onChanged: (v) => _actualizar((x) => x.copyWith(direccionEnvio: v)),
+            placeholder: 'Dirección de entrega',
+            multiline: true,
+          ),
 
         // Email: Velneo lo devuelve, pero esta API no permite modificarlo.
         CampoForm(

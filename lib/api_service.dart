@@ -440,7 +440,8 @@ class PedidosService {
         'dsc': linea.descripcion,
         'ref_man': linea.nReferencia,
         'can_ped': linea.cantidad,
-        'can_pdt': linea.pendiente,
+        'can_srv': linea.cantidadServida,
+        'can_pte': linea.pendiente,
         'pre': linea.precio,
         'por_dto': linea.dto,
         'imp': linea.importe,
@@ -527,10 +528,14 @@ class PedidosService {
           : (cliente.s('serie').isNotEmpty ? cliente.s('serie') : cliente.s('ser'));
       final direccion = cliente.s('dir_env').isNotEmpty
           ? cliente.s('dir_env')
-          : (cliente.s('direccion').isNotEmpty ? cliente.s('direccion') : cliente.s('dir'));
+          : (cliente.s('dir').isNotEmpty
+              ? cliente.s('dir')
+              : (cliente.s('direccion').isNotEmpty ? cliente.s('direccion') : cliente.s('DIR_ENV')));
       final email = cliente.s('EMAIL_DE_ENVIO_CLT').isNotEmpty
           ? cliente.s('EMAIL_DE_ENVIO_CLT')
-          : (cliente.s('email').isNotEmpty ? cliente.s('email') : cliente.s('mail'));
+          : (cliente.s('email').isNotEmpty
+              ? cliente.s('email')
+              : (cliente.s('mail').isNotEmpty ? cliente.s('mail') : cliente.s('eml')));
 
       return {
         'serie': serie,
@@ -553,13 +558,34 @@ class PedidosService {
       return payloadLista(json)
           .map(
             (r) => OpcionMaestra(
-              codigo: r.s('id'),
-              nombre: r.s('dir').isNotEmpty ? r.s('dir') : r.s('direccion'),
+              codigo: r.s('id').isNotEmpty ? r.s('id') : r.s('codigo'),
+              nombre: r.s('dir').isNotEmpty
+                  ? r.s('dir')
+                  : (r.s('direccion').isNotEmpty ? r.s('direccion') : r.s('nom_com')),
             ),
           )
           .toList();
     } catch (_) {
       return [];
+    }
+  }
+
+  static Future<Map<String, dynamic>> getEmpresaDefaults() async {
+    try {
+      final json = await _api.get(
+        AppConfig.endpoint('empresa'),
+        params: {'page[size]': 1},
+      );
+      final empresas = payloadLista(json);
+      if (empresas.isEmpty) {
+        return {'almacen': ''};
+      }
+      final empresa = empresas.first;
+      return {
+        'almacen': empresa.s('alm').isNotEmpty ? empresa.s('alm') : empresa.s('almacen'),
+      };
+    } catch (_) {
+      return {'almacen': ''};
     }
   }
 
