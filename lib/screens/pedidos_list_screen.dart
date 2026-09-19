@@ -152,6 +152,11 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
       appBar: AppBar(
         title: const Text('Pedidos de venta'),
         actions: [
+          IconButton(
+            tooltip: 'Presupuestos',
+            icon: const Icon(Icons.request_quote_outlined),
+            onPressed: () => Navigator.of(context).pushNamed('/presupuestos'),
+          ),
           // Botón "Salir": cierra la sesión → la app vuelve al login sola.
           IconButton(
             tooltip: 'Salir',

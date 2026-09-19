@@ -33,6 +33,9 @@ import 'screens/login_screen.dart'; // Pantalla de conexión al servidor.
 import 'screens/pedidos_list_screen.dart'; // Pantalla con la lista de pedidos.
 import 'screens/pedido_detail_screen.dart'; // Pantalla con el detalle de un pedido.
 import 'screens/pedido_form_screen.dart'; // Pantalla para crear/editar pedidos.
+import 'screens/presupuestos_list_screen.dart';
+import 'screens/presupuesto_detail_screen.dart';
+import 'screens/presupuesto_form_screen.dart';
 import 'state/auth_state.dart'; // Estado global de la sesión (¿estamos conectados?).
 import 'theme/app_theme.dart'; // Colores y estilos de toda la app.
 
@@ -85,6 +88,13 @@ class PedidosVentaApp extends StatelessWidget {
         // Ruta de FORMULARIO (crear/editar): también recibe el id, puede ser null.
         '/pedido/form': (context) => PedidoFormScreen(
               pedidoId: (ModalRoute.of(context)!.settings.arguments),
+            ),
+        '/presupuestos': (context) => const PresupuestosListScreen(),
+        '/presupuesto': (context) => PresupuestoDetailScreen(
+              presupuestoId: ModalRoute.of(context)!.settings.arguments,
+            ),
+        '/presupuesto/form': (context) => PresupuestoFormScreen(
+              presupuestoId: ModalRoute.of(context)!.settings.arguments,
             ),
       },
     );

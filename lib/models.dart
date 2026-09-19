@@ -107,7 +107,7 @@ Map<String, dynamic> _normalizePedidoJson(Map<String, dynamic> json) {
   final normalized = Map<String, dynamic>.from(json);
   final aliases = <String, List<String>>{
     'id': ['id', 'id_reg', 'codigo'],
-    'n_doc': ['n_doc', 'num_doc', 'nDocumento'],
+    'n_doc': ['n_doc', 'num_doc', 'num_pre', 'nDocumento'],
     'cliente': ['clt', 'cliente'],
     'clt': ['clt', 'clienteId'],
     'tot_ped': ['tot_ped', 'total'],
@@ -124,7 +124,7 @@ Map<String, dynamic> _normalizePedidoJson(Map<String, dynamic> json) {
     'cmr_nom': ['cmr_nom', 'comercialNombre'],
     'alm': ['alm', 'almacen'],
     'alm_nom': ['alm_nom', 'almacenNombre'],
-    'codigo': ['codigo', 'cod'],
+    'codigo': ['codigo', 'cod', 'id_reg'],
   };
   for (final entry in aliases.entries) {
     final value = _firstValue(json, entry.value);

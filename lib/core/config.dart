@@ -42,6 +42,8 @@ class AppConfig {
     'pedidos': 'TecERPv7_dat_dat/v1/VTA_PED_G',     // Cabeceras de pedidos de VENTA.
     'usuarios': 'TecERPv7_dat_dat/v1/USR_M',        // Usuarios de acceso.
     'lineas': 'TecERPv7_dat_dat/v1/VTA_PED_LIN_G',   // Líneas de pedido de venta.
+    'presupuestos': 'TecERPv7_dat_dat/v1/VTA_PRE_G', // Cabeceras de presupuestos de VENTA.
+    'lineasPresupuesto': 'TecERPv7_dat_dat/v1/VTA_PRE_LIN_G', // Líneas de presupuesto.
     'clientes': 'TecERPv7_dat_dat/v1/ENT_M',         // Entidades (clientes de venta).
     'comerciales': 'TecERPv7_dat_dat/v1/ENT_M',      // Entidades (comerciales).
     'direcciones': 'TecERPv7_dat_dat/v1/DIR_M',      // Direcciones de clientes.

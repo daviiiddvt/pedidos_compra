@@ -554,11 +554,7 @@ class PedidosService {
           }
         }
       }
-      final email = cliente.s('EMAIL_DE_ENVIO_CLT').isNotEmpty
-          ? cliente.s('EMAIL_DE_ENVIO_CLT')
-          : (cliente.s('email').isNotEmpty
-              ? cliente.s('email')
-              : (cliente.s('mail').isNotEmpty ? cliente.s('mail') : cliente.s('eml')));
+      final email = cliente.s('EML');
 
       return {
         'serie': serie,
@@ -579,17 +575,7 @@ class PedidosService {
         params: {'page[size]': 1000},
       );
       return payloadLista(json)
-          .where((r) {
-            final cliente = <String>[
-              _referenceId(r, 'clt'),
-              _referenceId(r, 'CLT'),
-              _referenceId(r, 'ent'),
-              _referenceId(r, 'ENT'),
-              _referenceId(r, 'cliente'),
-              _referenceId(r, 'clienteId'),
-            ].firstWhere((value) => value.isNotEmpty, orElse: () => '');
-            return cliente.isEmpty || cliente == '$clienteId';
-          })
+          .where((r) => _referenceId(r, 'ENT') == '$clienteId')
           .map(
             (r) =>             OpcionMaestra(
               codigo: r.s('id').isNotEmpty ? r.s('id') : r.s('codigo'),
