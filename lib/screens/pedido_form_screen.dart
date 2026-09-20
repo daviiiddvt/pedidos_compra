@@ -21,19 +21,20 @@
 // ============================================================================
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../api_service.dart'; // PedidosService (guardar + cargar detalle).
+import '../core/formatters.dart'; // todayIso (fecha de hoy por defecto).
 import '../models.dart'; // Modelos y calcularTotales.
 import '../state/auth_state.dart';
+import '../state/pedido_form_cubit.dart';
 import '../theme/app_theme.dart'; // Colores.
-import '../core/formatters.dart'; // todayIso (fecha de hoy por defecto).
-import '../widgets/segment_tabs.dart'; // Pestañas.
 import '../widgets/cabecera_form.dart'; // Formulario de la cabecera.
-import '../widgets/lineas_table.dart'; // Tabla de líneas (editable).
-import '../widgets/totales_card.dart'; // Tarjeta de totales.
-import '../widgets/linea_form_modal.dart'; // El "modal" para añadir/editar línea.
 import '../widgets/estado_badge.dart'; // Etiqueta del estado.
+import '../widgets/linea_form_modal.dart'; // El "modal" para añadir/editar línea.
+import '../widgets/lineas_table.dart'; // Tabla de líneas (editable).
+import '../widgets/segment_tabs.dart'; // Pestañas.
+import '../widgets/totales_card.dart'; // Tarjeta de totales.
 
 /// PedidoFormScreen: pantalla de ALTA/EDICIÓN de pedidos.
 class PedidoFormScreen extends StatefulWidget {
@@ -46,7 +47,7 @@ class PedidoFormScreen extends StatefulWidget {
 }
 
 class _PedidoFormScreenState extends State<PedidoFormScreen> {
-  late Pedido _pedido; // El pedido que estamos construyendo/editando.
+  late final PedidoFormCubit _cubit; // Estado de la cabecera (compartido).
   List<LineaPedido> _lineas = []; // Las líneas del pedido (en memoria).
   Set<int> _lineasOriginalesIds = {};
   bool _cargandoDetalle = false; // ¿Cargando el detalle (modo editar)?
@@ -56,25 +57,34 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   // ¿Estamos en modo edición? Sí, si nos pasaron un id.
   bool get _editando => widget.pedidoId != null;
 
+  /// El pedido en construcción vive en el cubit (fuente de verdad única).
+  Pedido get _pedido => _cubit.state.pedido;
+
   @override
   void initState() {
     super.initState();
     // Pedido nuevo con fecha de HOY por defecto.
-    _pedido = Pedido(fecha: todayIso());
+    _cubit = PedidoFormCubit(Pedido(fecha: todayIso()));
     if (_editando) {
       _cargarDetalle(); // Si es edición, cargamos los datos del servidor.
     }
   }
 
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
+
   /// _cargarDetalle: (modo editar) pide el pedido al servidor y lo mete en
-  /// la memoria (_pedido y _lineas) para que el usuario lo vea y modifique.
+  /// el cubit (_pedido y _lineas) para que el usuario lo vea y modifique.
   Future<void> _cargarDetalle() async {
     setState(() => _cargandoDetalle = true);
     try {
       final detalle = await PedidosService.getById(widget.pedidoId);
       if (!mounted) return;
+      _cubit.init(detalle);
       setState(() {
-        _pedido = detalle;
         _lineas = [...detalle.lineas]; // Copiamos las líneas.
         _lineasOriginalesIds = detalle.lineas
           .where((linea) => linea.id != null)
@@ -91,14 +101,14 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   }
 
   /// _onCambioCabecera: lo llama CabeceraForm cada vez que el usuario cambia
-  /// algo en la cabecera. Guardamos el pedido nuevo en _pedido.
+  /// algo en la cabecera. Guardamos el pedido nuevo en el cubit.
   ///
   /// REGLA DE NEGOCIO: si el usuario pone el estado a "Cancelado" (código "A"),
   /// todas las líneas pasan a "Cancelado" automáticamente.
   void _onCambioCabecera(Pedido nuevo) {
-    setState(() {
-      _pedido = nuevo;
-      if (AppColors.estadoCodigo(nuevo.estado) == 'C') {
+    _cubit.update(nuevo);
+    if (AppColors.estadoCodigo(nuevo.estado) == 'C') {
+      setState(() {
         // Reconstruimos cada línea con estado "Cancelado" y cancelado=true.
         // (No modificamos las originales directamente por inmutabilidad.)
         _lineas = _lineas
@@ -127,8 +137,8 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
               ),
             )
             .toList();
-      }
-    });
+      });
+    }
   }
 
   /// _editarLinea: abre el modal para editar UNA línea existente.
@@ -253,80 +263,88 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   /// build: la pantalla completa.
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_editando ? 'Editar pedido' : 'Nuevo pedido')),
-      body: _cargandoDetalle
-          ? const Center(child: CircularProgressIndicator()) // Cargando (editar).
-          : Column(
-              children: [
-                // Pestañas: Cabecera | Líneas (n) | Totales.
-                SegmentTabs(
-                  tabs: [
-                    (key: 'cabecera', label: 'Cabecera'),
-                    (key: 'lineas', label: 'Líneas (${_lineas.length})'),
-                    (key: 'totales', label: 'Totales'),
-                  ],
-                  active: _tab,
-                  onChanged: (key) => setState(() => _tab = key),
-                ),
-                // Contenido según la pestaña activa.
-                Expanded(
-                  child: switch (_tab) {
-                    // Líneas: versión editable (permite editar y añadir).
-                    'lineas' => LineasTable(
-                        lineas: _lineas,
-                        onEdit: _editarLinea,
-                        onAdd: _anadirLinea,
-                      ),
-                    // Totales: resumen de las líneas en memoria.
-                    'totales' => _totales(),
-                    // Cabecera: el formulario, que avisa en cada cambio.
-                    _ => CabeceraForm(
-                        pedido: _pedido,
-                        onChanged: _onCambioCabecera,
-                      ),
-                  },
-                ),
+    return BlocProvider<PedidoFormCubit>(
+      // El cubit lo creamos en initState; aquí solo lo exponemos al árbol.
+      create: (_) => _cubit,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: Text(_editando ? 'Editar pedido' : 'Nuevo pedido')),
+        body: _cargandoDetalle
+            ? const Center(child: CircularProgressIndicator()) // Cargando (editar).
+            : Column(
+                children: [
+                  // Pestañas: Cabecera | Líneas (n) | Totales.
+                  SegmentTabs(
+                    tabs: [
+                      (key: 'cabecera', label: 'Cabecera'),
+                      (key: 'lineas', label: 'Líneas (${_lineas.length})'),
+                      (key: 'totales', label: 'Totales'),
+                    ],
+                    active: _tab,
+                    onChanged: (key) => setState(() => _tab = key),
+                  ),
+                  // Contenido según la pestaña activa.
+                  Expanded(
+                    child: switch (_tab) {
+                      // Líneas: versión editable (permite editar y añadir).
+                      'lineas' => LineasTable(
+                          lineas: _lineas,
+                          onEdit: _editarLinea,
+                          onAdd: _anadirLinea,
+                        ),
+                      // Totales: resumen de las líneas en memoria.
+                      'totales' => _totales(),
+                      // Cabecera: el formulario, que avisa en cada cambio (lo
+                      // repintamos con BlocBuilder para reflejar al instante los
+                      // valores por defecto del cliente elegido).
+                      _ => BlocBuilder<PedidoFormCubit, PedidoFormState>(
+                          builder: (context, state) => CabeceraForm(
+                            pedido: state.pedido,
+                            onChanged: _onCambioCabecera,
+                          ),
+                        ),
+                    },
+                  ),
 
-                // ---- Barra inferior: Cancelar | Guardar ----
-                Material(
-                  color: AppColors.surface,
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.of(context).pop(), // Salir sin guardar.
-                              child: const Text('Cancelar'),
+                  // ---- Barra inferior: Cancelar | Guardar ----
+                  Material(
+                    color: AppColors.surface,
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.of(context).pop(), // Salir sin guardar.
+                                child: const Text('Cancelar'),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _guardando ? null : _guardar, // Deshabilitado mientras guarda.
-                              child: _guardando
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.white,
-                                      ),
-                                    )
-                                  : const Text('Guardar'),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _guardando ? null : _guardar, // Deshabilitado mientras guarda.
+                                child: _guardando
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppColors.white,
+                                        ),
+                                      )
+                                    : const Text('Guardar'),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 

@@ -25,6 +25,7 @@
 // ============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 
 import '../api_service.dart'; // PedidosService (cargar clientes, series, etc.).
@@ -32,6 +33,7 @@ import '../core/master_cache_service.dart';
 import '../core/search/entity_search_repository.dart'; // Repositorio local-first.
 import '../models.dart'; // Pedido, OpcionMaestra.
 import '../state/auth_state.dart';
+import '../state/pedido_form_cubit.dart'; // selectCliente (valores por defecto).
 import '../theme/app_theme.dart'; // Colores (para etiqueta de estado).
 import 'autocomplete_field.dart'; // Buscador de cliente con autocompletado.
 import 'campo_form.dart'; // CampoForm (texto) y CampoSelect (selector).
@@ -60,8 +62,6 @@ class _CabeceraFormState extends State<CabeceraForm> {
   List<OpcionMaestra> _comerciales = [];
   List<OpcionMaestra> _almacenes = [];
   List<OpcionMaestra> _formasPago = [];
-  List<OpcionMaestra> _direccionesCliente = [];
-  bool _cargandoCliente = false;
   bool _cargandoMaestros = true;
 
   @override
@@ -140,97 +140,6 @@ class _CabeceraFormState extends State<CabeceraForm> {
     return nuevo;
   }
 
-  Future<void> _cargarDatosCliente(
-    int clienteId, {
-    required Pedido basePedido,
-  }) async {
-    if (clienteId <= 0) {
-      setState(() {
-        _direccionesCliente = [];
-        _cargandoCliente = false;
-      });
-      return;
-    }
-
-    setState(() => _cargandoCliente = true);
-    try {
-      final defaults = await PedidosService.getClienteDefaults(clienteId);
-      final direcciones = await PedidosService.getDireccionesCliente(clienteId);
-      if (!mounted) return;
-
-      final direccionDefault = defaults['direccion'];
-      final direccionesDisponibles = [...direcciones];
-      if (direccionesDisponibles.isEmpty &&
-          direccionDefault is String &&
-          direccionDefault.isNotEmpty) {
-        direccionesDisponibles.add(
-          OpcionMaestra(codigo: direccionDefault, nombre: direccionDefault),
-        );
-      }
-
-      setState(() {
-        _direccionesCliente = direccionesDisponibles;
-        _cargandoCliente = false;
-      });
-
-      var pedidoActualizado = basePedido;
-      final serieDefault = defaults['serie'];
-      if (serieDefault is String && serieDefault.isNotEmpty &&
-          serieDefault != basePedido.serie) {
-        final serieOpcion = PedidosService.findMatchingOption(_series, serieDefault) ??
-            OpcionMaestra(codigo: serieDefault, nombre: serieDefault);
-        pedidoActualizado = pedidoActualizado.copyWith(
-          serie: serieOpcion.codigo,
-          serieNombre: serieOpcion.nombre,
-        );
-      }
-
-      if (direccionDefault is String &&
-          direccionDefault.isNotEmpty &&
-          direccionDefault != basePedido.direccionEnvio) {
-        final direccionOpcion = PedidosService.findMatchingOption(direccionesDisponibles, direccionDefault) ??
-            OpcionMaestra(codigo: direccionDefault, nombre: direccionDefault);
-        pedidoActualizado = pedidoActualizado.copyWith(
-          direccionEnvio: direccionOpcion.codigo,
-        );
-      }
-
-      final emailDefault = defaults['email'];
-      if (emailDefault is String &&
-          emailDefault.isNotEmpty &&
-          emailDefault != basePedido.email) {
-        pedidoActualizado = pedidoActualizado.copyWith(email: emailDefault);
-      }
-
-      final formaPagoDefault = defaults['formaPago'];
-      if (formaPagoDefault is String &&
-          formaPagoDefault.isNotEmpty &&
-          formaPagoDefault != basePedido.formaPago) {
-        final formaPagoOpcion = PedidosService.findMatchingOption(_formasPago, formaPagoDefault) ??
-            OpcionMaestra(codigo: formaPagoDefault, nombre: formaPagoDefault);
-        pedidoActualizado = pedidoActualizado.copyWith(
-          formaPago: formaPagoOpcion.codigo,
-          formaPagoNombre: formaPagoOpcion.nombre,
-        );
-      }
-
-      if (direccionesDisponibles.isNotEmpty &&
-          (direccionDefault is! String || direccionDefault.isEmpty)) {
-        final direccionElegida = direccionesDisponibles.first;
-        pedidoActualizado = pedidoActualizado.copyWith(
-          direccionEnvio: direccionElegida.codigo,
-        );
-      }
-
-      if (pedidoActualizado != basePedido) {
-        widget.onChanged(pedidoActualizado);
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _cargandoCliente = false);
-    }
-  }
-
   /// _elegir: abre el selector de una lista maestro y guarda la elección.
   Future<void> _elegir(
     String title, // Título de la ventana.
@@ -287,6 +196,8 @@ class _CabeceraFormState extends State<CabeceraForm> {
         // Cliente (buscador con autocompletado; obligatorio).
         // Se consulta a Velneo bajo demanda (debounce 400 ms, mín. 3 letras)
         // y se apoya en la caché local para devolver resultados al instante.
+        // Al elegir, el PedidoFormCubit aplica los valores por defecto del
+        // cliente (almacén central '1', forma de pago y serie).
         AutocompleteField(
           label: 'Cliente',
           required: true,
@@ -298,36 +209,23 @@ class _CabeceraFormState extends State<CabeceraForm> {
           search: (query) => context
               .read<EntitySearchRepository>()
               .search(EntityKind.cliente, query, limit: 20),
-          onSelected: (cliente) async {
-            final clienteId = int.tryParse(cliente.codigo) ?? 0;
-            final nuevoPedido = _actualizar(
-              (x) => x.copyWith(
-                clienteId: clienteId,
-                cliente: cliente.codigo,
-                clienteNombre: cliente.nombre,
-              ),
-            );
-            if (clienteId > 0) {
-              await _cargarDatosCliente(clienteId, basePedido: nuevoPedido);
-            }
+          onSelected: (cliente) {
+            context.read<PedidoFormCubit>().selectCliente(
+                  cliente,
+                  series: _series,
+                  formasPago: _formasPago,
+                  almacenes: _almacenes,
+                );
           },
           onCleared: () {
-            _actualizar(
-              (x) => x.copyWith(
-                clienteId: 0,
-                cliente: '',
-                clienteNombre: '',
-                direccionEnvio: '',
-              ),
-            );
-            setState(() => _direccionesCliente = []);
+            context.read<PedidoFormCubit>().clearCliente();
           },
         ),
-        if (_cargandoCliente)
+        if (context.watch<PedidoFormCubit>().state.cargandoDatosCliente)
           const Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text(
-              'Cargando datos del cliente...',
+              'Aplicando datos del cliente...',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ),
@@ -433,23 +331,25 @@ class _CabeceraFormState extends State<CabeceraForm> {
         // ================= ENVÍO =================
         const _Seccion('Envío'),
 
-        // Dirección de envío: siempre se muestra como selector.
-        CampoSelect(
-          label: 'Dirección de envío',
-          value: _direccionesCliente.any((d) => d.codigo == p.direccionEnvio)
-              ? _direccionesCliente
-                  .firstWhere((d) => d.codigo == p.direccionEnvio)
-                  .nombre
-              : p.direccionEnvio,
-          enabled: !_cargandoMaestros,
-          onTap: () => _elegir(
-            'Seleccionar dirección de envío',
-            _direccionesCliente,
-            (o) => _actualizar(
-              (x) => x.copyWith(direccionEnvio: o.codigo),
+        // Dirección de envío: siempre se muestra como selector. Las
+        // direcciones del cliente elegido viven en el PedidoFormCubit.
+        Builder(builder: (context) {
+          final direcciones = context.watch<PedidoFormCubit>().state.direccionesCliente;
+          return CampoSelect(
+            label: 'Dirección de envío',
+            value: direcciones.any((d) => d.codigo == p.direccionEnvio)
+                ? direcciones
+                    .firstWhere((d) => d.codigo == p.direccionEnvio)
+                    .nombre
+                : p.direccionEnvio,
+            enabled: !_cargandoMaestros,
+            onTap: () => _elegir(
+              'Seleccionar dirección de envío',
+              direcciones,
+              (o) => context.read<PedidoFormCubit>().selectDireccion(o),
             ),
-          ),
-        ),
+          );
+        }),
 
         // Email: Velneo lo devuelve, pero esta API no permite modificarlo.
         CampoForm(

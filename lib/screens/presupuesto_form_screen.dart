@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../core/formatters.dart';
 import '../models.dart';
 import '../presupuesto_service.dart';
 import '../state/auth_state.dart';
+import '../state/pedido_form_cubit.dart';
 import '../theme/app_theme.dart';
-import '../core/formatters.dart';
 import '../widgets/cabecera_form.dart';
 import '../widgets/linea_form_modal.dart';
 import '../widgets/lineas_table.dart';
@@ -22,7 +23,7 @@ class PresupuestoFormScreen extends StatefulWidget {
 }
 
 class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
-  late Pedido _presupuesto;
+  late final PedidoFormCubit _cubit;
   List<LineaPedido> _lineas = [];
   Set<int> _originalLineIds = {};
   bool _loading = false;
@@ -31,11 +32,19 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
 
   bool get _editing => widget.presupuestoId != null;
 
+  Pedido get _presupuesto => _cubit.state.pedido;
+
   @override
   void initState() {
     super.initState();
-    _presupuesto = Pedido(fecha: todayIso());
+    _cubit = PedidoFormCubit(Pedido(fecha: todayIso()));
     if (_editing) _load();
+  }
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -43,8 +52,8 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
     try {
       final budget = await PresupuestosService.getById(widget.presupuestoId);
       if (!mounted) return;
+      _cubit.init(budget);
       setState(() {
-        _presupuesto = budget;
         _lineas = [...budget.lineas];
         _originalLineIds = budget.lineas
             .where((line) => line.id != null)
@@ -113,70 +122,75 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_editing ? 'Editar presupuesto' : 'Nuevo presupuesto')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                SegmentTabs(
-                  tabs: [
-                    (key: 'cabecera', label: 'Cabecera'),
-                    (key: 'lineas', label: 'Líneas (${_lineas.length})'),
-                    (key: 'totales', label: 'Totales'),
-                  ],
-                  active: _tab,
-                  onChanged: (tab) => setState(() => _tab = tab),
-                ),
-                Expanded(
-                  child: switch (_tab) {
-                    'lineas' => LineasTable(
-                        lineas: _lineas,
-                        onEdit: _editLine,
-                        onAdd: _addLine,
-                      ),
-                    'totales' => SingleChildScrollView(
-                        padding: const EdgeInsets.all(12),
-                        child: TotalesCard(
-                          base: calcularTotales(_lineas).base,
-                          iva: calcularTotales(_lineas).iva,
-                          total: calcularTotales(_lineas).total,
+    return BlocProvider<PedidoFormCubit>(
+      create: (_) => _cubit,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: Text(_editing ? 'Editar presupuesto' : 'Nuevo presupuesto')),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  SegmentTabs(
+                    tabs: [
+                      (key: 'cabecera', label: 'Cabecera'),
+                      (key: 'lineas', label: 'Líneas (${_lineas.length})'),
+                      (key: 'totales', label: 'Totales'),
+                    ],
+                    active: _tab,
+                    onChanged: (tab) => setState(() => _tab = tab),
+                  ),
+                  Expanded(
+                    child: switch (_tab) {
+                      'lineas' => LineasTable(
+                          lineas: _lineas,
+                          onEdit: _editLine,
+                          onAdd: _addLine,
                         ),
-                      ),
-                    _ => CabeceraForm(
-                        pedido: _presupuesto,
-                        onChanged: (value) => setState(() => _presupuesto = value),
-                      ),
-                  },
-                ),
-                SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Cancelar'),
+                      'totales' => SingleChildScrollView(
+                          padding: const EdgeInsets.all(12),
+                          child: TotalesCard(
+                            base: calcularTotales(_lineas).base,
+                            iva: calcularTotales(_lineas).iva,
+                            total: calcularTotales(_lineas).total,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _saving ? null : _save,
-                            child: _saving
-                                ? const CircularProgressIndicator()
-                                : const Text('Guardar'),
+                      _ => BlocBuilder<PedidoFormCubit, PedidoFormState>(
+                          builder: (context, state) => CabeceraForm(
+                            pedido: state.pedido,
+                            onChanged: (value) => _cubit.update(value),
                           ),
                         ),
-                      ],
+                    },
+                  ),
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text('Cancelar'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _saving ? null : _save,
+                              child: _saving
+                                  ? const CircularProgressIndicator()
+                                  : const Text('Guardar'),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 }
