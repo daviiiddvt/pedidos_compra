@@ -28,9 +28,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api_service.dart'; // PedidosService (cargar clientes, series, etc.).
+import '../core/master_cache_service.dart';
+import '../core/search/entity_search_repository.dart'; // Repositorio local-first.
 import '../models.dart'; // Pedido, OpcionMaestra.
 import '../state/auth_state.dart';
 import '../theme/app_theme.dart'; // Colores (para etiqueta de estado).
+import 'autocomplete_field.dart'; // Buscador de cliente con autocompletado.
 import 'campo_form.dart'; // CampoForm (texto) y CampoSelect (selector).
 import 'campo_fecha.dart'; // CampoFecha (calendario).
 import 'modal_selector.dart'; // mostrarSelector (ventana para elegir).
@@ -51,13 +54,15 @@ class CabeceraForm extends StatefulWidget {
 
 class _CabeceraFormState extends State<CabeceraForm> {
   // Las listas "maestras" que bajamos del servidor para los desplegables.
-  List<OpcionMaestra> _clientes = [];
+  // Nota: clientes y artículos NO se cargan completos; se buscan bajo demanda
+  // a través del repositorio local-first (AutocompleteField).
   List<OpcionMaestra> _series = [];
   List<OpcionMaestra> _comerciales = [];
   List<OpcionMaestra> _almacenes = [];
   List<OpcionMaestra> _formasPago = [];
   List<OpcionMaestra> _direccionesCliente = [];
   bool _cargandoCliente = false;
+  bool _cargandoMaestros = true;
 
   @override
   void initState() {
@@ -68,19 +73,17 @@ class _CabeceraFormState extends State<CabeceraForm> {
 
   Future<void> _cargarEmpresaDefaults() async {
     try {
-      final defaults = await PedidosService.getEmpresaDefaults();
+      final currentUser = context.read<AuthState>().currentUser;
+      final defaults = await PedidosService.getEmpresaDefaults(
+        contactId: currentUser?.contactId,
+      );
       if (!mounted) return;
       final almacenDefault = defaults['almacen'];
       if (almacenDefault is String &&
           almacenDefault.isNotEmpty &&
           widget.pedido.almacen.isEmpty) {
-        final almacenOpcion = _almacenes.firstWhere(
-          (almacen) => almacen.codigo == almacenDefault,
-          orElse: () => OpcionMaestra(
-            codigo: almacenDefault,
-            nombre: almacenDefault,
-          ),
-        );
+        final almacenOpcion = PedidosService.findMatchingOption(_almacenes, almacenDefault) ??
+            OpcionMaestra(codigo: almacenDefault, nombre: almacenDefault);
         widget.onChanged(widget.pedido.copyWith(
           almacen: almacenOpcion.codigo,
           almacenNombre: almacenOpcion.nombre,
@@ -91,14 +94,21 @@ class _CabeceraFormState extends State<CabeceraForm> {
     }
   }
 
-  /// _cargarMaestros: pide las listas al servidor A LA VEZ.
+  /// _cargarMaestros: usa caché por sesión para reutilizar las listas maestra.
   Future<void> _cargarMaestros() async {
+    final cache = MasterCacheService();
+
     Future<List<OpcionMaestra>> cargar(
       String nombre,
+      String cacheKey,
       Future<List<OpcionMaestra>> Function() solicitud,
     ) async {
       try {
-        return await solicitud();
+        return await cache.getOrLoad<List<OpcionMaestra>>(
+          key: cacheKey,
+          loader: solicitud,
+          ttl: const Duration(minutes: 10),
+        );
       } catch (e) {
         debugPrint('No se pudo cargar $nombre: $e');
         return [];
@@ -106,20 +116,20 @@ class _CabeceraFormState extends State<CabeceraForm> {
     }
 
     final resultados = await Future.wait([
-      cargar('clientes', PedidosService.getClientes),
-      cargar('series', PedidosService.getSeries),
-      cargar('comerciales', PedidosService.getComerciales),
-      cargar('almacenes', PedidosService.getAlmacenes),
-      cargar('formas de pago', PedidosService.getFormasPago),
+      cargar('series', 'series', PedidosService.getSeries),
+      cargar('comerciales', 'comerciales', PedidosService.getComerciales),
+      cargar('almacenes', 'almacenes', PedidosService.getAlmacenes),
+      cargar('formas de pago', 'formas_pago', PedidosService.getFormasPago),
     ]);
     if (!mounted) return;
     setState(() {
-      _clientes = resultados[0];
-      _series = resultados[1];
-      _comerciales = resultados[2];
-      _almacenes = resultados[3];
-      _formasPago = resultados[4];
+      _series = resultados[0];
+      _comerciales = resultados[1];
+      _almacenes = resultados[2];
+      _formasPago = resultados[3];
+      _cargandoMaestros = false;
     });
+    await _cargarEmpresaDefaults();
   }
 
   /// _actualizar: aplica un cambio al pedido y avisa a la pantalla madre.
@@ -167,10 +177,8 @@ class _CabeceraFormState extends State<CabeceraForm> {
       final serieDefault = defaults['serie'];
       if (serieDefault is String && serieDefault.isNotEmpty &&
           serieDefault != basePedido.serie) {
-        final serieOpcion = _series.firstWhere(
-          (s) => s.codigo == serieDefault,
-          orElse: () => OpcionMaestra(codigo: serieDefault, nombre: serieDefault),
-        );
+        final serieOpcion = PedidosService.findMatchingOption(_series, serieDefault) ??
+            OpcionMaestra(codigo: serieDefault, nombre: serieDefault);
         pedidoActualizado = pedidoActualizado.copyWith(
           serie: serieOpcion.codigo,
           serieNombre: serieOpcion.nombre,
@@ -180,7 +188,11 @@ class _CabeceraFormState extends State<CabeceraForm> {
       if (direccionDefault is String &&
           direccionDefault.isNotEmpty &&
           direccionDefault != basePedido.direccionEnvio) {
-        pedidoActualizado = pedidoActualizado.copyWith(direccionEnvio: direccionDefault);
+        final direccionOpcion = PedidosService.findMatchingOption(direccionesDisponibles, direccionDefault) ??
+            OpcionMaestra(codigo: direccionDefault, nombre: direccionDefault);
+        pedidoActualizado = pedidoActualizado.copyWith(
+          direccionEnvio: direccionOpcion.codigo,
+        );
       }
 
       final emailDefault = defaults['email'];
@@ -188,6 +200,18 @@ class _CabeceraFormState extends State<CabeceraForm> {
           emailDefault.isNotEmpty &&
           emailDefault != basePedido.email) {
         pedidoActualizado = pedidoActualizado.copyWith(email: emailDefault);
+      }
+
+      final formaPagoDefault = defaults['formaPago'];
+      if (formaPagoDefault is String &&
+          formaPagoDefault.isNotEmpty &&
+          formaPagoDefault != basePedido.formaPago) {
+        final formaPagoOpcion = PedidosService.findMatchingOption(_formasPago, formaPagoDefault) ??
+            OpcionMaestra(codigo: formaPagoDefault, nombre: formaPagoDefault);
+        pedidoActualizado = pedidoActualizado.copyWith(
+          formaPago: formaPagoOpcion.codigo,
+          formaPagoNombre: formaPagoOpcion.nombre,
+        );
       }
 
       if (direccionesDisponibles.isNotEmpty &&
@@ -260,28 +284,44 @@ class _CabeceraFormState extends State<CabeceraForm> {
           ),
         ],
 
-        // Cliente (selector; obligatorio).
-        CampoSelect(
+        // Cliente (buscador con autocompletado; obligatorio).
+        // Se consulta a Velneo bajo demanda (debounce 400 ms, mín. 3 letras)
+        // y se apoya en la caché local para devolver resultados al instante.
+        AutocompleteField(
           label: 'Cliente',
-          value: p.clienteNombre.isNotEmpty ? p.clienteNombre : p.cliente,
-          required: true, // Obligatorio.
-          onTap: () => _elegir(
-            'Seleccionar cliente',
-            _clientes,
-            (o) async {
-              final clienteId = int.tryParse(o.codigo) ?? 0;
-              final nuevoPedido = _actualizar(
-                (x) => x.copyWith(
-                  clienteId: clienteId,
-                  cliente: o.codigo,
-                  clienteNombre: o.nombre,
-                ),
-              );
-              if (clienteId > 0) {
-                await _cargarDatosCliente(clienteId, basePedido: nuevoPedido);
-              }
-            },
-          ),
+          required: true,
+          minChars: 3,
+          debounce: const Duration(milliseconds: 400),
+          maxResults: 20,
+          initialValue: p.clienteNombre.isNotEmpty ? p.clienteNombre : p.cliente,
+          hint: 'Buscar por nombre o código...',
+          search: (query) => context
+              .read<EntitySearchRepository>()
+              .search(EntityKind.cliente, query, limit: 20),
+          onSelected: (cliente) async {
+            final clienteId = int.tryParse(cliente.codigo) ?? 0;
+            final nuevoPedido = _actualizar(
+              (x) => x.copyWith(
+                clienteId: clienteId,
+                cliente: cliente.codigo,
+                clienteNombre: cliente.nombre,
+              ),
+            );
+            if (clienteId > 0) {
+              await _cargarDatosCliente(clienteId, basePedido: nuevoPedido);
+            }
+          },
+          onCleared: () {
+            _actualizar(
+              (x) => x.copyWith(
+                clienteId: 0,
+                cliente: '',
+                clienteNombre: '',
+                direccionEnvio: '',
+              ),
+            );
+            setState(() => _direccionesCliente = []);
+          },
         ),
         if (_cargandoCliente)
           const Padding(
@@ -296,6 +336,7 @@ class _CabeceraFormState extends State<CabeceraForm> {
         CampoSelect(
           label: 'Serie ventas',
           value: p.serieNombre.isNotEmpty ? p.serieNombre : p.serie,
+          enabled: !_cargandoMaestros,
           onTap: () => _elegir(
             'Seleccionar serie',
             _series,
@@ -309,6 +350,7 @@ class _CabeceraFormState extends State<CabeceraForm> {
           CampoSelect(
             label: 'Comercial',
             value: p.comercialNombre.isNotEmpty ? p.comercialNombre : p.comercial,
+            enabled: !_cargandoMaestros,
             onTap: () => _elegir(
               'Seleccionar comercial',
               _comerciales,
@@ -322,6 +364,7 @@ class _CabeceraFormState extends State<CabeceraForm> {
         CampoSelect(
           label: 'Almacén',
           value: p.almacenNombre.isNotEmpty ? p.almacenNombre : p.almacen,
+          enabled: !_cargandoMaestros,
           onTap: () => _elegir(
             'Seleccionar almacén',
             _almacenes,
@@ -358,6 +401,7 @@ class _CabeceraFormState extends State<CabeceraForm> {
         CampoSelect(
           label: 'Forma de pago',
           value: p.formaPagoNombre.isNotEmpty ? p.formaPagoNombre : p.formaPago,
+          enabled: !_cargandoMaestros,
           onTap: () => _elegir(
             'Seleccionar forma de pago',
             _formasPago,
@@ -371,6 +415,7 @@ class _CabeceraFormState extends State<CabeceraForm> {
         CampoSelect(
           label: 'Estado',
           value: AppColors.estadoLabel(p.estado), // Texto bonito ("Pendiente").
+          enabled: !_cargandoMaestros,
           onTap: () async {
             final seleccionado = await mostrarSelector(
               context,
@@ -396,6 +441,7 @@ class _CabeceraFormState extends State<CabeceraForm> {
                   .firstWhere((d) => d.codigo == p.direccionEnvio)
                   .nombre
               : p.direccionEnvio,
+          enabled: !_cargandoMaestros,
           onTap: () => _elegir(
             'Seleccionar dirección de envío',
             _direccionesCliente,

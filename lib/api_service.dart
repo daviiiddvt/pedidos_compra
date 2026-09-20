@@ -63,13 +63,134 @@ class ResultadoLista<T> {
 class PedidosService {
   // El mensajero único que hará las llamadas HTTP.
   static final _api = ApiClient.instance;
+  static final Map<String, String> _articuloNombreCache = <String, String>{};
 
-  static String _firstNonEmpty(Map<String, dynamic> record, List<String> fields) {
+  static Map<String, String> buildArticleNameMap(
+    List<Map<String, dynamic>> records,
+    Set<String> requestedIds,
+  ) {
+    final names = <String, String>{};
+    for (final record in records) {
+      final id = _referenceId(record, 'id');
+      final normalizedId = id.isEmpty ? record.s('codigo') : id;
+      if (normalizedId.isEmpty || !requestedIds.contains(normalizedId)) {
+        continue;
+      }
+      final name = record.s('name').isNotEmpty
+          ? record.s('name')
+          : record.s('descripcion');
+      if (name.isNotEmpty) {
+        names[normalizedId] = name;
+      }
+    }
+    return names;
+  }
+
+  static bool shouldRequestNextPage({
+    required int loadedRecords,
+    required int totalRecords,
+    required int pageSize,
+    required int pageRecords,
+  }) {
+    if (pageRecords == 0) return false;
+    if (totalRecords > 0) return loadedRecords < totalRecords;
+    return pageRecords >= pageSize;
+  }
+
+  static Future<List<Map<String, dynamic>>> _fetchAllRecords(
+    String endpoint, {
+    Map<String, dynamic>? extraParams,
+    int pageSize = 1000,
+  }) async {
+    final allRecords = <Map<String, dynamic>>[];
+    var pageNumber = 1;
+
+    while (true) {
+      final params = <String, dynamic>{
+        'page[size]': pageSize,
+        'page[number]': pageNumber,
+        ...?extraParams,
+      };
+
+      final json = await _api.get(endpoint, params: params);
+      final records = payloadLista(json);
+      if (records.isEmpty) break;
+
+      allRecords.addAll(records);
+      final shouldContinue = shouldRequestNextPage(
+        loadedRecords: allRecords.length,
+        totalRecords: payloadTotal(json),
+        pageSize: pageSize,
+        pageRecords: records.length,
+      );
+
+      if (!shouldContinue) break;
+      pageNumber++;
+    }
+
+    return allRecords;
+  }
+
+  static String resolveDefaultValue(Map<String, dynamic> record, List<String> fields) {
     for (final field in fields) {
-      final value = record.s(field);
-      if (value.isNotEmpty) return value;
+      final normalized = _normalizeDefaultValue(record.raw(field));
+      if (normalized.isNotEmpty) return normalized;
     }
     return '';
+  }
+
+  static String _normalizeDefaultValue(dynamic value) {
+    if (value == null) return '';
+    if (value is List) {
+      for (final item in value) {
+        final normalized = _normalizeDefaultValue(item);
+        if (normalized.isNotEmpty) return normalized;
+      }
+      return '';
+    }
+    if (value is Map) {
+      final candidates = [
+        value['value'],
+        value['id'],
+        value['codigo'],
+        value['code'],
+        value['cod'],
+        value['name'],
+        value['nom_com'],
+        value['descripcion'],
+        value['DIR'],
+        value['ALM'],
+        value['FPG'],
+        value['EML'],
+        value['ser_vta'],
+      ];
+      for (final candidate in candidates) {
+        final normalized = _normalizeDefaultValue(candidate);
+        if (normalized.isNotEmpty) return normalized;
+      }
+      return '';
+    }
+    return '$value'.trim();
+  }
+
+  static String _firstNonEmpty(Map<String, dynamic> record, List<String> fields) {
+    return resolveDefaultValue(record, fields);
+  }
+
+  static OpcionMaestra? findMatchingOption(List<OpcionMaestra> options, String? rawValue) {
+    final value = (rawValue ?? '').trim();
+    if (value.isEmpty) return null;
+
+    final normalized = value.toLowerCase();
+    for (final option in options) {
+      final code = option.codigo.trim();
+      final name = option.nombre.trim();
+      if (code.isNotEmpty && code.toLowerCase() == normalized) return option;
+      if (name.isNotEmpty && name.toLowerCase() == normalized) return option;
+      if (code.isNotEmpty && code.toLowerCase().contains(normalized)) return option;
+      if (name.isNotEmpty && name.toLowerCase().contains(normalized)) return option;
+    }
+    return null;
   }
 
   /// Extrae el identificador de una referencia Velneo.
@@ -83,6 +204,27 @@ class PedidosService {
       return '${value['id'] ?? value['value'] ?? ''}';
     }
     return value == null ? '' : '$value';
+  }
+
+  static bool isClienteEntity(Map<String, dynamic> record) {
+    final values = [
+      record.raw('ES_CLT'),
+      record.raw('es_clt'),
+      record.raw('esCliente'),
+      record.raw('es_cliente'),
+      record.raw('CLT'),
+      record.raw('clt'),
+    ];
+    for (final value in values) {
+      if (value is bool && value) return true;
+      if (value is num && value != 0) return true;
+      if (value is String && value.trim().toLowerCase() == 'true') return true;
+      if (value is String && value.trim() == '1') return true;
+      if (value is String && value.trim().toLowerCase() == 's') return true;
+      if (value is String && value.trim().toLowerCase() == 'si') return true;
+      if (value is String && value.trim().toLowerCase() == 'sí') return true;
+    }
+    return false;
   }
 
   static OpcionMaestra _opcionFromRecord(Map<String, dynamic> record) {
@@ -175,17 +317,51 @@ class PedidosService {
     return name.isNotEmpty ? name : contact.s('nom_com');
   }
 
-  static Future<String> _getArticleName(String id) async {
-    final json = await _api.get(
-      AppConfig.endpoint('articulos'),
-      params: {'filter[id]': id, 'page[size]': 1},
+  static Future<Map<String, String>> _getArticleNamesByIds(
+    Set<String> requestedIds,
+  ) async {
+    final cleanIds = requestedIds.where((id) => id.isNotEmpty).toSet();
+    if (cleanIds.isEmpty) return {};
+
+    final cached = <String, String>{};
+    for (final id in cleanIds) {
+      final cachedName = _articuloNombreCache[id];
+      if (cachedName != null && cachedName.isNotEmpty) {
+        cached[id] = cachedName;
+      }
+    }
+
+    final missing = cleanIds.where((id) => !cached.containsKey(id)).toSet();
+    if (missing.isEmpty) return cached;
+
+    final results = await Future.wait(
+      missing.map((id) async {
+        try {
+          final json = await _api.get(
+            AppConfig.endpoint('articulos'),
+            params: {'filter[id]': id, 'page[size]': 1},
+          );
+          final records = payloadLista(json);
+          if (records.isEmpty) return null;
+          final record = records.first;
+          final name = record.s('name').isNotEmpty
+              ? record.s('name')
+              : record.s('descripcion');
+          if (name.isEmpty) return null;
+          _articuloNombreCache[id] = name;
+          return MapEntry(id, name);
+        } on ApiException {
+          return null;
+        }
+      }),
     );
-    final records = payloadLista(json);
-    if (records.isEmpty) return '';
-    final record = records.first;
-    return record.s('name').isNotEmpty
-        ? record.s('name')
-        : record.s('descripcion');
+
+    for (final result in results) {
+      if (result != null) {
+        cached[result.key] = result.value;
+      }
+    }
+    return cached;
   }
 
   static Future<List<LineaPedido>> _enrichLineArticleNames(
@@ -197,17 +373,7 @@ class PedidosService {
         .toSet();
     if (missing.isEmpty) return lineas;
 
-    final names = <String, String>{};
-    await Future.wait(
-      missing.map((id) async {
-        try {
-          final name = await _getArticleName(id);
-          if (name.isNotEmpty) names[id] = name;
-        } on ApiException {
-          // El código del artículo sigue siendo un fallback válido.
-        }
-      }),
-    );
+    final names = await _getArticleNamesByIds(missing);
     return lineas
         .map(
           (linea) => linea.copyWith(
@@ -362,8 +528,8 @@ class PedidosService {
     throw ApiException('No se pudo crear el pedido.');
   }
 
-  static Map<String, dynamic> _pedidoPayload(Pedido pedido) {
-    return {
+  static Map<String, dynamic> buildPedidoPayload(Pedido pedido) {
+    final payload = <String, dynamic>{
       'clt': pedido.clienteId,
       'est': AppColors.estadoCodigo(pedido.estado),
       'ser': pedido.serie,
@@ -373,12 +539,23 @@ class PedidosService {
       'fch_ent': pedido.previstoPara,
       'fpg': pedido.formaPago,
       'dir_env': pedido.direccionEnvio,
-      'email': pedido.email,
       'obs': pedido.observaciones,
       'emp': 1,
       'emp_div': 1,
     };
+
+    if (pedido.email.trim().isNotEmpty) {
+      // VELNEO rechaza este campo en la cabecera de una venta; es un dato del
+      // cliente y no debe enviarse al crear/actualizar VTA_PED_G.
+      // Se omite deliberadamente para evitar el 403/validation error del backend.
+      payload.remove('email');
+    }
+
+    return payload;
   }
+
+  static Map<String, dynamic> _pedidoPayload(Pedido pedido) =>
+      buildPedidoPayload(pedido);
 
   static Future<Pedido> createComplete(Pedido pedido) async {
     late final Pedido created;
@@ -487,11 +664,11 @@ class PedidosService {
   /// [key] debe existir en `AppConfig.endpoints`. Se utiliza para artículos,
   /// almacenes y formas de pago, solicitando hasta [size] registros.
   static Future<List<OpcionMaestra>> _maestros(String key, {int size = 1000}) async {
-    final json = await _api.get(
+    final records = await _fetchAllRecords(
       AppConfig.endpoint(key),
-      params: {'page[size]': size},
+      pageSize: size,
     );
-    return payloadLista(json).map(_opcionFromRecord).toList();
+    return records.map(_opcionFromRecord).toList();
   }
 
   /// Carga los clientes de [ids] desde `ENT_M`.
@@ -500,24 +677,35 @@ class PedidosService {
   /// teléfono y CIF. Si [ids] está vacío no realiza ninguna petición.
   static Future<List<Cliente>> getClientesByIds(List<int> ids) async {
     if (ids.isEmpty) return [];
-    final json = await _api.get(
-      AppConfig.endpoint('clientes'),
-      params: {'page[size]': 1000},
+    final uniqueIds = ids.toSet().toList();
+    final clientes = await Future.wait(
+      uniqueIds.map((id) async {
+        try {
+          final json = await _api.get(
+            AppConfig.endpoint('clientes'),
+            params: {'filter[id]': '$id', 'page[size]': 1},
+          );
+          final records = payloadLista(json);
+          if (records.isEmpty) return null;
+          final record = records.first;
+          return Cliente(
+            id: record.i('id'),
+            nombreComercial: record.s('nom_com').isNotEmpty ? record.s('nom_com') : record.s('name'),
+            cif: record.s('cif'),
+            telefono: record.s('tlf'),
+          );
+        } on ApiException {
+          return null;
+        }
+      }),
     );
-    return payloadLista(json)
-        .where((r) => ids.contains(r.i('id')))
-        .map((r) => Cliente(
-              id: r.i('id'),
-              nombreComercial: r.s('nom_com').isNotEmpty ? r.s('nom_com') : r.s('name'),
-              cif: r.s('cif'),
-              telefono: r.s('tlf'),
-            ))
-        .toList();
+
+    return clientes.whereType<Cliente>().toList();
   }
 
   static Future<Map<String, dynamic>> getClienteDefaults(int clienteId) async {
     if (clienteId <= 0) {
-      return {'serie': '', 'direccion': '', 'email': '', 'almacen': ''};
+      return {'serie': '', 'direccion': '', 'email': '', 'almacen': '', 'formaPago': ''};
     }
 
     try {
@@ -527,14 +715,18 @@ class PedidosService {
       );
       final clientes = payloadLista(clienteJson);
       if (clientes.isEmpty) {
-        return {'serie': '', 'direccion': '', 'email': '', 'almacen': ''};
+        return {'serie': '', 'direccion': '', 'email': '', 'almacen': '', 'formaPago': ''};
       }
       final cliente = clientes.first;
 
-      final serie = _firstNonEmpty(cliente, [
-        'ser_vta',
+      final serie = resolveDefaultValue(cliente, ['ser_vta', 'SER_VTA', 'serie', 'ser']);
+      final formaPago = resolveDefaultValue(cliente, ['fpg', 'FPG', 'forma_pago', 'formaPago', 'fpg_def']);
+      var direccion = resolveDefaultValue(cliente, [
+        'DIR_M_VTA_PED_ENV',
+        'dir_env',
+        'direccion_envio',
+        'dir_env_def',
       ]);
-      var direccion = cliente.s('DIR_M_VTA_PED_ENV');
       if (direccion.isEmpty) {
         final direccionPrimariaId = _referenceId(cliente, 'DIR_PRI').isNotEmpty
             ? _referenceId(cliente, 'DIR_PRI')
@@ -547,37 +739,35 @@ class PedidosService {
             final direccionData = payloadData(direccionJson);
             if (direccionData is Map) {
               final direccionPrimaria = Map<String, dynamic>.from(direccionData);
-              direccion = direccionPrimaria.s('DIR');
+              direccion = _firstNonEmpty(direccionPrimaria, ['DIR', 'direccion', 'dir']);
             }
           } on ApiException {
             // Se mantiene vacío si la dirección referenciada no es accesible.
           }
         }
       }
-      final email = cliente.s('EML');
+      final email = resolveDefaultValue(cliente, ['EML', 'email', 'mail']);
 
       return {
         'serie': serie,
         'direccion': direccion,
         'email': email,
         'almacen': '',
+        'formaPago': formaPago,
       };
     } catch (_) {
-      return {'serie': '', 'direccion': '', 'email': '', 'almacen': ''};
+      return {'serie': '', 'direccion': '', 'email': '', 'almacen': '', 'formaPago': ''};
     }
   }
 
   static Future<List<OpcionMaestra>> getDireccionesCliente(int clienteId) async {
     if (clienteId <= 0) return [];
     try {
-      final json = await _api.get(
-        AppConfig.endpoint('direcciones'),
-        params: {'page[size]': 1000},
-      );
-      return payloadLista(json)
+      final records = await _fetchAllRecords(AppConfig.endpoint('direcciones'));
+      return records
           .where((r) => _referenceId(r, 'ENT') == '$clienteId')
           .map(
-            (r) =>             OpcionMaestra(
+            (r) => OpcionMaestra(
               codigo: r.s('id').isNotEmpty ? r.s('id') : r.s('codigo'),
               nombre: r.s('DIR'),
             ),
@@ -589,8 +779,39 @@ class PedidosService {
     }
   }
 
-  static Future<Map<String, dynamic>> getEmpresaDefaults() async {
+  static Future<Map<String, dynamic>> getEmpresaDefaults({String? contactId}) async {
     try {
+      final contactIdValue = (contactId ?? '').trim();
+      if (contactIdValue.isNotEmpty) {
+        try {
+          final contactoJson = await _api.get(
+            AppConfig.endpoint('clientes'),
+            params: {'filter[id]': contactIdValue, 'page[size]': 1},
+          );
+          final contactos = payloadLista(contactoJson);
+          if (contactos.isNotEmpty) {
+            final contacto = contactos.first;
+            final almacenDirecto = _firstNonEmpty(contacto, ['ALM', 'alm', 'almacen', 'alm_def']);
+            if (almacenDirecto.isNotEmpty) {
+              return {'almacen': almacenDirecto};
+            }
+
+            final empresaId = resolveDefaultValue(contacto, ['emp', 'EMP', 'empresa', 'id_emp', 'emp_id']);
+            if (empresaId.isNotEmpty) {
+              final detalleEmpresa = payloadData(
+                await _api.get('${AppConfig.endpoint('empresa')}/$empresaId'),
+              );
+              if (detalleEmpresa is Map) {
+                final empresa = Map<String, dynamic>.from(detalleEmpresa);
+                return {'almacen': resolveDefaultValue(empresa, ['ALM', 'alm', 'almacen', 'alm_def'])};
+              }
+            }
+          }
+        } on ApiException {
+          // Se intenta con la ruta global si el contacto no expone la empresa.
+        }
+      }
+
       Map<String, dynamic>? empresa;
       try {
         final detalle = payloadData(
@@ -619,9 +840,7 @@ class PedidosService {
         return {'almacen': ''};
       }
       return {
-        'almacen': _firstNonEmpty(empresa, [
-          'ALM',
-        ]),
+        'almacen': resolveDefaultValue(empresa, ['ALM', 'alm', 'almacen', 'alm_def']),
       };
     } catch (_) {
       return {'almacen': ''};
@@ -633,11 +852,8 @@ class PedidosService {
   /// El filtro final por `ES_CMR` se aplica en Dart para tolerar instalaciones
   /// donde Velneo no interpreta correctamente filtros booleanos.
   static Future<List<OpcionMaestra>> getComerciales() async {
-    final json = await _api.get(
-      AppConfig.endpoint('comerciales'),
-      params: {'page[size]': 1000},
-    );
-    return payloadLista(json)
+    final records = await _fetchAllRecords(AppConfig.endpoint('comerciales'));
+    return records
         .where((r) => r.b('es_cmr') || r.b('cmr'))
         .map(
           (r) => OpcionMaestra(
@@ -651,6 +867,26 @@ class PedidosService {
   /// Carga artículos desde `ART_M`.
   static Future<List<OpcionMaestra>> getArticulos() => _maestros('articulos');
 
+  /// Página de artículos desde `ART_M`. Se usa en la sincronización diferida
+  /// para ir llenando la caché local por lotes pequeños.
+  static Future<List<OpcionMaestra>> getArticulosPage(int page, {int size = 500}) async {
+    final json = await _api.get(
+      AppConfig.endpoint('articulos'),
+      params: {'page[number]': '$page', 'page[size]': '$size'},
+    );
+    return payloadLista(json).map(_opcionFromRecord).toList();
+  }
+
+  /// Artículo concreto por su id/código desde `ART_M` (sin descargar maestros).
+  static Future<OpcionMaestra?> getArticuloById(String id) async {
+    final json = await _api.get(
+      AppConfig.endpoint('articulos'),
+      params: {'filter[id]': id, 'page[size]': 1},
+    );
+    final records = payloadLista(json);
+    return records.isEmpty ? null : _opcionFromRecord(records.first);
+  }
+
   /// Carga almacenes desde `ALM_M`.
   static Future<List<OpcionMaestra>> getAlmacenes() => _maestros('almacenes');
 
@@ -659,11 +895,11 @@ class PedidosService {
 
   /// Carga únicamente series de venta (`ser_tip == 'V'`) desde `SER_M`.
   static Future<List<OpcionMaestra>> getSeries() async {
-    final json = await _api.get(
+    final records = await _fetchAllRecords(
       AppConfig.endpoint('series'),
-      params: {'page[size]': 500},
+      pageSize: 500,
     );
-    return payloadLista(json)
+    return records
         .where((r) => r.s('ser_tip') == 'V')
         .map(_opcionFromRecord)
         .toList();
@@ -684,11 +920,9 @@ class PedidosService {
   /// autorización de pedidos no depende de este método: se realiza mediante
   /// `VTA_PED_G.CMR` y el contacto comercial de la sesión.
   static Future<List<OpcionMaestra>> getClientes() async {
-    final json = await _api.get(
-      AppConfig.endpoint('clientes'),
-      params: {'page[size]': 1000},
-    );
-    return payloadLista(json)
+    final records = await _fetchAllRecords(AppConfig.endpoint('clientes'));
+    return records
+        .where(isClienteEntity)
         .map(
           (r) => OpcionMaestra(
             codigo: r.s('id'),
@@ -696,5 +930,127 @@ class PedidosService {
           ),
         )
         .toList();
+  }
+
+  /// Página de clientes desde `ENT_M` (solo entidades cliente). Se usa en la
+  /// sincronización diferida para llenar la caché local por lotes pequeños.
+  static Future<List<OpcionMaestra>> getClientesPage(int page, {int size = 500}) async {
+    final json = await _api.get(
+      AppConfig.endpoint('clientes'),
+      params: {'page[number]': '$page', 'page[size]': '$size'},
+    );
+    return payloadLista(json)
+        .where(isClienteEntity)
+        .map(
+          (r) => OpcionMaestra(
+            codigo: r.s('id'),
+            nombre: r.s('nom_com').isNotEmpty ? r.s('nom_com') : r.s('name'),
+          ),
+        )
+        .toList();
+  }
+
+  /// Cliente concreto por su id desde `ENT_M` (sin descargar todo el maestro).
+  static Future<OpcionMaestra?> getClienteById(String id) async {
+    final json = await _api.get(
+      AppConfig.endpoint('clientes'),
+      params: {'filter[id]': id, 'page[size]': 1},
+    );
+    final records = payloadLista(json).where(isClienteEntity).toList();
+    if (records.isEmpty) return null;
+    return OpcionMaestra(
+      codigo: records.first.s('id'),
+      nombre: records.first.s('nom_com').isNotEmpty ? records.first.s('nom_com') : records.first.s('name'),
+    );
+  }
+
+  /// Construye los parámetros de una petición paginada y filtrada de clientes
+  /// contra el endpoint `clientes`. Se exponen como método estático para
+  /// poder probar la consulta sin depender de una llamada HTTP real.
+  static Map<String, dynamic> buildClienteSearchParams(
+    String texto, {
+    int limit = 25,
+    int page = 1,
+  }) {
+    final query = texto.trim();
+    return {
+      'page[size]': limit,
+      'page[number]': page,
+      'filter[nom_com]': query,
+      'filter[name]': query,
+      'search': query,
+      'q': query,
+    };
+  }
+
+  /// Filtra en memoria una lista de registros de `ENT_M` dejando solo los que
+  /// son clientes (`ES_CLT`) y cuyo nombre o código coincide con [query].
+  static List<Map<String, dynamic>> filterClienteRecords(
+    List<Map<String, dynamic>> records,
+    String query,
+  ) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+    return records.where(isClienteEntity).where((record) {
+      final nombre = (record.s('nom_com').isNotEmpty ? record.s('nom_com') : record.s('name'))
+          .toLowerCase();
+      final codigo = record.s('id').toLowerCase();
+      return nombre.contains(q) || codigo.contains(q);
+    }).toList();
+  }
+
+  static Future<List<OpcionMaestra>> searchClientes(String texto, {int limit = 25}) async {
+    final query = texto.trim();
+    if (query.isEmpty) return const [];
+
+    try {
+      final json = await _api.get(
+        AppConfig.endpoint('clientes'),
+        params: buildClienteSearchParams(query, limit: limit),
+      );
+
+      return filterClienteRecords(payloadLista(json), query).take(limit).map(
+            (r) => OpcionMaestra(
+              codigo: r.s('id'),
+              nombre: r.s('nom_com').isNotEmpty ? r.s('nom_com') : r.s('name'),
+            ),
+          ).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Busca artículos del catálogo (`ART_M`) por nombre, descripción o código.
+  /// Devuelve una lista acotada de [limit] opciones; si algo falla, lista vacía.
+  static Future<List<OpcionMaestra>> searchArticulos(String texto, {int limit = 25}) async {
+    final query = texto.trim();
+    if (query.isEmpty) return const [];
+
+    try {
+      final json = await _api.get(
+        AppConfig.endpoint('articulos'),
+        params: {
+          'page[size]': limit,
+          'page[number]': 1,
+          'filter[name]': query,
+          'filter[descripcion]': query,
+          'filter[art]': query,
+          'search': query,
+          'q': query,
+        },
+      );
+
+      final records = payloadLista(json).where((record) {
+        final nombre = (record.s('name').isNotEmpty ? record.s('name') : record.s('descripcion'))
+            .toLowerCase();
+        final codigo = (record.s('art').isNotEmpty ? record.s('art') : record.s('id'))
+            .toLowerCase();
+        return nombre.contains(query.toLowerCase()) || codigo.contains(query.toLowerCase());
+      }).take(limit).map(_opcionFromRecord).toList();
+
+      return records;
+    } catch (_) {
+      return const [];
+    }
   }
 }

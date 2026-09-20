@@ -29,7 +29,9 @@ import 'package:provider/provider.dart'; // Librería que comparte datos globale
 // Importamos nuestras propias pantallas y clases (los archivos de la carpeta lib).
 import 'core/order_repository.dart';
 import 'core/app_lifecycle_manager.dart'; // Nuevo manager de ciclo de vida.
+import 'core/search/entity_search_repository.dart'; // Repositorio local-first.
 import 'screens/login_screen.dart'; // Pantalla de conexión al servidor.
+import 'screens/dashboard_screen.dart';
 import 'screens/pedidos_list_screen.dart'; // Pantalla con la lista de pedidos.
 import 'screens/pedido_detail_screen.dart'; // Pantalla con el detalle de un pedido.
 import 'screens/pedido_form_screen.dart'; // Pantalla para crear/editar pedidos.
@@ -49,6 +51,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthState()),
         Provider(create: (_) => OrderRepository()),
+        Provider(create: (_) => EntitySearchRepository()),
       ],
       child: const AppLifecycleManager(
         child: PedidosVentaApp(),
@@ -78,8 +81,11 @@ class PedidosVentaApp extends StatelessWidget {
       // (el texto entre comillas) y la pantalla que debe abrir.
       // Los parámetros se pasan con .arguments cuando se navega (pushNamed).
       routes: {
-        // Ruta raíz: decide automáticamente Login o Lista según la sesión.
+        // Ruta raíz: decide automáticamente Login o Dashboard según la sesión.
         '/': (context) => _RootScreen(),
+        '/home': (context) => const DashboardScreen(),
+        '/pedidos': (context) => const PedidosListScreen(),
+        '/cmr': (context) => const CmrComingSoonScreen(),
 
         // Ruta de DETALLE: pedidoId se recibe como argumento.
         '/pedido': (context) =>
@@ -113,7 +119,7 @@ class _RootScreen extends StatelessWidget {
     // Al usar watch (no read), esta pantalla se REDIBUJA sola cuando cambia.
     final auth = context.watch<AuthState>();
 
-    // Si estamos conectados → lista de pedidos. Si no → pantalla de login.
-    return auth.connected ? const PedidosListScreen() : const LoginScreen();
+    // Si estamos conectados → dashboard principal. Si no → pantalla de login.
+    return auth.connected ? const DashboardScreen() : const LoginScreen();
   }
 }

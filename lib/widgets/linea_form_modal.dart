@@ -20,11 +20,13 @@
 // ============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../api_service.dart'; // PedidosService (cargar artículos del catálogo).
-import '../models.dart'; // LineaPedido, OpcionMaestra.
 import '../core/formatters.dart'; // formatNumber y parseNumber.
+import '../core/search/entity_search_repository.dart'; // Repositorio local-first.
+import '../models.dart'; // LineaPedido, OpcionMaestra.
 import '../theme/app_theme.dart'; // Colores.
+import 'autocomplete_field.dart'; // Buscador remoto con autocompletado (artículos).
 import 'campo_form.dart'; // CampoForm y CampoSelect.
 import 'campo_fecha.dart'; // CampoFecha.
 import 'modal_selector.dart'; // mostrarSelector.
@@ -64,11 +66,15 @@ class _LineaFormModalState extends State<LineaFormModal> {
   String? _articuloId; // El CÓDIGO del artículo elegido (lo que se guarda).
   String _previstoPara = ''; // Fecha prevista de entrega (ISO).
 
-  // Catálogo de artículos bajado del servidor (para el selector).
-  List<OpcionMaestra> _articulos = [];
-
   // ¿Es modo edición? Sí, si nos pasaron una línea.
   bool get _editando => widget.linea != null;
+
+  void _syncPendienteValue() {
+    final cantidad = parseNumber(_cantidad.text);
+    final cantidadServida = widget.linea?.cantidadServida ?? 0.0;
+    final pendiente = (cantidad - cantidadServida).clamp(0.0, double.infinity);
+    _pendiente.text = formatNumber(pendiente, decimals: 2);
+  }
 
   @override
   void initState() {
@@ -112,8 +118,6 @@ class _LineaFormModalState extends State<LineaFormModal> {
     final esCancelada = _editando && (l!.cancelado || AppColors.estadoCodigo(l.estado) == 'C');
     _estado = esCancelada ? 'Cancelado' : 'Pendiente';
     _previstoPara = l?.previstoPara ?? '';
-
-    _cargarArticulos(); // Bajamos el catálogo de artículos.
   }
 
   @override
@@ -131,17 +135,6 @@ class _LineaFormModalState extends State<LineaFormModal> {
     super.dispose();
   }
 
-  /// _cargarArticulos: baja el catálogo de artículos del servidor.
-  Future<void> _cargarArticulos() async {
-    try {
-      final lista = await PedidosService.getArticulos();
-      if (mounted) setState(() => _articulos = lista);
-    } catch (e) {
-      // Endpoint sin configurar → no rompemos, solo lo anotamos.
-      debugPrint('No se pudieron cargar artículos: $e');
-    }
-  }
-
   /// _importeCalculado: el importe en vivo = cantidad × precio − descuento.
   /// Se recalcula solo cada vez que se pinta (leyendo los controllers).
   double get _importeCalculado {
@@ -152,26 +145,11 @@ class _LineaFormModalState extends State<LineaFormModal> {
     return base - base * (dto / 100); // Le restamos el % de descuento.
   }
 
-  /// _elegirArticulo: abre el catálogo; al elegir, rellena nombre y código.
-  Future<void> _elegirArticulo() async {
-    if (_articulos.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Configura el endpoint de artículos.')),
-      );
-      return;
-    }
-    final seleccionado = await mostrarSelector(
-      context,
-      title: 'Seleccionar artículo',
-      options: _articulos,
-      textOf: (o) => (o as OpcionMaestra).nombre,
-    );
-    if (seleccionado != null) {
-      setState(() {
-        _articulo.text = seleccionado.nombre; // Mostramos el nombre.
-        _articuloId = seleccionado.codigo; // Guardamos el código.
-      });
-    }
+  /// Busca artículos en Velneo mediante el repositorio local-first.
+  /// 1º consulta la caché local (SQLite) y, si no hay, llama al API acotado.
+  Future<List<OpcionMaestra>> _buscarArticulos(String query) {
+    final repo = context.read<EntitySearchRepository>();
+    return repo.search(EntityKind.articulo, query, limit: 20);
   }
 
   /// _guardar: valida el formulario, construye la LINEA y cierra devolviéndola.
@@ -182,7 +160,7 @@ class _LineaFormModalState extends State<LineaFormModal> {
 
     final cantidad = parseNumber(_cantidad.text);
     final cantidadServida = widget.linea?.cantidadServida ?? 0.0;
-    final pendiente = cantidad - cantidadServida;
+    final pendiente = (cantidad - cantidadServida).clamp(0.0, double.infinity);
 
     final linea = LineaPedido(
       // Conservamos id/código si venían de una línea ya existente.
@@ -232,12 +210,30 @@ class _LineaFormModalState extends State<LineaFormModal> {
               child: SingleChildScrollView( // Permite hacer scroll si no caben.
                 child: Column(
                   children: [
-                    // Artículo: campo selector (no texto).
-                    CampoSelect(
+                    // Artículo: buscador con autocompletado remoto (debounce).
+                    // Nada más escribir 3 caracteres consulta a Velneo y
+                    // ofrece hasta 20 resultados; no se baja el catálogo.
+                    AutocompleteField(
                       label: 'Artículo',
-                      value: _articulo.text,
                       required: true,
-                      onTap: _elegirArticulo,
+                      minChars: 3,
+                      debounce: const Duration(milliseconds: 400),
+                      maxResults: 20,
+                      initialValue: _articulo.text,
+                      hint: 'Buscar por nombre o código...',
+                      search: _buscarArticulos,
+                      onSelected: (opcion) {
+                        setState(() {
+                          _articulo.text = opcion.nombre; // Mostramos el nombre.
+                          _articuloId = opcion.codigo; // Guardamos el código.
+                        });
+                      },
+                      onCleared: () {
+                        setState(() {
+                          _articulo.clear();
+                          _articuloId = null;
+                        });
+                      },
                     ),
 
                     // Descripción (obligatoria, multilínea).
@@ -265,8 +261,10 @@ class _LineaFormModalState extends State<LineaFormModal> {
                           child: CampoForm(
                             label: 'Cantidad',
                             controller: _cantidad,
-                            // setState(() {}) fuerza a repintar el importe.
-                            onChanged: (v) => setState(() {}),
+                            onChanged: (v) {
+                              _syncPendienteValue();
+                              setState(() {});
+                            },
                             keyboardType: TextInputType.numberWithOptions(decimal: true),
                             required: true,
                             validator: (v) =>

@@ -182,6 +182,7 @@ class CampoSelect extends StatelessWidget {
   final String placeholder; // Texto por defecto si no hay valor ("Seleccionar...").
   final bool required; // Muestra el "*" rojo.
   final String? error; // Mensaje de error.
+  final bool enabled; // false = deshabilita la interacción del selector.
 
   const CampoSelect({
     super.key,
@@ -191,6 +192,7 @@ class CampoSelect extends StatelessWidget {
     this.placeholder = 'Seleccionar...',
     this.required = false,
     this.error,
+    this.enabled = true,
   });
 
   @override
@@ -217,12 +219,12 @@ class CampoSelect extends StatelessWidget {
 
         // Zona clicable con aspecto de campo.
         InkWell(
-          onTap: onTap, // Al pulsar → abre el selector (lo define quien lo usa).
+          onTap: enabled ? onTap : null, // Al pulsar → abre el selector (lo define quien lo usa).
           borderRadius: BorderRadius.circular(10),
           child: InputDecorator(
             decoration: InputDecoration(
               errorText: error,
-              enabled: true,
+              enabled: enabled,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween, // Texto ✓ flecha.

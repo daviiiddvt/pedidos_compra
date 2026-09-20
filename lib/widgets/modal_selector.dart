@@ -26,9 +26,10 @@ import '../theme/app_theme.dart'; // Colores.
 /// ModalSelector: la ventana emergente con la lista y el buscador.
 class ModalSelector extends StatefulWidget {
   final String title; // Título ("Seleccionar proveedor"...).
-  final List<dynamic> options; // Las opciones (cualquier tipo).
+  final List<dynamic> options; // Las opciones iniciales (cualquier tipo).
   final String Function(dynamic option)? textOf; // Cómo convertir opción → texto.
   final bool searchable; // true = mostrar buscador.
+  final Future<List<dynamic>> Function(String query)? onSearch;
 
   const ModalSelector({
     super.key,
@@ -36,6 +37,7 @@ class ModalSelector extends StatefulWidget {
     required this.options,
     this.textOf,
     this.searchable = true,
+    this.onSearch,
   });
 
   @override
@@ -45,6 +47,14 @@ class ModalSelector extends StatefulWidget {
 class _ModalSelectorState extends State<ModalSelector> {
   final _searchController = TextEditingController(); // Lo puesto en el buscador.
   String _search = ''; // Texto actual de búsqueda.
+  List<dynamic> _filteredOptions = [];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredOptions = widget.options;
+  }
 
   @override
   void dispose() {
@@ -69,13 +79,35 @@ class _ModalSelectorState extends State<ModalSelector> {
     return '$option';
   }
 
-  /// _filtered: las opciones filtradas por el buscador (o todas si no hay búsqueda).
+  Future<void> _handleSearch(String value) async {
+    _search = value;
+    if (widget.onSearch == null) {
+      setState(() {});
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final results = await widget.onSearch!(value);
+      if (!mounted) return;
+      setState(() {
+        _filteredOptions = results;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _filteredOptions = const [];
+        _loading = false;
+      });
+    }
+  }
+
   List<dynamic> get _filtered {
+    if (widget.onSearch != null) return _filteredOptions;
     if (_search.trim().isEmpty) return widget.options;
-    final term = _search.toLowerCase(); // Buscamos sin distinguir mayúsculas.
-    return widget.options
-        .where((o) => _text(o).toLowerCase().contains(term))
-        .toList();
+    final term = _search.toLowerCase();
+    return widget.options.where((o) => _text(o).toLowerCase().contains(term)).toList();
   }
 
   @override
@@ -107,18 +139,27 @@ class _ModalSelectorState extends State<ModalSelector> {
             if (widget.searchable)
               TextField(
                 controller: _searchController,
-                onChanged: (v) => setState(() => _search = v), // Filtra en vivo.
+                onChanged: (v) => _handleSearch(v),
                 decoration: const InputDecoration(
                   hintText: 'Buscar...',
-                  prefixIcon: Icon(Icons.search, size: 20), // Lupa.
+                  prefixIcon: Icon(Icons.search, size: 20),
                   isDense: true,
                 ),
               ),
             const SizedBox(height: 8),
 
-            // La lista de opciones.
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+
             Flexible(
-              child: widget.options.isEmpty
+              child: _filtered.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.all(24),
                       child: Text(
@@ -131,14 +172,12 @@ class _ModalSelectorState extends State<ModalSelector> {
                       itemCount: _filtered.length,
                       itemBuilder: (context, index) {
                         final option = _filtered[index];
-                        return ListTile( // Una fila de la lista.
+                        return ListTile(
                           dense: true,
                           title: Text(
                             _text(option),
                             style: const TextStyle(fontSize: 15),
                           ),
-                          // Al tocar, cerramos la ventana DEVOLVIENDO la opción
-                          // (Navigator.pop(option) → quien llamó la recibe).
                           onTap: () => Navigator.of(context).pop(option),
                         );
                       },
@@ -166,6 +205,7 @@ Future<dynamic> mostrarSelector(
   String Function(dynamic option)? textOf,
   bool searchable = true,
   String? searchPlaceholder,
+  Future<List<dynamic>> Function(String query)? onSearch,
 }) {
   return showDialog<dynamic>(
     context: context,
@@ -174,6 +214,7 @@ Future<dynamic> mostrarSelector(
       options: options,
       textOf: textOf,
       searchable: searchable,
+      onSearch: onSearch,
     ),
   );
 }

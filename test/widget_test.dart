@@ -20,10 +20,14 @@
 //        "Comprueba que REAL es IGUAL a ESPERADO". Si no lo es → falla.
 // ============================================================================
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart'; // El "marco" de tests de Flutter.
 
+import 'package:pedidos_venta/api_service.dart';
 import 'package:pedidos_venta/core/formatters.dart'; // Las funciones que probamos.
+import 'package:pedidos_venta/core/master_cache_service.dart';
 import 'package:pedidos_venta/models.dart';
+import 'package:pedidos_venta/widgets/campo_form.dart';
 
 void main() {
   // ------ Test 1: formatNumber -------
@@ -87,5 +91,193 @@ void main() {
     expect(linea.descripcion, 'Articulo de prueba');
     expect(linea.tipoIva, 21);
     expect(linea.getLineTotal(), 90);
+  });
+
+  test('buildArticleNameMap agrupa nombres por artículo sin consultar uno a uno', () {
+    final recordMap = [
+      {'id': 10, 'name': 'Tornillo M5'},
+      {'id': 20, 'descripcion': 'Tuerca hexagonal'},
+      {'id': 99, 'name': 'No solicitado'},
+    ];
+
+    final map = PedidosService.buildArticleNameMap(recordMap, {'10', '20', '999'});
+
+    expect(map['10'], 'Tornillo M5');
+    expect(map['20'], 'Tuerca hexagonal');
+    expect(map.containsKey('999'), isFalse);
+  });
+
+  testWidgets('CampoSelect no dispara onTap cuando está deshabilitado', (tester) async {
+    var tapped = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CampoSelect(
+            label: 'Cliente',
+            enabled: false,
+            onTap: () => tapped = true,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(InkWell));
+    await tester.pump();
+
+    expect(tapped, isFalse);
+  });
+
+  test('buildPedidoPayload omite el email porque la API no lo admite en cabecera', () {
+    final pedido = Pedido(
+      clienteId: 25,
+      estado: 'P',
+      serie: 'V',
+      comercial: '7',
+      almacen: 'A1',
+      fecha: '2026-09-18',
+      previstoPara: '2026-09-20',
+      formaPago: 'CONT',
+      direccionEnvio: 'DIR-1',
+      email: 'cliente@example.com',
+      observaciones: 'Pedido de prueba',
+    );
+
+    final payload = PedidosService.buildPedidoPayload(pedido);
+
+    expect(payload['clt'], 25);
+    expect(payload['email'], isNull);
+    expect(payload['dir_env'], 'DIR-1');
+    expect(payload['fpg'], 'CONT');
+  });
+
+  test('shouldRequestNextPage sigue paginando hasta cubrir total_count', () {
+    expect(
+      PedidosService.shouldRequestNextPage(
+        loadedRecords: 1000,
+        totalRecords: 6298,
+        pageSize: 1000,
+        pageRecords: 1000,
+      ),
+      isTrue,
+    );
+
+    expect(
+      PedidosService.shouldRequestNextPage(
+        loadedRecords: 6298,
+        totalRecords: 6298,
+        pageSize: 1000,
+        pageRecords: 298,
+      ),
+      isFalse,
+    );
+  });
+
+  test('resolveDefaultValue acepta valores anidados de Velneo', () {
+    final record = {
+      'ser_vta': {'value': 'V'},
+      'fpg': {'id': 'CONT'},
+      'DIR_M_VTA_PED_ENV': {'id': 42},
+      'EML': {'value': 'cliente@empresa.com'},
+      'ALM': {'value': 'A1'},
+    };
+
+    expect(PedidosService.resolveDefaultValue(record, ['ser_vta', 'SER_VTA']), 'V');
+    expect(PedidosService.resolveDefaultValue(record, ['fpg', 'FPG']), 'CONT');
+    expect(PedidosService.resolveDefaultValue(record, ['DIR_M_VTA_PED_ENV', 'dir_env']), '42');
+    expect(PedidosService.resolveDefaultValue(record, ['EML', 'email']), 'cliente@empresa.com');
+    expect(PedidosService.resolveDefaultValue(record, ['ALM', 'alm']), 'A1');
+  });
+
+  test('findMatchingOption acepta tanto el código como el nombre del maestro', () {
+    final opciones = [
+      const OpcionMaestra(codigo: 'CONT', nombre: 'Contado'),
+      const OpcionMaestra(codigo: 'A1', nombre: 'Almacén principal'),
+    ];
+
+    expect(PedidosService.findMatchingOption(opciones, 'Contado')?.codigo, 'CONT');
+    expect(PedidosService.findMatchingOption(opciones, 'Almacén principal')?.codigo, 'A1');
+    expect(PedidosService.findMatchingOption(opciones, 'A1')?.codigo, 'A1');
+  });
+
+  test('isClienteEntity solo acepta entidades con ES_CLT marcado como cliente', () {
+    expect(PedidosService.isClienteEntity({'ES_CLT': true}), isTrue);
+    expect(PedidosService.isClienteEntity({'es_clt': 'true'}), isTrue);
+    expect(PedidosService.isClienteEntity({'ES_CLT': false}), isFalse);
+    expect(PedidosService.isClienteEntity({'name': 'Proveedor'}), isFalse);
+  });
+
+  test('searchClientes genera una petición paginada y filtrada por cliente', () {
+    final params = PedidosService.buildClienteSearchParams('alfa', limit: 25, page: 2);
+    final records = [
+      {'id': '10', 'nom_com': 'Alfa Distribuciones', 'ES_CLT': true},
+      {'id': '11', 'nom_com': 'Beta S.L.', 'ES_CLT': true},
+      {'id': '12', 'nom_com': 'Alfabeta', 'ES_CLT': false},
+    ];
+
+    expect(params['page[size]'], 25);
+    expect(params['page[number]'], 2);
+    expect(params['search'], 'alfa');
+    expect(
+      PedidosService.filterClienteRecords(records, 'alfa').map((r) => r['id']).toList(),
+      ['10'],
+    );
+  });
+
+  test('MasterCacheService reutiliza la misma respuesta en la misma sesión', () async {
+    final cache = MasterCacheService();
+    var calls = 0;
+
+    final first = await cache.getOrLoad<String>(
+      key: 'clientes',
+      loader: () async {
+        calls++;
+        return 'clientes-v1';
+      },
+      ttl: const Duration(minutes: 10),
+    );
+
+    final second = await cache.getOrLoad<String>(
+      key: 'clientes',
+      loader: () async {
+        calls++;
+        return 'clientes-v2';
+      },
+      ttl: const Duration(minutes: 10),
+    );
+
+    expect(first, 'clientes-v1');
+    expect(second, 'clientes-v1');
+    expect(calls, 1);
+  });
+
+  test('MasterCacheService deduplica peticiones concurrentes del mismo maestro', () async {
+    final cache = MasterCacheService();
+    cache.invalidate('clientes');
+    var calls = 0;
+
+    final future1 = cache.getOrLoad<String>(
+      key: 'clientes',
+      loader: () async {
+        calls++;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        return 'clientes-v1';
+      },
+      ttl: const Duration(minutes: 10),
+    );
+
+    final future2 = cache.getOrLoad<String>(
+      key: 'clientes',
+      loader: () async {
+        calls++;
+        return 'clientes-v2';
+      },
+      ttl: const Duration(minutes: 10),
+    );
+
+    final results = await Future.wait([future1, future2]);
+
+    expect(results, ['clientes-v1', 'clientes-v1']);
+    expect(calls, 1);
   });
 }
