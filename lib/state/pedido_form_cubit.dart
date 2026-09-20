@@ -22,6 +22,7 @@
 //  - Además se propaga email y dirección de envío por defecto del cliente.
 // ============================================================================
 
+import 'package:flutter/foundation.dart' show debugPrint; // Logging.
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -62,6 +63,9 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
   }) async {
     final clienteId = int.tryParse(cliente.codigo) ?? 0;
 
+    debugPrint('\n[selectCliente] Recibido del AutocompleteField: ${cliente.codigo}'
+        ' | ${cliente.nombre} (id=$clienteId)');
+
     // Almacén central fijo: siempre el código '1'.
     final almacenOpcion = PedidosService.findMatchingOption(almacenes, '1') ??
         const OpcionMaestra(codigo: '1', nombre: '1');
@@ -78,6 +82,9 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
       direccionesCliente: const [],
       cargandoDatosCliente: clienteId > 0,
     ));
+    debugPrint('[selectCliente] Paso 1 aplicado → clienteId=$clienteId,'
+        ' cliente=${cliente.codigo}, clienteNombre=${cliente.nombre},'
+        " almacen='1', almacenNombre=${almacenOpcion.nombre}");
     if (clienteId <= 0) return;
 
     try {
@@ -86,30 +93,38 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
       final direcciones = await PedidosService.getDireccionesCliente(clienteId);
       if (isClosed) return;
 
+      debugPrint('[selectCliente] Defaults de Velneo recibidos → $defaults');
       var pedido = state.pedido;
 
+      // ── Mapeo explícito de campos del cliente al Pedido ────────────────
+      // Almacén: siempre '1' (fijado ya en Paso 1).
+      //
+      // Forma de pago: la del cliente. Se aplica SIEMPRE que venga definida,
+      // sobrescribiendo cualquier selección previa.
       final formaPagoDefault = defaults['formaPago'];
-      if (formaPagoDefault is String &&
-          formaPagoDefault.isNotEmpty &&
-          formaPagoDefault != pedido.formaPago) {
+      if (formaPagoDefault is String && formaPagoDefault.isNotEmpty) {
         final opcion = PedidosService.findMatchingOption(formasPago, formaPagoDefault) ??
             OpcionMaestra(codigo: formaPagoDefault, nombre: formaPagoDefault);
         pedido = pedido.copyWith(
           formaPago: opcion.codigo,
           formaPagoNombre: opcion.nombre,
         );
+        debugPrint('[selectCliente] formaPago <- ${opcion.codigo}'
+            ' (${opcion.nombre}) desde default="$formaPagoDefault"');
       }
 
+      // Serie: la del cliente. Se aplica SIEMPRE que venga definida,
+      // sobrescribiendo cualquier selección previa.
       final serieDefault = defaults['serie'];
-      if (serieDefault is String &&
-          serieDefault.isNotEmpty &&
-          serieDefault != pedido.serie) {
+      if (serieDefault is String && serieDefault.isNotEmpty) {
         final opcion = PedidosService.findMatchingOption(series, serieDefault) ??
             OpcionMaestra(codigo: serieDefault, nombre: serieDefault);
         pedido = pedido.copyWith(
           serie: opcion.codigo,
           serieNombre: opcion.nombre,
         );
+        debugPrint('[selectCliente] serie <- ${opcion.codigo}'
+            ' (${opcion.nombre}) desde default="$serieDefault"');
       }
 
       final emailDefault = defaults['email'];
@@ -143,7 +158,11 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
         direccionesCliente: direccionesDisponibles,
         cargandoDatosCliente: false,
       ));
-    } catch (_) {
+      debugPrint('[selectCliente] PASO 2 FINAL →'
+          ' almacen=${pedido.almacen}, serie=${pedido.serie},'
+          ' formaPago=${pedido.formaPago}, direccionEnvio=${pedido.direccionEnvio}');
+    } catch (e) {
+      debugPrint('[selectCliente] Error al aplicar defaults del cliente: $e');
       if (!isClosed) emit(state.copyWith(cargandoDatosCliente: false));
     }
   }

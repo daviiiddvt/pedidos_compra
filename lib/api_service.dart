@@ -23,6 +23,8 @@
 //        PedidosService.list()  (no hace falta "new").
 // ============================================================================
 
+import 'package:flutter/foundation.dart' show debugPrint; // Logging.
+
 import 'core/api_client.dart'; // ApiClient (el mensajero) + ApiException.
 import 'core/config.dart'; // AppConfig (para saber a qué endpoint llamar).
 import 'models.dart'; // Nuestros modelos (Pedido, OpcionMaestra).
@@ -719,6 +721,15 @@ class PedidosService {
       }
       final cliente = clientes.first;
 
+      // ── DEPURACIÓN: mostrar el JSON exacto que devuelve VELNEO ────────
+      // Para que puedas ver TODAS las claves que manda la API al elegir un
+      // cliente y decidir con cuáles mapear serie/formaPago/almacén.
+      debugPrint('\n━━━ [VELNEO] Cliente $clienteId → JSON completo (${cliente.keys.length} claves) ━━━');
+      for (final entry in cliente.entries) {
+        debugPrint('  ${entry.key}: ${entry.value}');
+      }
+      debugPrint('━━━ /FIN JSON cliente $clienteId ━━━');
+
       final serie = resolveDefaultValue(cliente, ['ser_vta', 'SER_VTA', 'serie', 'ser']);
       final formaPago = resolveDefaultValue(cliente, ['fpg', 'FPG', 'forma_pago', 'formaPago', 'fpg_def']);
       var direccion = resolveDefaultValue(cliente, [
@@ -748,13 +759,15 @@ class PedidosService {
       }
       final email = resolveDefaultValue(cliente, ['EML', 'email', 'mail']);
 
-      return {
+      final resultado = {
         'serie': serie,
         'direccion': direccion,
         'email': email,
         'almacen': '',
         'formaPago': formaPago,
       };
+      debugPrint('[VELNEO] Defaults del cliente $clienteId → $resultado');
+      return resultado;
     } catch (_) {
       return {'serie': '', 'direccion': '', 'email': '', 'almacen': '', 'formaPago': ''};
     }
