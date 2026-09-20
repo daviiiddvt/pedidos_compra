@@ -964,9 +964,14 @@ class PedidosService {
     );
   }
 
-  /// Construye los parámetros de una petición paginada y filtrada de clientes
-  /// contra el endpoint `clientes`. Se exponen como método estático para
+  /// Construye los parámetros de una petición de búsqueda de clientes contra
+  /// el endpoint `clientes` (`ENT_M`). Se exponen como método estático para
   /// poder probar la consulta sin depender de una llamada HTTP real.
+  ///
+  /// El filtro obligatorio de VELNEO es `filter[TRO_ES_CLT]`, que recibe el
+  /// texto del usuario ENVUELTO EN COMILLAS DOBLES (p. ej. '"audidat"'). Los
+  /// demás filtros (`filter[nom_com]`, `search`...) los ignora/descarta el
+  /// API, así que no se envían. `api_key` la añade ApiClient automáticamente.
   static Map<String, dynamic> buildClienteSearchParams(
     String texto, {
     int limit = 25,
@@ -976,10 +981,7 @@ class PedidosService {
     return {
       'page[size]': limit,
       'page[number]': page,
-      'filter[nom_com]': query,
-      'filter[name]': query,
-      'search': query,
-      'q': query,
+      'filter[TRO_ES_CLT]': '"$query"',
     };
   }
 

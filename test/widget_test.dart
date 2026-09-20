@@ -217,7 +217,11 @@ void main() {
 
     expect(params['page[size]'], 25);
     expect(params['page[number]'], 2);
-    expect(params['search'], 'alfa');
+    // El filtro obligatorio de Velneo recibe el texto entre comillas dobles.
+    expect(params['filter[TRO_ES_CLT]'], '"alfa"');
+    // No se envían los filtros especulativos que el API ignora.
+    expect(params.containsKey('search'), isFalse);
+    expect(params.containsKey('filter[nom_com]'), isFalse);
     expect(
       PedidosService.filterClienteRecords(records, 'alfa').map((r) => r['id']).toList(),
       ['10'],
