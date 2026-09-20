@@ -30,6 +30,7 @@ import 'package:provider/provider.dart'; // Librería que comparte datos globale
 import 'core/order_repository.dart';
 import 'core/app_lifecycle_manager.dart'; // Nuevo manager de ciclo de vida.
 import 'core/search/entity_search_repository.dart'; // Repositorio local-first.
+import 'core/search/local_cache_db.dart'; // Caché local (SQLite en escritorio/móvil).
 import 'screens/login_screen.dart'; // Pantalla de conexión al servidor.
 import 'screens/dashboard_screen.dart';
 import 'screens/pedidos_list_screen.dart'; // Pantalla con la lista de pedidos.
@@ -42,8 +43,15 @@ import 'state/auth_state.dart'; // Estado global de la sesión (¿estamos conect
 import 'theme/app_theme.dart'; // Colores y estilos de toda la app.
 
 /// main() es la FUNCIÓN DE ARRANQUE: es lo PRIMERO que ejecuta Flutter.
-void main() {
+Future<void> main() async {
+  // Necesario para usar plugins antes de que esté lista la UI (sqlite etc.).
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Abrimos la caché local (SQLite) ANTES de pintar la app. Sin esto, el
+  // buscador de clientes/artículos falla con "LocalCacheDbSqlite no
+  // inicializado" y la sincronización diferida lanza también TimeoutException.
+  // Es idempotente: si ya está abierta, no hace nada.
+  await localCacheDbInstance.init();
 
   // runApp(...) = "enciende la app y muestra esto en la pantalla".
   runApp(
