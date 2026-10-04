@@ -22,7 +22,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 
-import '../../models.dart'; // OpcionMaestra.
+import '../../models/models.dart'; // OpcionMaestra.
 import 'local_cache_db_base.dart'; // Contrato LocalCacheDb.
 
 /// Implementación SQLite de la caché local.

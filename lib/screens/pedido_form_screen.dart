@@ -23,9 +23,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../api_service.dart'; // PedidosService (guardar + cargar detalle).
+import '../core/api_service.dart'; // PedidosService (guardar + cargar detalle).
 import '../core/formatters.dart'; // todayIso (fecha de hoy por defecto).
-import '../models.dart'; // Modelos y calcularTotales.
+import '../models/models.dart'; // Modelos y calcularTotales.
 import '../state/auth_state.dart';
 import '../state/pedido_form_cubit.dart';
 import '../theme/app_theme.dart'; // Colores.
@@ -35,6 +35,7 @@ import '../widgets/linea_form_modal.dart'; // El "modal" para añadir/editar lí
 import '../widgets/lineas_table.dart'; // Tabla de líneas (editable).
 import '../widgets/segment_tabs.dart'; // Pestañas.
 import '../widgets/totales_card.dart'; // Tarjeta de totales.
+import '../core/presupuesto_service.dart';
 
 /// PedidoFormScreen: pantalla de ALTA/EDICIÓN de pedidos.
 class PedidoFormScreen extends StatefulWidget {
@@ -55,7 +56,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   String _tab = 'cabecera'; // Pestaña activa.
 
   // ¿Estamos en modo edición? Sí, si nos pasaron un id.
-  bool get _editando => widget.pedidoId != null;
+  bool get _editando => widget.pedidoId != null && widget.pedidoId is! Pedido;
 
   /// El pedido en construcción vive en el cubit (fuente de verdad única).
   Pedido get _pedido => _cubit.state.pedido;
@@ -63,8 +64,14 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   @override
   void initState() {
     super.initState();
-    // Pedido nuevo con fecha de HOY por defecto.
-    _cubit = PedidoFormCubit(Pedido(fecha: todayIso()));
+    // Pedido nuevo con fecha de HOY por defecto, o el pedido inicial pasado.
+    if (widget.pedidoId is Pedido) {
+      final initial = widget.pedidoId as Pedido;
+      _cubit = PedidoFormCubit(initial);
+      _lineas = [...initial.lineas];
+    } else {
+      _cubit = PedidoFormCubit(Pedido(fecha: todayIso()));
+    }
     if (_editando) {
       _cargarDetalle(); // Si es edición, cargamos los datos del servidor.
     }
@@ -128,6 +135,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
                 dto: l.dto,
                 importe: l.importe,
                 tipoIva: l.tipoIva,
+                regIvaVta: l.regIvaVta,
                 retencionIrpf: l.retencionIrpf,
                 retencionAlquiler: l.retencionAlquiler,
                 clienteVenta: l.clienteVenta,
@@ -247,11 +255,22 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
           removedLineIds,
         );
       } else {
-        await PedidosService.createComplete(pedidoParaGuardar);
+        final nuevoPedido = await PedidosService.createComplete(pedidoParaGuardar);
+          if (widget.pedidoId is Pedido && (widget.pedidoId as Pedido).id != null) {
+            await PresupuestosService.linkPedido(
+              (widget.pedidoId as Pedido).id,
+              nuevoPedido.id ?? nuevoPedido.codigo,
+            );
+          }
       }
       if (!mounted) return;
-      // Volvemos a la pantalla anterior con "pop(true)" (= se guardó).
-      Navigator.of(context).pop(true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pedido guardado correctamente')),
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/pedidos',
+        (route) => route.settings.name == '/home' || route.isFirst,
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _guardando = false); // Rehabilitamos el botón.

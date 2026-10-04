@@ -18,8 +18,8 @@
 
 import 'package:flutter/material.dart';
 
-import '../api_service.dart'; // PedidosService (pedir el detalle).
-import '../models.dart'; // Modelos y cálculo de totales.
+import '../core/api_service.dart'; // PedidosService (pedir el detalle).
+import '../models/models.dart'; // Modelos y cálculo de totales.
 import '../theme/app_theme.dart'; // Colores.
 import '../core/formatters.dart'; // formatDate (fecha en formato español).
 import '../widgets/segment_tabs.dart'; // Las pestañas (Cabecera/Líneas/Totales).
@@ -168,12 +168,12 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  'Código ${pedido.codigo == 0 ? '' : pedido.codigo}',
+                  'Nº de pedido: ${pedido.numeroPedido.isNotEmpty ? pedido.numeroPedido : (pedido.codigo > 0 ? pedido.codigo.toString() : '')}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: AppColors.primary,
-                  ),
+                  ), 
                 ),
               ),
               // Etiqueta de color según el estado (naranja/verde/gris).

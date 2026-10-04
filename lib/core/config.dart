@@ -42,8 +42,10 @@ class AppConfig {
     'pedidos': 'TecERPv7_dat_dat/v1/VTA_PED_G',     // Cabeceras de pedidos de VENTA.
     'usuarios': 'TecERPv7_dat_dat/v1/USR_M',        // Usuarios de acceso.
     'lineas': 'TecERPv7_dat_dat/v1/VTA_PED_LIN_G',   // Líneas de pedido de venta.
+    'procesoActualizarLinea': 'ACT_VTA_PED_LIN_G_APP.pro', // Proceso Velneo para actualizar líneas.
     'presupuestos': 'TecERPv7_dat_dat/v1/VTA_PRE_G', // Cabeceras de presupuestos de VENTA.
-    'lineasPresupuesto': 'TecERPv7_dat_dat/v1/VTA_PRE_LIN_G', // Líneas de presupuesto.
+    'lineasPresupuesto': 'TecERPv7_dat_dat/v1/VTA_PRE_LIN_G',
+    'procesoActualizarLineaPresupuesto': 'ACT_VTA_PRE_LIN_G_APP.pro', // Líneas de presupuesto.
     'clientes': 'TecERPv7_dat_dat/v1/ENT_M',         // Entidades (clientes de venta).
     'comerciales': 'TecERPv7_dat_dat/v1/ENT_M',      // Entidades (comerciales).
     'direcciones': 'TecERPv7_dat_dat/v1/DIR_M',      // Direcciones de clientes.
@@ -52,6 +54,11 @@ class AppConfig {
     'almacenes': 'TecERPv7_dat_dat/v1/ALM_M',        // Lista de almacenes.
     'series': 'TecERPv7_dat_dat/v1/SER_M',           // Numeración de documentos.
     'formasPago': 'TecERPv7_dat_dat/v1/FPG_M',       // Formas de pago aceptadas.
+    'agenda': 'TecERPv7_dat_dat/v1/CRM_AGE',         // Visitas de agenda CRM.
+    'campanas': 'TecERPv7_dat_dat/v1/CRM_CAM_COM',    // Campañas comerciales CRM.
+    'tiposVisita': 'TecERPv7_dat_dat/v1/TIP_VIS',     // Tipos de visita CRM.
+    'zonasTecnicas': 'TecERPv7_dat_dat/v1/ZN_TCN',    // Zonas técnicas
+    'zonasComerciales': 'TecERPv7_dat_dat/v1/ZN_TCN_CMR', // Tabla intermedia zonas-comercial
   };
 
   // Número de resultados que se piden por página (parámetro page[size]).

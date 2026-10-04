@@ -22,12 +22,14 @@ class TotalesCard extends StatelessWidget {
   final double base; // Suma de bases (sin IVA).
   final double iva; // Suma de IVA.
   final double total; // Base + IVA.
+  final String labelTotal;
 
   const TotalesCard({
     super.key,
     required this.base,
     required this.iva,
     required this.total,
+    this.labelTotal = 'Total Pedido',
   });
 
   @override
@@ -46,8 +48,8 @@ class TotalesCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Total Pedido',
+                Text(
+                  labelTotal,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

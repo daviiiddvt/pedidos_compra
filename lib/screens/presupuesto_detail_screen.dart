@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../models.dart';
-import '../presupuesto_service.dart';
+import '../models/models.dart';
+import '../core/presupuesto_service.dart';
+import '../core/formatters.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cabecera_view.dart';
 import '../widgets/estado_badge.dart';
@@ -15,27 +16,33 @@ class PresupuestoDetailScreen extends StatefulWidget {
   const PresupuestoDetailScreen({super.key, required this.presupuestoId});
 
   @override
-  State<PresupuestoDetailScreen> createState() => _PresupuestoDetailScreenState();
+  State<PresupuestoDetailScreen> createState() =>
+      _PresupuestoDetailScreenState();
 }
 
 class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
-  Pedido? _presupuesto;
-  bool _loading = true;
+  PresupuestoVenta? _presupuesto;
+  bool _cargando = true;
   String _tab = 'cabecera';
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _cargar();
   }
 
-  Future<void> _load() async {
+  Future<void> _cargar() async {
     try {
-      final budget = await PresupuestosService.getById(widget.presupuestoId);
-      if (mounted) setState(() { _presupuesto = budget; _loading = false; });
+      final presupuestoRecibido = await PresupuestosService.getById(widget.presupuestoId);
+      if (mounted) {
+        setState(() {
+          _presupuesto = presupuestoRecibido;
+          _cargando = false;
+        });
+      }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() => _cargando = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('$error')));
     }
@@ -43,22 +50,36 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final budget = _presupuesto;
+    final presupuesto = _presupuesto;
+    final pedidoVisual = presupuesto?.toPedidoVisual();
+
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(budget == null ? 'Presupuesto' : 'Presupuesto ${budget.codigo}'),
+        title: Text(
+          presupuesto == null ||
+                  (presupuesto.numeroPresupuesto.isEmpty &&
+                      (presupuesto.id == null || presupuesto.id == 0))
+              ? 'Presupuesto'
+              : (presupuesto.numeroPresupuesto.isNotEmpty
+                  ? 'Presupuesto ${presupuesto.numeroPresupuesto}'
+                  : 'Presupuesto ${presupuesto.id}'),
+        ),
       ),
-      body: _loading
+      body: _cargando
           ? const Center(child: CircularProgressIndicator())
-          : budget == null
+          : presupuesto == null || pedidoVisual == null
               ? const Center(child: Text('No se encontró el presupuesto'))
               : Column(
                   children: [
-                    _summary(budget),
+                    _resumen(presupuesto),
                     SegmentTabs(
                       tabs: [
                         (key: 'cabecera', label: 'Cabecera'),
-                        (key: 'lineas', label: 'Líneas (${budget.lineas.length})'),
+                        (
+                          key: 'lineas',
+                          label: 'Líneas (${presupuesto.lineas.length})',
+                        ),
                         (key: 'totales', label: 'Totales'),
                       ],
                       active: _tab,
@@ -66,34 +87,111 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                     ),
                     Expanded(
                       child: switch (_tab) {
-                        'lineas' => LineasTable(lineas: budget.lineas),
+                        'lineas' => LineasTable(lineas: pedidoVisual.lineas),
                         'totales' => SingleChildScrollView(
                             padding: const EdgeInsets.all(12),
                             child: TotalesCard(
-                              base: calcularTotales(budget.lineas).base,
-                              iva: calcularTotales(budget.lineas).iva,
-                              total: calcularTotales(budget.lineas).total,
+                              base: calcularTotales(pedidoVisual.lineas).base,
+                              iva: calcularTotales(pedidoVisual.lineas).iva,
+                              total: calcularTotales(pedidoVisual.lineas).total,
+                              labelTotal: 'Total Presupuesto',
                             ),
                           ),
-                        _ => CabeceraView(pedido: budget),
+                        _ => CabeceraView(
+                            pedido: pedidoVisual,
+                            mostrarAlmacen: false,
+                            mostrarFechaEntrega: false,
+                            mostrarEmail: true,
+                            mostrarFechaValidez: true,
+                            mostrarNumeroPresupuesto: true,
+                          ),
                       },
                     ),
-                    SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              await Navigator.of(context).pushNamed(
-                                '/presupuesto/form',
-                                arguments: budget.id,
-                              );
-                              if (mounted) _load();
-                            },
-                            icon: const Icon(Icons.edit),
-                            label: const Text('Editar'),
+                    Material(
+                      color: AppColors.surface,
+                      child: SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () async {
+                                    await Navigator.of(context).pushNamed(
+                                      '/presupuesto/form',
+                                      arguments: presupuesto.id,
+                                    );
+                                    if (mounted) _cargar();
+                                  },
+                                  icon: const Icon(Icons.edit),
+                                  label: const Text('Editar'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    if (presupuesto.vtaPedG > 0 ||
+                                        presupuesto.estado == 'A') {
+                                      showDialog(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: const Text('Aviso'),
+                                          content: const Text(
+                                            'Este presupuesto ya ha sido aceptado o convertido a un pedido de venta previamente y no puede volver a convertirse.',
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.of(ctx).pop(),
+                                              child: const Text('Aceptar'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    final navigator = Navigator.of(context);
+
+                                    // Marcamos el presupuesto como aceptado en Velneo
+                                    await PresupuestosService.marcarAceptado(
+                                      presupuesto.id,
+                                    );
+                                    if (!mounted) return;
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Presupuesto aceptado'),
+                                      ),
+                                    );
+                                    _cargar();
+
+                                    await navigator.pushNamed(
+                                      '/pedido/form',
+                                      arguments: pedidoVisual.copyWith(
+                                        fecha: todayIso(),
+                                        codigo: 0,
+                                        numeroPedido: '',
+                                        estado: 'P',
+                                        lineas: pedidoVisual.lineas
+                                            .map((l) => l.copyWith(id: null))
+                                            .toList(),
+                                      ),
+                                    );
+                                    if (mounted) _cargar();
+                                  },
+                                  icon: const Icon(Icons.shopping_cart_checkout),
+                                  label: Text(
+                                    (presupuesto.vtaPedG > 0 ||
+                                            presupuesto.estado == 'A')
+                                        ? 'Aceptado'
+                                        : 'A Pedido',
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -103,21 +201,94 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
     );
   }
 
-  Widget _summary(Pedido budget) => Container(
-        color: AppColors.surface,
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Código ${budget.codigo == 0 ? '' : budget.codigo}',
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
+  /// _resumen: bloque superior idéntico en estructura y alineación al de pedidos.
+  Widget _resumen(PresupuestoVenta presupuesto) {
+    final numeroPresupuesto = presupuesto.numeroPresupuesto.isNotEmpty
+        ? presupuesto.numeroPresupuesto
+        : (presupuesto.id != null ? '#${presupuesto.id}' : '');
+
+    return Container(
+      color: AppColors.surface,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Etiqueta azul con el código/número de presupuesto
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Nº de presupuesto: $numeroPresupuesto',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
               ),
+              // Etiqueta de color según el estado
+              EstadoBadge(estado: presupuesto.estado),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Cliente: el nombre si lo hay; si no, el código; si no, "Sin cliente".
+          Text(
+            presupuesto.clienteNombre.isNotEmpty
+                ? presupuesto.clienteNombre
+                : (presupuesto.cliente.isNotEmpty
+                    ? presupuesto.cliente
+                    : 'Sin cliente'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: AppColors.text,
             ),
-            EstadoBadge(estado: budget.estado),
-          ],
-        ),
-      );
+          ),
+
+          // Fecha y Pedido asociado (si lo hay)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (presupuesto.fecha.isNotEmpty)
+                Text(
+                  'Fecha: ${formatDate(presupuesto.fecha)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
+              if (presupuesto.vtaPedG > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Pedido asociado: ${presupuesto.vtaPedG}',
+                    style: const TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
+

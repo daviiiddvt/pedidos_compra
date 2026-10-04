@@ -16,7 +16,7 @@
 //  de modo que una segunda búsqueda offline encuentra resultados al instante.
 // ============================================================================
 
-import '../../models.dart'; // OpcionMaestra.
+import '../../models/models.dart'; // OpcionMaestra.
 
 /// Entrada guardada en la caché local.
 class CachedOption {

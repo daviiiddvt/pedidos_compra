@@ -29,8 +29,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-import '../../api_service.dart'; // PedidosService (páginas de maestros).
-import '../../models.dart'; // OpcionMaestra.
+import '../api_service.dart'; // PedidosService (páginas de maestros).
+import '../../models/models.dart'; // OpcionMaestra.
 import 'entity_search_repository.dart'; // EntityKind + repositorio.
 
 /// Sincroniza maestros pesados (clientes/artículos) en segundo plano.

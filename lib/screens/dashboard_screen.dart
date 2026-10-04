@@ -30,10 +30,10 @@ class DashboardScreen extends StatelessWidget {
         onTap: () => Navigator.of(context).pushNamed('/pedidos'),
       ),
       _DashboardCard(
-        icon: Icons.people_alt_outlined,
+        icon: Icons.calendar_month_outlined,
         title: 'CMR',
-        subtitle: 'Sección en desarrollo.',
-        color: AppColors.textSecondary,
+        subtitle: 'Agenda de visitas del comercial.',
+        color: AppColors.primary,
         onTap: () => Navigator.of(context).pushNamed('/cmr'),
       ),
     ];
@@ -187,49 +187,3 @@ class _DashboardCard extends StatelessWidget {
   }
 }
 
-class CmrComingSoonScreen extends StatelessWidget {
-  const CmrComingSoonScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('CMR'),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.construction_rounded,
-                size: 72,
-                color: AppColors.primary,
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'Sección CMR en desarrollo',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.text,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Pronto estará disponible para consultar información del equipo comercial.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

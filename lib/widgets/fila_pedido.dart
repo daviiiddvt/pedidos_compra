@@ -17,7 +17,7 @@
 
 import 'package:flutter/material.dart';
 
-import '../models.dart'; // Pedido + calcularTotales.
+import '../models/models.dart'; // Pedido + calcularTotales.
 import '../theme/app_theme.dart'; // Colores.
 import '../core/formatters.dart'; // formatDate y formatNumber.
 import 'estado_badge.dart'; // La píldora del estado.
@@ -26,8 +26,14 @@ import 'estado_badge.dart'; // La píldora del estado.
 class FilaPedido extends StatelessWidget {
   final Pedido pedido; // El pedido a dibujar.
   final VoidCallback onTap; // Qué hacer al tocar (navegar al detalle).
+  final bool mostrarNumeroPresupuesto;
 
-  const FilaPedido({super.key, required this.pedido, required this.onTap});
+  const FilaPedido({
+    super.key,
+    required this.pedido,
+    required this.onTap,
+    this.mostrarNumeroPresupuesto = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -36,11 +42,17 @@ class FilaPedido extends StatelessWidget {
     final total = (pedido.lineas.isNotEmpty)
         ? calcularTotales(pedido.lineas).total
         : pedido.total;
-    final nPedido = pedido.nPedido; // N° de pedido (num_ped).
+    final numero = mostrarNumeroPresupuesto
+        ? pedido.nPresupuesto
+        : pedido.nPedido;
+    final etiquetaNumero = mostrarNumeroPresupuesto
+        ? 'N° presupuesto'
+        : 'N° pedido';
     final fecha = pedido.fecha.isNotEmpty ? formatDate(pedido.fecha) : '';
 
     return Card(
-      child: InkWell( // Hace toda la tarjeta clicable.
+      child: InkWell(
+        // Hace toda la tarjeta clicable.
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
@@ -81,7 +93,9 @@ class FilaPedido extends StatelessWidget {
                 // Nombre; si no, código; si no, "Sin cliente".
                 pedido.clienteNombre.isNotEmpty
                     ? pedido.clienteNombre
-                    : (pedido.cliente.isNotEmpty ? pedido.cliente : 'Sin cliente'),
+                    : (pedido.cliente.isNotEmpty
+                          ? pedido.cliente
+                          : 'Sin cliente'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis, // "..."
                 style: const TextStyle(
@@ -95,10 +109,10 @@ class FilaPedido extends StatelessWidget {
               // ---- N° pedido (izquierda) + fecha (derecha) ----
               Row(
                 children: [
-                  if (nPedido.isNotEmpty)
+                  if (numero.isNotEmpty)
                     Expanded(
                       child: Text(
-                        'N° pedido: $nPedido',
+                        '$etiquetaNumero: $numero',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -117,14 +131,16 @@ class FilaPedido extends StatelessWidget {
                 ],
               ),
               const Divider(height: 20), // Línea separadora.
-
               // ---- Total ----
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Total pedido',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  Text(
+                    mostrarNumeroPresupuesto ? 'Total presupuesto' : 'Total pedido',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   Text(
                     '${formatNumber(total)} €', // "1.234,56 €"

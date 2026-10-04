@@ -1,6 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/order_repository.dart';
-import '../models.dart';
+import '../models/models.dart';
 
 class OrderState {
   final List<Pedido> filteredOrders;

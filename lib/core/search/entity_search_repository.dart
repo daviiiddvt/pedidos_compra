@@ -19,8 +19,10 @@
 //  - Añadir un maestro nuevo (ej. almacenes) = añadir un valor a EntityKind.
 // ============================================================================
 
-import '../../api_service.dart'; // PedidosService (búsqueda remota acotada).
-import '../../models.dart'; // OpcionMaestra.
+import 'package:flutter/foundation.dart' show debugPrint; // Trazado.
+
+import '../api_service.dart'; // PedidosService (búsqueda remota acotada).
+import '../../models/models.dart'; // OpcionMaestra.
 import 'local_cache_db.dart'; // LocalCacheDb + localCacheDbInstance.
 
 /// Tipos de entidad buscables. Cada valor sabe el 'type' usado en la caché.
@@ -66,9 +68,11 @@ class EntitySearchRepository {
     if (trimmed.isEmpty) return const [];
 
     final local = await _db.search(kind.type, trimmed, limit: limit);
+    debugPrint('💾 ${kind.type}: caché local $trimmed → ${local.length} resultados: $local');
     if (local.isNotEmpty) return local;
 
     final remote = await _remoteSearch(kind, trimmed, limit: limit);
+    debugPrint('🌐 ${kind.type}: API remoto $trimmed → ${remote.length} resultados: $remote');
     if (remote.isNotEmpty) {
       await _db.upsertMany(kind.type, remote);
     }

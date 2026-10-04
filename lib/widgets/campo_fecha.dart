@@ -23,6 +23,7 @@ class CampoFecha extends StatelessWidget {
   final String? value; // Fecha actual en ISO (o null = no hay).
   final ValueChanged<String> onChanged; // Avisa con la nueva fecha en ISO.
   final bool required; // Muestra el "*".
+  final bool enabled; // false = no abre el calendario.
 
   const CampoFecha({
     super.key,
@@ -30,6 +31,7 @@ class CampoFecha extends StatelessWidget {
     this.value,
     required this.onChanged,
     this.required = false,
+    this.enabled = true,
   });
 
   /// _seleccionar: abre el calendario y, si elige fecha, avisa en ISO.
@@ -81,10 +83,10 @@ class CampoFecha extends StatelessWidget {
 
         // Zona clicable con aspecto de campo.
         InkWell(
-          onTap: () => _seleccionar(context), // Tocar = abrir calendario.
+          onTap: enabled ? () => _seleccionar(context) : null,
           borderRadius: BorderRadius.circular(10),
           child: InputDecorator(
-            decoration: const InputDecoration(),
+            decoration: InputDecoration(enabled: enabled),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween, // Fecha ✓ icono.
               children: [
@@ -94,14 +96,17 @@ class CampoFecha extends StatelessWidget {
                     hayValor ? formatDate(value) : 'Seleccionar fecha',
                     style: TextStyle(
                       fontSize: 15,
-                      color: hayValor ? AppColors.text : AppColors.disabled,
+                      color: !enabled
+                          ? AppColors.disabled
+                          : (hayValor ? AppColors.text : AppColors.disabled),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 // Icono de calendario.
-                const Icon(Icons.calendar_today_outlined,
-                    color: AppColors.textSecondary, size: 18),
+                Icon(Icons.calendar_today_outlined,
+                    color: enabled ? AppColors.textSecondary : AppColors.disabled,
+                    size: 18),
               ],
             ),
           ),

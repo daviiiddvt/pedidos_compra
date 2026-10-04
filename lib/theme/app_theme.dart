@@ -37,6 +37,9 @@ class AppColors {
   static const estadoPendiente = Color(0xFFF57C00); // Naranja (pendiente).
   static const estadoRecibido = Color(0xFF388E3C); // Verde (servido).
   static const estadoCancelado = Color(0xFF9E9E9E); // Gris (cancelado).
+  static const estadoAceptado = Color(0xFF4CAF50); // Verde (aceptado).
+  static const estadoRechazado = Color(0xFFD32F2F); // Rojo (rechazado).
+  static const estadoParcial = Color(0xFF2196F3); // Azul (parcial).
 
   /// estadoCodigo: traduce el texto o código del estado al código Velneo.
   /// Acepta "Recibido" como alias heredado de la interfaz, pero los estados
@@ -53,10 +56,18 @@ class AppColors {
       case 'RECIBIDO':
         return 'S';
       case 'C':
-      case 'A':
       case 'CANCELADO':
       case 'ANULADO':
         return 'C';
+      case 'A':
+      case 'ACEPTADO':
+        return 'A';
+      case 'R':
+      case 'RECHAZADO':
+        return 'R';
+      case 'X':
+      case 'PARCIALMENTE_SERVIDO':
+        return 'X';
       default:
         return estado ?? ''; // Desconocido → se envía tal cual (no rompe).
     }
@@ -73,6 +84,12 @@ class AppColors {
         return estadoRecibido;
       case 'C':
         return estadoCancelado;
+      case 'A':
+        return estadoAceptado;
+      case 'R':
+        return estadoRechazado;
+      case 'X':
+        return estadoParcial;
       default:
         return primary; // Estado desconocido → azul.
     }
@@ -88,6 +105,12 @@ class AppColors {
         return 'Servido';
       case 'C':
         return 'Cancelado';
+      case 'A':
+        return 'Aceptado';
+      case 'R':
+        return 'Rechazado';
+      case 'X':
+        return 'Parcialmente Servido';
       default:
         return estado ?? '—'; // Desconocido → mostramos el texto tal cual (o guion).
     }

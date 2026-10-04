@@ -3,12 +3,12 @@
 // ============================================================================
 
 import 'package:flutter/foundation.dart';
-import '../api_service.dart'; 
+import '../core/api_service.dart'; 
 import '../core/api_client.dart'; 
 import '../core/config.dart'; 
 import '../core/master_cache_service.dart';
 import '../core/search/master_sync_service.dart';
-import '../models.dart'; // 1. IMPORTANTE: Importar los modelos para reconocer User
+import '../models/models.dart'; // 1. IMPORTANTE: Importar los modelos para reconocer User
 
 /// AuthState: el "cerebro" de la sesión. Guarda y controla la conexión.
 class AuthState extends ChangeNotifier {

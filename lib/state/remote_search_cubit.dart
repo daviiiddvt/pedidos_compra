@@ -22,9 +22,10 @@
 //    antiguas si el usuario sigue tecleando (respuestas fuera de orden).
 // ============================================================================
 
+import 'package:flutter/foundation.dart' show debugPrint; // Trazado.
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../models.dart'; // OpcionMaestra (resultado de la búsqueda).
+import '../models/models.dart'; // OpcionMaestra (resultado de la búsqueda).
 
 /// Estado base del buscador remoto.
 sealed class RemoteSearchState {
@@ -82,12 +83,15 @@ class RemoteSearchCubit extends Cubit<RemoteSearchState> {
 
     emit(const RemoteSearchLoading());
     final seq = ++_sequence;
+    debugPrint('🔍 SEARCH(query="$trimmed") disparada → llamando a searchFn...');
     try {
       final results = await searchFn(trimmed);
+      debugPrint('🔍 SEARCH(query="$trimmed") devolvió ${results.length} resultados: $results');
       if (seq == _sequence && !isClosed) {
         emit(RemoteSearchSuccess(results));
       }
     } catch (e) {
+      debugPrint('🔍 SEARCH(query="$trimmed") FALLÓ: $e');
       if (seq == _sequence && !isClosed) {
         emit(RemoteSearchFailure('No se pudo buscar. Inténtalo de nuevo.'));
       }

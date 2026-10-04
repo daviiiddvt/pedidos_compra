@@ -22,9 +22,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/api_service.dart'; // PedidosService (defaults del artículo).
 import '../core/formatters.dart'; // formatNumber y parseNumber.
 import '../core/search/entity_search_repository.dart'; // Repositorio local-first.
-import '../models.dart'; // LineaPedido, OpcionMaestra.
+import '../models/models.dart'; // LineaPedido, OpcionMaestra.
 import '../theme/app_theme.dart'; // Colores.
 import 'autocomplete_field.dart'; // Buscador remoto con autocompletado (artículos).
 import 'campo_form.dart'; // CampoForm y CampoSelect.
@@ -34,9 +35,20 @@ import 'modal_selector.dart'; // mostrarSelector.
 /// LineaFormModal: la ventana para introducir/editar una línea de pedido.
 class LineaFormModal extends StatefulWidget {
   final LineaPedido? linea; // La línea a editar (null = línea nueva).
-  final VoidCallback? onDelete; // Qué hacer si se pulsa "Eliminar" (solo modo editar).
+  final VoidCallback?
+  onDelete; // Qué hacer si se pulsa "Eliminar" (solo modo editar).
+  final bool mostrarFechaEntrega;
+  final bool mostrarReferencia;
+  final List<String> estadosDisponibles;
 
-  const LineaFormModal({super.key, this.linea, this.onDelete});
+  const LineaFormModal({
+    super.key,
+    this.linea,
+    this.onDelete,
+    this.mostrarFechaEntrega = true,
+    this.mostrarReferencia = true,
+    this.estadosDisponibles = const ['Pendiente', 'Cancelado'],
+  });
 
   @override
   State<LineaFormModal> createState() => _LineaFormModalState();
@@ -44,37 +56,29 @@ class LineaFormModal extends StatefulWidget {
 
 class _LineaFormModalState extends State<LineaFormModal> {
   // Valores "fijos" que se pueden elegir:
-  static const _tiposIva = [21, 10, 4, 0]; // Tipos de IVA españoles.
-  static const _estados = ['Pendiente', 'Cancelado']; // Estados posibles de la línea.
+  
 
-  late final _formKey = GlobalKey<FormState>(); // Llave del formulario (para validar).
+  late final _formKey =
+      GlobalKey<FormState>(); // Llave del formulario (para validar).
 
   // Controllers: UNO por cada campo editable de la línea.
   late final TextEditingController _articulo;
   late final TextEditingController _descripcion;
   late final TextEditingController _nReferencia;
   late final TextEditingController _cantidad;
-  late final TextEditingController _pendiente;
   late final TextEditingController _precio;
   late final TextEditingController _dto;
   late final TextEditingController _retencionIrpf;
   late final TextEditingController _retencionAlquiler;
 
   // Estado "elegido" (no con controller porque son selectores):
-  late String _tipoIva; // "21", "10", "4" o "0" (como texto).
+  late RegimenIva _regimenIva;
   late String _estado; // 'Pendiente' o 'Cancelado'.
   String? _articuloId; // El CÓDIGO del artículo elegido (lo que se guarda).
   String _previstoPara = ''; // Fecha prevista de entrega (ISO).
 
   // ¿Es modo edición? Sí, si nos pasaron una línea.
   bool get _editando => widget.linea != null;
-
-  void _syncPendienteValue() {
-    final cantidad = parseNumber(_cantidad.text);
-    final cantidadServida = widget.linea?.cantidadServida ?? 0.0;
-    final pendiente = (cantidad - cantidadServida).clamp(0.0, double.infinity);
-    _pendiente.text = formatNumber(pendiente, decimals: 2);
-  }
 
   @override
   void initState() {
@@ -84,19 +88,17 @@ class _LineaFormModalState extends State<LineaFormModal> {
     // Rellenamos cada controller con el valor existente (o vacío/por defecto).
     // El artículo se muestra con su NOMBRE bonito, pero se guarda el CÓDIGO.
     _articulo = TextEditingController(
-      text: (l?.articuloNombre.isNotEmpty ?? false) ? l!.articuloNombre : (l?.articulo ?? ''),
+      text: (l?.articuloNombre.isNotEmpty ?? false)
+          ? l!.articuloNombre
+          : (l?.articulo ?? ''),
     );
     _articuloId = (l?.articulo.isNotEmpty ?? false) ? l!.articulo : null;
     _descripcion = TextEditingController(text: l?.descripcion ?? '');
     _nReferencia = TextEditingController(text: l?.nReferencia ?? '');
     _cantidad = TextEditingController(
-      text: l != null ? formatNumber(l.cantidad, decimals: 2) : '1', // 1 por defecto.
-    );
-    final pendienteBase = l != null
-        ? (l.pendiente > 0 ? l.pendiente : l.pendienteCalculada)
-        : 1.0;
-    _pendiente = TextEditingController(
-      text: formatNumber(pendienteBase, decimals: 2),
+      text: l != null
+          ? formatNumber(l.cantidad, decimals: 2)
+          : '1', // 1 por defecto.
     );
     _precio = TextEditingController(
       text: l != null ? formatNumber(l.precio, decimals: 2) : '0',
@@ -112,10 +114,17 @@ class _LineaFormModalState extends State<LineaFormModal> {
     );
 
     // Selectores con valor por defecto:
-    _tipoIva = (l?.tipoIva ?? 21).toStringAsFixed(0); // "21" por defecto.
+    if (l != null && l.regIvaVta.isNotEmpty) {
+      _regimenIva = regimenIvaPorCodigo(l.regIvaVta);
+    } else if (l != null) {
+      _regimenIva = regimenIvaPorPorcentaje(l.tipoIva);
+    } else {
+      _regimenIva = kRegimenesIva.first;
+    }
     // Si edito una línea ya cancelada, el estado sale "Cancelado".
     // (l.estado puede venir como código VELNEO "C"... → lo normalizamos.)
-    final esCancelada = _editando && (l!.cancelado || AppColors.estadoCodigo(l.estado) == 'C');
+    final esCancelada =
+        _editando && (l!.cancelado || AppColors.estadoCodigo(l.estado) == 'C');
     _estado = esCancelada ? 'Cancelado' : 'Pendiente';
     _previstoPara = l?.previstoPara ?? '';
   }
@@ -127,7 +136,6 @@ class _LineaFormModalState extends State<LineaFormModal> {
     _descripcion.dispose();
     _nReferencia.dispose();
     _cantidad.dispose();
-    _pendiente.dispose();
     _precio.dispose();
     _dto.dispose();
     _retencionIrpf.dispose();
@@ -152,6 +160,39 @@ class _LineaFormModalState extends State<LineaFormModal> {
     return repo.search(EntityKind.articulo, query, limit: 20);
   }
 
+  /// Pide a Velneo los datos por defecto del artículo elegido (precio, IVA,
+  /// descripción) y los vuelca en los campos del formulario de la línea.
+  Future<void> _cargarDatosArticulo(String articuloCodigo) async {
+    debugPrint(
+      '🔧 _cargarDatosArticulo("$articuloCodigo") → pidiendo defaults a Velneo...',
+    );
+    final defaults = await PedidosService.getArticuloDefaults(articuloCodigo);
+    if (!mounted) return;
+    debugPrint(
+      '🔧 _cargarDatosArticulo("$articuloCodigo") → defaults recibidos: $defaults',
+    );
+    setState(() {
+      final descripcion = (defaults['descripcion'] ?? '').toString().trim();
+      if (descripcion.isNotEmpty && _descripcion.text.trim().isEmpty) {
+        _descripcion.text = descripcion;
+      }
+      final precio =
+          double.tryParse((defaults['precio'] ?? '').toString()) ?? 0;
+      if (precio > 0) {
+        _precio.text = formatNumber(precio, decimals: 2);
+      }
+      final regIvaRaw = defaults['reg_iva_vta'] ?? defaults['reg_iva'];
+      if (regIvaRaw != null && regIvaRaw.toString().isNotEmpty) {
+        _regimenIva = regimenIvaPorCodigo(regIvaRaw.toString());
+      } else {
+        final tipoIva = double.tryParse((defaults['tipoIva'] ?? '').toString());
+        if (tipoIva != null) {
+          _regimenIva = regimenIvaPorPorcentaje(tipoIva);
+        }
+      }
+    });
+  }
+
   /// _guardar: valida el formulario, construye la LINEA y cierra devolviéndola.
   /// (Navigator.pop(linea) → quien llamó a mostrarLineaForm recibe la línea).
   void _guardar() {
@@ -160,7 +201,6 @@ class _LineaFormModalState extends State<LineaFormModal> {
 
     final cantidad = parseNumber(_cantidad.text);
     final cantidadServida = widget.linea?.cantidadServida ?? 0.0;
-    final pendiente = (cantidad - cantidadServida).clamp(0.0, double.infinity);
 
     final linea = LineaPedido(
       // Conservamos id/código si venían de una línea ya existente.
@@ -173,15 +213,16 @@ class _LineaFormModalState extends State<LineaFormModal> {
       nReferencia: _nReferencia.text.trim(),
       cantidad: cantidad,
       cantidadServida: cantidadServida,
-      pendiente: pendiente,
       precio: parseNumber(_precio.text),
       dto: parseNumber(_dto.text),
       importe: _importeCalculado, // El importe calculado en vivo.
-      tipoIva: double.parse(_tipoIva), // "21" → 21.0
+      tipoIva: _regimenIva.porcentaje,
+      regIvaVta: _regimenIva.codigo,
       retencionIrpf: parseNumber(_retencionIrpf.text),
       retencionAlquiler: parseNumber(_retencionAlquiler.text),
       estado: _estado,
-      cancelado: _estado == 'Cancelado', // Si estado = Cancelado → sí cancelada.
+      cancelado:
+          _estado == 'Cancelado', // Si estado = Cancelado → sí cancelada.
       previstoPara: _previstoPara,
     );
     Navigator.of(context).pop(linea); // Cerramos y entregamos la línea.
@@ -207,7 +248,8 @@ class _LineaFormModalState extends State<LineaFormModal> {
 
             // ---- Zona con SCROLL de los campos ----
             Flexible(
-              child: SingleChildScrollView( // Permite hacer scroll si no caben.
+              child: SingleChildScrollView(
+                // Permite hacer scroll si no caben.
                 child: Column(
                   children: [
                     // Artículo: buscador con autocompletado remoto (debounce).
@@ -223,10 +265,17 @@ class _LineaFormModalState extends State<LineaFormModal> {
                       hint: 'Buscar por nombre o código...',
                       search: _buscarArticulos,
                       onSelected: (opcion) {
+                        debugPrint('🔥🔥🔥 SE CLICÓ UN ARTICULO: $opcion');
+                        // Mapeo SEGURO del artículo elegido → estado del modal.
+                        // El ID real de la línea es el CÓDIGO del artículo
+                        // (ART_M). El nombre es lo que se muestra y guarda en
+                        // articuloNombre. Ambos se guardan explícitamente.
                         setState(() {
-                          _articulo.text = opcion.nombre; // Mostramos el nombre.
-                          _articuloId = opcion.codigo; // Guardamos el código.
+                          _articulo.text = opcion.nombre; // Nombre visible.
+                          _articuloId =
+                              opcion.codigo; // Código → 'art' en Velneo.
                         });
+                        _cargarDatosArticulo(opcion.codigo);
                       },
                       onCleared: () {
                         setState(() {
@@ -246,40 +295,27 @@ class _LineaFormModalState extends State<LineaFormModal> {
                       multiline: true,
                     ),
 
-                    // N/Referencia.
-                    CampoForm(
-                      label: 'N/Referencia',
-                      value: _nReferencia.text,
-                      onChanged: (v) => _nReferencia.text = v,
-                    ),
+                    if (widget.mostrarReferencia)
+                      CampoForm(
+                        label: 'N/Referencia',
+                        value: _nReferencia.text,
+                        onChanged: (v) => _nReferencia.text = v,
+                      ),
 
-                    // Cantidad y cantidad pendiente (lado a lado).
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: CampoForm(
-                            label: 'Cantidad',
-                            controller: _cantidad,
-                            onChanged: (v) {
-                              _syncPendienteValue();
-                              setState(() {});
-                            },
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
-                            required: true,
-                            validator: (v) =>
-                                parseNumber(v ?? '') <= 0 ? 'Debe ser mayor que 0' : null,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: CampoForm(
-                            label: 'Cantidad pendiente',
-                            controller: _pendiente,
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
-                          ),
-                        ),
-                      ],
+                    // Cantidad.
+                    CampoForm(
+                      label: 'Cantidad',
+                      controller: _cantidad,
+                      onChanged: (v) {
+                        setState(() {});
+                      },
+                      keyboardType: TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      required: true,
+                      validator: (v) => parseNumber(v ?? '') <= 0
+                          ? 'Debe ser mayor que 0'
+                          : null,
                     ),
 
                     // Precio y % descuento (lado a lado).
@@ -290,8 +326,11 @@ class _LineaFormModalState extends State<LineaFormModal> {
                           child: CampoForm(
                             label: 'Precio',
                             controller: _precio,
-                            onChanged: (v) => setState(() {}), // Recalcula importe.
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (v) =>
+                                setState(() {}), // Recalcula importe.
+                            keyboardType: TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -299,25 +338,31 @@ class _LineaFormModalState extends State<LineaFormModal> {
                           child: CampoForm(
                             label: '% descuento',
                             controller: _dto,
-                            onChanged: (v) => setState(() {}), // Recalcula importe.
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (v) =>
+                                setState(() {}), // Recalcula importe.
+                            keyboardType: TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                           ),
                         ),
                       ],
                     ),
 
-                    // Tipo de IVA (selector con los 4 tipos).
+                    // Régimen de IVA
                     CampoSelect(
-                      label: 'Tipo de IVA',
-                      value: '$_tipoIva %', // "21 %"
+                      label: 'Régimen de IVA',
+                      value: _regimenIva.nombre,
                       onTap: () async {
                         final sel = await mostrarSelector(
                           context,
-                          title: 'Seleccionar tipo de IVA',
-                          options: _tiposIva, // [21, 10, 4, 0]
+                          title: 'Seleccionar régimen de IVA',
+                          options: kRegimenesIva,
+                          textOf: (op) => (op as RegimenIva).nombre,
                           searchable: false,
                         );
-                        if (sel != null) setState(() => _tipoIva = '$sel');
+                        if (sel != null && sel is RegimenIva) {
+                          setState(() => _regimenIva = sel);
+                        }
                       },
                     ),
 
@@ -329,19 +374,19 @@ class _LineaFormModalState extends State<LineaFormModal> {
                         final sel = await mostrarSelector(
                           context,
                           title: 'Seleccionar estado',
-                          options: _estados,
+                          options: widget.estadosDisponibles,
                           searchable: false,
                         );
                         if (sel != null) setState(() => _estado = sel);
                       },
                     ),
 
-                    // Fecha prevista de entrega (calendario).
-                    CampoFecha(
-                      label: 'Entrega prevista',
-                      value: _previstoPara,
-                      onChanged: (v) => setState(() => _previstoPara = v),
-                    ),
+                    if (widget.mostrarFechaEntrega)
+                      CampoFecha(
+                        label: 'Entrega prevista',
+                        value: _previstoPara,
+                        onChanged: (v) => setState(() => _previstoPara = v),
+                      ),
 
                     // Retenciones (lado a lado).
                     Row(
@@ -351,7 +396,9 @@ class _LineaFormModalState extends State<LineaFormModal> {
                           child: CampoForm(
                             label: 'Retención IRPF',
                             controller: _retencionIrpf,
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -359,7 +406,9 @@ class _LineaFormModalState extends State<LineaFormModal> {
                           child: CampoForm(
                             label: 'Retención alquiler',
                             controller: _retencionAlquiler,
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                           ),
                         ),
                       ],
@@ -427,7 +476,8 @@ class _LineaFormModalState extends State<LineaFormModal> {
                 ],
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(), // Cerrar sin guardar → null.
+                    onPressed: () => Navigator.of(context)
+                        .pop(), // Cerrar sin guardar → null.
                     child: const Text('Cancelar'),
                   ),
                 ),
@@ -457,14 +507,26 @@ Future<LineaPedido?> mostrarLineaForm(
   BuildContext context, {
   LineaPedido? linea, // null = línea nueva.
   VoidCallback? onDelete, // Para mostrar el botón "Eliminar".
+  bool mostrarFechaEntrega = true,
+  bool mostrarReferencia = true,
+  List<String> estadosDisponibles = const ['Pendiente', 'Cancelado'],
 }) {
-  return showModalBottomSheet<LineaPedido>( // La "hoja" que sube desde abajo.
+  return showModalBottomSheet<LineaPedido>(
+    // La "hoja" que sube desde abajo.
     context: context,
     isScrollControlled: true, // Permite que la hoja ocupe casi toda la pantalla.
     backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(14)), // Esquinas arriba.
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(14),
+      ), // Esquinas arriba.
     ),
-    builder: (_) => LineaFormModal(linea: linea, onDelete: onDelete),
+    builder: (ctx) => LineaFormModal(
+      linea: linea,
+      onDelete: onDelete,
+      mostrarFechaEntrega: mostrarFechaEntrega,
+      mostrarReferencia: mostrarReferencia,
+      estadosDisponibles: estadosDisponibles,
+    ),
   );
 }

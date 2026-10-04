@@ -32,7 +32,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../state/remote_search_cubit.dart';
 import '../theme/app_theme.dart';
-import '../models.dart'; // OpcionMaestra.
+import '../models/models.dart'; // OpcionMaestra.
 
 /// Campo de texto con sugerencias de autocompletado remotas.
 class AutocompleteField extends StatefulWidget {
@@ -47,6 +47,8 @@ class AutocompleteField extends StatefulWidget {
   final Future<List<OpcionMaestra>> Function(String query) search; // Búsqueda remota.
   final ValueChanged<OpcionMaestra> onSelected; // Al elegir una sugerencia.
   final VoidCallback? onCleared; // Al borrar el texto (opcional).
+  final String? emptyActionText; // Texto de botón cuando no hay resultados
+  final void Function(String query)? onEmptyAction; // Acción cuando no hay resultados
 
   const AutocompleteField({
     super.key,
@@ -61,6 +63,8 @@ class AutocompleteField extends StatefulWidget {
     this.debounce = const Duration(milliseconds: 400),
     this.maxResults = 20,
     this.onCleared,
+    this.emptyActionText,
+    this.onEmptyAction,
   });
 
   @override
@@ -127,6 +131,7 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
   /// se detiene 400 ms (y hay ≥ minChars) se llama a la red.
   void _onChanged(String value) {
     _debounce?.cancel();
+    debugPrint('⌨️ "${widget.label}" texto="$value" (${value.trim().length} chars)');
     if (value.trim().length < widget.minChars) {
       _cubit.cancel();
       if (_selected != null) {
@@ -142,6 +147,7 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
 
   void _select(OpcionMaestra option) {
     _debounce?.cancel();
+    debugPrint('🖱️ "${widget.label}" → SUGERENCIA TOCADA: $option');
     setState(() {
       _selected = option;
       _controller.text = option.nombre;
@@ -248,13 +254,41 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
               case RemoteSearchSuccess():
                 final results = state.results;
                 if (results.isEmpty) {
-                  return const _SuggestionsCard(
+                  return _SuggestionsCard(
                     child: Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Text(
-                        'Sin resultados',
-                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: widget.emptyActionText != null && widget.onEmptyAction != null
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Text(
+                                  'Sin resultados',
+                                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                Listener(
+                                  behavior: HitTestBehavior.opaque,
+                                  onPointerDown: (_) {
+                                    final text = _controller.text;
+                                    _cubit.cancel();
+                                    _focusNode.unfocus();
+                                    widget.onEmptyAction!(text);
+                                  },
+                                  child: IgnorePointer(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {},
+                                      icon: const Icon(Icons.add),
+                                      label: Text(widget.emptyActionText!),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : const Text(
+                              'Sin resultados',
+                              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                            ),
                     ),
                   );
                 }
@@ -267,15 +301,25 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
                       itemCount: results.length,
                       itemBuilder: (context, index) {
                         final option = results[index];
-                        return ListTile(
-                          dense: true,
-                          leading: const Icon(Icons.sell_outlined, size: 18,
-                              color: AppColors.textSecondary),
-                          title: Text(option.nombre, style: const TextStyle(fontSize: 14)),
-                          subtitle: option.codigo.isNotEmpty
-                              ? Text('Código: ${option.codigo}', style: const TextStyle(fontSize: 11))
-                              : null,
-                          onTap: () => _select(option),
+                        return Listener(
+                          // En Windows el tap completo a veces no llega a
+                          // completarse (la arena de gestos no reconoce el
+                          // clic como tap y la selección nunca se dispara).
+                          // Un Listener escucha el evento CRUDO onPointerDown,
+                          // que llega SIEMPRE con la presión del ratón/táctil,
+                          // independientemente del reconocedor de gestos.
+                          behavior: HitTestBehavior.opaque,
+                          onPointerDown: (_) => _select(option),
+                          child: ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.sell_outlined, size: 18,
+                                color: AppColors.textSecondary),
+                            title: Text(option.nombre, style: const TextStyle(fontSize: 14)),
+                            subtitle: option.codigo.isNotEmpty
+                                ? Text('Código: ${option.codigo}',
+                                    style: const TextStyle(fontSize: 11))
+                                : null,
+                          ),
                         );
                       },
                     ),

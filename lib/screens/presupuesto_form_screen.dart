@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../core/formatters.dart';
-import '../models.dart';
-import '../presupuesto_service.dart';
+import '../models/models.dart';
+import '../core/presupuesto_service.dart';
 import '../state/auth_state.dart';
 import '../state/pedido_form_cubit.dart';
 import '../theme/app_theme.dart';
-import '../widgets/cabecera_form.dart';
-import '../widgets/linea_form_modal.dart';
+import '../widgets/presupuesto_cabecera_form.dart';
+import '../widgets/presupuesto_linea_form_modal.dart';
 import '../widgets/lineas_table.dart';
 import '../widgets/segment_tabs.dart';
 import '../widgets/totales_card.dart';
@@ -25,12 +25,12 @@ class PresupuestoFormScreen extends StatefulWidget {
 class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
   late final PedidoFormCubit _cubit;
   List<LineaPedido> _lineas = [];
-  Set<int> _originalLineIds = {};
-  bool _loading = false;
-  bool _saving = false;
+  Set<int> _lineasOriginalesIds = {};
+  bool _cargando = false;
+  bool _guardando = false;
   String _tab = 'cabecera';
 
-  bool get _editing => widget.presupuestoId != null;
+  bool get _editando => widget.presupuestoId != null;
 
   Pedido get _presupuesto => _cubit.state.pedido;
 
@@ -38,7 +38,7 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
   void initState() {
     super.initState();
     _cubit = PedidoFormCubit(Pedido(fecha: todayIso()));
-    if (_editing) _load();
+    if (_editando) _cargar();
   }
 
   @override
@@ -47,30 +47,30 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _cargar() async {
+    setState(() => _cargando = true);
     try {
-      final budget = await PresupuestosService.getById(widget.presupuestoId);
+      final presupuesto = await PresupuestosService.getById(widget.presupuestoId);
       if (!mounted) return;
-      _cubit.init(budget);
+      _cubit.init(presupuesto.toPedidoVisual());
       setState(() {
-        _lineas = [...budget.lineas];
-        _originalLineIds = budget.lineas
+        _lineas = [...presupuesto.toPedidoVisual().lineas];
+        _lineasOriginalesIds = presupuesto.lineas
             .where((line) => line.id != null)
             .map((line) => line.id!)
             .toSet();
-        _loading = false;
+        _cargando = false;
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() => _cargando = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('$error')));
     }
   }
 
-  Future<void> _editLine(LineaPedido line, int index) async {
-    final result = await mostrarLineaForm(
+  Future<void> _editarLinea(LineaPedido line, int index) async {
+    final result = await mostrarPresupuestoLineaForm(
       context,
       linea: line,
       onDelete: () => setState(() => _lineas = [..._lineas]..removeAt(index)),
@@ -78,47 +78,103 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
     if (result != null && mounted) setState(() => _lineas[index] = result);
   }
 
-  Future<void> _addLine() async {
-    final result = await mostrarLineaForm(context);
-    if (result != null && mounted) setState(() => _lineas = [..._lineas, result]);
+  Future<void> _anadirLinea() async {
+    final result = await mostrarPresupuestoLineaForm(context);
+    if (result != null && mounted) {
+      setState(() => _lineas = [..._lineas, result]);
+    }
   }
 
-  Future<void> _save() async {
+  Future<void> _guardar() async {
     if (_presupuesto.clienteId <= 0) {
-      _snack('Selecciona un cliente.');
+      _mostrarMensaje('Selecciona un cliente.');
       return;
     }
     if (_lineas.isEmpty) {
-      _snack('El presupuesto debe tener al menos una línea.');
+      _mostrarMensaje('El presupuesto debe tener al menos una línea.');
       return;
     }
-    setState(() => _saving = true);
+    setState(() => _guardando = true);
     try {
       final user = context.read<AuthState>().currentUser;
-      final budget = user?.role.toLowerCase() == 'comercial'
-          ? _presupuesto.copyWith(comercial: user!.contactId, comercialNombre: user.name)
+      final pedidoVisual = user?.role.toLowerCase() == 'comercial'
+          ? _presupuesto.copyWith(
+              comercial: user!.contactId,
+              comercialNombre: user.name,
+            )
           : _presupuesto;
-      final removed = _originalLineIds
-          .difference(_lineas.where((line) => line.id != null).map((line) => line.id!).toSet());
-      if (_editing) {
+      final presupuesto = PresupuestoVenta.fromPedidoVisual(pedidoVisual);
+      final removed = _lineasOriginalesIds.difference(
+        _lineas
+            .where((line) => line.id != null)
+            .map((line) => line.id!)
+            .toSet(),
+      );
+      if (_editando) {
         await PresupuestosService.updateComplete(
           widget.presupuestoId,
-          budget.copyWith(lineas: _lineas),
+          presupuesto.copyWith(
+            lineas: _lineas
+                .map(
+                  (linea) => LineaPresupuestoVenta(
+                    id: linea.id,
+                    articulo: linea.articulo,
+                    articuloNombre: linea.articuloNombre,
+                    descripcion: linea.descripcion,
+                    cantidad: linea.cantidad,
+                    precio: linea.precio,
+                    dto: linea.dto,
+                    importe: linea.importe,
+                    tipoIva: linea.tipoIva,
+                    regIvaVta: linea.regIvaVta,
+                    estado: linea.estado,
+                  ),
+                )
+                .toList(),
+          ),
           removed,
         );
       } else {
-        await PresupuestosService.createComplete(budget.copyWith(lineas: _lineas));
+        await PresupuestosService.createComplete(
+          presupuesto.copyWith(
+            lineas: _lineas
+                .map(
+                  (linea) => LineaPresupuestoVenta(
+                    id: linea.id,
+                    articulo: linea.articulo,
+                    articuloNombre: linea.articuloNombre,
+                    descripcion: linea.descripcion,
+                    cantidad: linea.cantidad,
+                    precio: linea.precio,
+                    dto: linea.dto,
+                    importe: linea.importe,
+                    tipoIva: linea.tipoIva,
+                    regIvaVta: linea.regIvaVta,
+                    estado: linea.estado,
+                  ),
+                )
+                .toList(),
+          ),
+        );
       }
-      if (mounted) Navigator.of(context).pop(true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Presupuesto guardado correctamente')),
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/presupuestos',
+        (route) => route.settings.name == '/home' || route.isFirst,
+      );
     } catch (error) {
       if (!mounted) return;
-      setState(() => _saving = false);
-      _snack('Error al guardar: $error');
+      setState(() => _guardando = false);
+      _mostrarMensaje('Error al guardar: $error');
     }
   }
 
-  void _snack(String message) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  void _mostrarMensaje(String mensaje) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(mensaje)));
 
   @override
   Widget build(BuildContext context) {
@@ -126,8 +182,10 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
       create: (_) => _cubit,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(title: Text(_editing ? 'Editar presupuesto' : 'Nuevo presupuesto')),
-        body: _loading
+        appBar: AppBar(
+          title: Text(_editando ? 'Editar presupuesto' : 'Nuevo presupuesto'),
+        ),
+        body: _cargando
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
@@ -143,24 +201,25 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
                   Expanded(
                     child: switch (_tab) {
                       'lineas' => LineasTable(
-                          lineas: _lineas,
-                          onEdit: _editLine,
-                          onAdd: _addLine,
-                        ),
+                        lineas: _lineas,
+                        onEdit: _editarLinea,
+                        onAdd: _anadirLinea,
+                      ),
                       'totales' => SingleChildScrollView(
-                          padding: const EdgeInsets.all(12),
-                          child: TotalesCard(
-                            base: calcularTotales(_lineas).base,
-                            iva: calcularTotales(_lineas).iva,
-                            total: calcularTotales(_lineas).total,
-                          ),
+                        padding: const EdgeInsets.all(12),
+                        child: TotalesCard(
+                          base: calcularTotales(_lineas).base,
+                          iva: calcularTotales(_lineas).iva,
+                          total: calcularTotales(_lineas).total,
+                          labelTotal: 'Total Presupuesto',
                         ),
+                      ),
                       _ => BlocBuilder<PedidoFormCubit, PedidoFormState>(
-                          builder: (context, state) => CabeceraForm(
-                            pedido: state.pedido,
-                            onChanged: (value) => _cubit.update(value),
-                          ),
+                        builder: (context, state) => PresupuestoCabeceraForm(
+                          pedido: state.pedido,
+                          onChanged: (value) => _cubit.update(value),
                         ),
+                      ),
                     },
                   ),
                   SafeArea(
@@ -178,8 +237,8 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: _saving ? null : _save,
-                              child: _saving
+                              onPressed: _guardando ? null : _guardar,
+                              child: _guardando
                                   ? const CircularProgressIndicator()
                                   : const Text('Guardar'),
                             ),
@@ -194,3 +253,4 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
     );
   }
 }
+

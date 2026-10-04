@@ -23,10 +23,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart'; // El "marco" de tests de Flutter.
 
-import 'package:pedidos_venta/api_service.dart';
+import 'package:pedidos_venta/core/api_service.dart';
 import 'package:pedidos_venta/core/formatters.dart'; // Las funciones que probamos.
 import 'package:pedidos_venta/core/master_cache_service.dart';
-import 'package:pedidos_venta/models.dart';
+import 'package:pedidos_venta/models/models.dart';
 import 'package:pedidos_venta/widgets/campo_form.dart';
 
 void main() {
@@ -149,6 +149,8 @@ void main() {
     expect(payload['email'], isNull);
     expect(payload['dir_env'], 'DIR-1');
     expect(payload['fpg'], 'CONT');
+    expect(payload['emp'], '1');
+    expect(payload['emp_div'], '1');
   });
 
   test('shouldRequestNextPage sigue paginando hasta cubrir total_count', () {

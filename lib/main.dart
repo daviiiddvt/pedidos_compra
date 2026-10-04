@@ -27,8 +27,10 @@ import 'package:flutter/material.dart'; // Librería estándar de Flutter (inter
 import 'package:provider/provider.dart'; // Librería que comparte datos globales.
 
 // Importamos nuestras propias pantallas y clases (los archivos de la carpeta lib).
+import 'core/app_log.dart'; // Logs a fichero (imprescindible en Windows).
 import 'core/order_repository.dart';
 import 'core/app_lifecycle_manager.dart'; // Nuevo manager de ciclo de vida.
+import 'core/crm_repository.dart';
 import 'core/search/entity_search_repository.dart'; // Repositorio local-first.
 import 'core/search/local_cache_db.dart'; // Caché local (SQLite en escritorio/móvil).
 import 'screens/login_screen.dart'; // Pantalla de conexión al servidor.
@@ -36,6 +38,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/pedidos_list_screen.dart'; // Pantalla con la lista de pedidos.
 import 'screens/pedido_detail_screen.dart'; // Pantalla con el detalle de un pedido.
 import 'screens/pedido_form_screen.dart'; // Pantalla para crear/editar pedidos.
+import 'screens/agenda_calendar_screen.dart';
 import 'screens/presupuestos_list_screen.dart';
 import 'screens/presupuesto_detail_screen.dart';
 import 'screens/presupuesto_form_screen.dart';
@@ -46,6 +49,10 @@ import 'theme/app_theme.dart'; // Colores y estilos de toda la app.
 Future<void> main() async {
   // Necesario para usar plugins antes de que esté lista la UI (sqlite etc.).
   WidgetsFlutterBinding.ensureInitialized();
+
+  // En Windows la app es GUI (sin consola): los print se perderían. Este log
+  // a fichero los hace visibles en %APPDATA%\pedidos_venta\pedidos_venta.log.
+  setupFileLogging();
 
   // Abrimos la caché local (SQLite) ANTES de pintar la app. Sin esto, el
   // buscador de clientes/artículos falla con "LocalCacheDbSqlite no
@@ -59,6 +66,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthState()),
         Provider(create: (_) => OrderRepository()),
+        Provider(create: (_) => CrmRepository()),
         Provider(create: (_) => EntitySearchRepository()),
       ],
       child: const AppLifecycleManager(
@@ -93,7 +101,7 @@ class PedidosVentaApp extends StatelessWidget {
         '/': (context) => _RootScreen(),
         '/home': (context) => const DashboardScreen(),
         '/pedidos': (context) => const PedidosListScreen(),
-        '/cmr': (context) => const CmrComingSoonScreen(),
+        '/cmr': (context) => const AgendaCalendarScreen(),
 
         // Ruta de DETALLE: pedidoId se recibe como argumento.
         '/pedido': (context) =>

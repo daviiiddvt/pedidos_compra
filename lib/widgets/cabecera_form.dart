@@ -28,10 +28,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 
-import '../api_service.dart'; // PedidosService (cargar clientes, series, etc.).
+import '../core/api_service.dart'; // PedidosService (cargar clientes, series, etc.).
 import '../core/master_cache_service.dart';
 import '../core/search/entity_search_repository.dart'; // Repositorio local-first.
-import '../models.dart'; // Pedido, OpcionMaestra.
+import '../models/models.dart'; // Pedido, OpcionMaestra.
 import '../state/auth_state.dart';
 import '../state/pedido_form_cubit.dart'; // selectCliente (valores por defecto).
 import '../theme/app_theme.dart'; // Colores (para etiqueta de estado).
@@ -39,16 +39,31 @@ import 'autocomplete_field.dart'; // Buscador de cliente con autocompletado.
 import 'campo_form.dart'; // CampoForm (texto) y CampoSelect (selector).
 import 'campo_fecha.dart'; // CampoFecha (calendario).
 import 'modal_selector.dart'; // mostrarSelector (ventana para elegir).
+import 'cliente_form_modal.dart'; // Modal para crear un nuevo cliente.
 
 // Los estados posibles de un pedido de venta (fuera de las clases: constante).
-const _estados = ['Pendiente', 'Servido', 'Cancelado'];
-
 /// CabeceraForm: el formulario editable de la cabecera del pedido de venta.
 class CabeceraForm extends StatefulWidget {
   final Pedido pedido; // El pedido actual (para mostrar los valores).
   final ValueChanged<Pedido> onChanged; // Avisamos del pedido modificado.
+  final bool mostrarAlmacen;
+  final bool mostrarFechaEntrega;
+  final bool mostrarEmail;
+  final bool mostrarFechaValidez;
+  final bool mostrarNumeroPresupuesto;
+  final List<String> estadosDisponibles;
 
-  const CabeceraForm({super.key, required this.pedido, required this.onChanged});
+  const CabeceraForm({
+    super.key,
+    required this.pedido,
+    required this.onChanged,
+    this.mostrarAlmacen = true,
+    this.mostrarFechaEntrega = true,
+    this.mostrarEmail = false,
+    this.mostrarFechaValidez = false,
+    this.mostrarNumeroPresupuesto = false,
+    this.estadosDisponibles = const ['Pendiente', 'Servido', 'Cancelado'],
+  });
 
   @override
   State<CabeceraForm> createState() => _CabeceraFormState();
@@ -63,6 +78,7 @@ class _CabeceraFormState extends State<CabeceraForm> {
   List<OpcionMaestra> _almacenes = [];
   List<OpcionMaestra> _formasPago = [];
   bool _cargandoMaestros = true;
+  bool _fechaValidezEditable = false;
 
   @override
   void initState() {
@@ -78,16 +94,27 @@ class _CabeceraFormState extends State<CabeceraForm> {
         contactId: currentUser?.contactId,
       );
       if (!mounted) return;
-      final almacenDefault = defaults['almacen'];
-      if (almacenDefault is String &&
-          almacenDefault.isNotEmpty &&
-          widget.pedido.almacen.isEmpty) {
-        final almacenOpcion = PedidosService.findMatchingOption(_almacenes, almacenDefault) ??
-            OpcionMaestra(codigo: almacenDefault, nombre: almacenDefault);
-        widget.onChanged(widget.pedido.copyWith(
-          almacen: almacenOpcion.codigo,
-          almacenNombre: almacenOpcion.nombre,
-        ));
+
+      final preValDia = defaults['preValDia'];
+      setState(() {
+        _fechaValidezEditable = preValDia == null || preValDia.toString().trim().isEmpty;
+      });
+
+      if (widget.mostrarAlmacen) {
+        final almacenDefault = defaults['almacen'];
+        if (almacenDefault is String &&
+            almacenDefault.isNotEmpty &&
+            widget.pedido.almacen.isEmpty) {
+          final almacenOpcion =
+              PedidosService.findMatchingOption(_almacenes, almacenDefault) ??
+              OpcionMaestra(codigo: almacenDefault, nombre: almacenDefault);
+          widget.onChanged(
+            widget.pedido.copyWith(
+              almacen: almacenOpcion.codigo,
+              almacenNombre: almacenOpcion.nombre,
+            ),
+          );
+        }
       }
     } catch (_) {
       // Silencio: si la empresa no expone ese valor, el usuario puede elegirlo.
@@ -118,7 +145,10 @@ class _CabeceraFormState extends State<CabeceraForm> {
     final resultados = await Future.wait([
       cargar('series', 'series', PedidosService.getSeries),
       cargar('comerciales', 'comerciales', PedidosService.getComerciales),
-      cargar('almacenes', 'almacenes', PedidosService.getAlmacenes),
+      if (widget.mostrarAlmacen)
+        cargar('almacenes', 'almacenes', PedidosService.getAlmacenes)
+      else
+        Future.value(<OpcionMaestra>[]),
       cargar('formas de pago', 'formas_pago', PedidosService.getFormasPago),
     ]);
     if (!mounted) return;
@@ -129,6 +159,21 @@ class _CabeceraFormState extends State<CabeceraForm> {
       _formasPago = resultados[3];
       _cargandoMaestros = false;
     });
+
+    final s = PedidosService.findMatchingOption(_series, widget.pedido.serie);
+    final c = PedidosService.findMatchingOption(_comerciales, widget.pedido.comercial);
+    final a = PedidosService.findMatchingOption(_almacenes, widget.pedido.almacen);
+    final f = PedidosService.findMatchingOption(_formasPago, widget.pedido.formaPago);
+
+    if (s != null || c != null || a != null || f != null) {
+      widget.onChanged(widget.pedido.copyWith(
+        serieNombre: s?.nombre ?? widget.pedido.serieNombre,
+        comercialNombre: c?.nombre ?? widget.pedido.comercialNombre,
+        almacenNombre: a?.nombre ?? widget.pedido.almacenNombre,
+        formaPagoNombre: f?.nombre ?? widget.pedido.formaPagoNombre,
+      ));
+    }
+
     await _cargarEmpresaDefaults();
   }
 
@@ -151,7 +196,9 @@ class _CabeceraFormState extends State<CabeceraForm> {
     if (opciones.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No hay opciones disponibles (permisos o configuración).'),
+          content: Text(
+            'No hay opciones disponibles (permisos o configuración).',
+          ),
         ),
       );
       return;
@@ -177,21 +224,7 @@ class _CabeceraFormState extends State<CabeceraForm> {
         // ================= DATOS GENERALES =================
         const _Seccion('Datos generales'),
 
-        if (p.id != null) ...[
-          // Velneo genera estos valores al crear el pedido.
-          CampoForm(
-            label: 'N° pedido',
-            value: p.nPedido,
-            enabled: false,
-            placeholder: 'Se genera automáticamente',
-          ),
-          CampoForm(
-            label: 'N° documento',
-            value: p.nDocumento.toString(),
-            enabled: false,
-            placeholder: 'Número de documento',
-          ),
-        ],
+        
 
         // Cliente (buscador con autocompletado; obligatorio).
         // Se consulta a Velneo bajo demanda (debounce 400 ms, mín. 3 letras)
@@ -204,18 +237,36 @@ class _CabeceraFormState extends State<CabeceraForm> {
           minChars: 3,
           debounce: const Duration(milliseconds: 400),
           maxResults: 20,
-          initialValue: p.clienteNombre.isNotEmpty ? p.clienteNombre : p.cliente,
+          emptyActionText: 'Crear nuevo cliente',
+          onEmptyAction: (query) async {
+            final cubit = context.read<PedidoFormCubit>();
+            final nuevoCliente = await mostrarCrearClienteModal(context, initialName: query);
+            if (!mounted || nuevoCliente == null) return;
+            final opcion = OpcionMaestra(codigo: nuevoCliente.id.toString(), nombre: nuevoCliente.nombreComercial);
+            cubit.selectCliente(
+              opcion,
+              series: _series,
+              formasPago: _formasPago,
+              almacenes: widget.mostrarAlmacen ? _almacenes : const [],
+            );
+          },
+          initialValue: p.clienteNombre.isNotEmpty
+              ? p.clienteNombre
+              : p.cliente,
           hint: 'Buscar por nombre o código...',
-          search: (query) => context
-              .read<EntitySearchRepository>()
-              .search(EntityKind.cliente, query, limit: 20),
+          search: (query) => context.read<EntitySearchRepository>().search(
+            EntityKind.cliente,
+            query,
+            limit: 20,
+          ),
           onSelected: (cliente) {
+            debugPrint('🔥🔥🔥 SE CLICÓ UN CLIENTE EN LA INTERFAZ: $cliente');
             context.read<PedidoFormCubit>().selectCliente(
-                  cliente,
-                  series: _series,
-                  formasPago: _formasPago,
-                  almacenes: _almacenes,
-                );
+              cliente,
+              series: _series,
+              formasPago: _formasPago,
+              almacenes: widget.mostrarAlmacen ? _almacenes : const [],
+            );
           },
           onCleared: () {
             context.read<PedidoFormCubit>().clearCliente();
@@ -247,30 +298,33 @@ class _CabeceraFormState extends State<CabeceraForm> {
         if (!esComercial)
           CampoSelect(
             label: 'Comercial',
-            value: p.comercialNombre.isNotEmpty ? p.comercialNombre : p.comercial,
+            value: p.comercialNombre.isNotEmpty
+                ? p.comercialNombre
+                : p.comercial,
             enabled: !_cargandoMaestros,
             onTap: () => _elegir(
               'Seleccionar comercial',
               _comerciales,
               (o) => _actualizar(
-                (x) => x.copyWith(comercial: o.codigo, comercialNombre: o.nombre),
+                (x) =>
+                    x.copyWith(comercial: o.codigo, comercialNombre: o.nombre),
               ),
             ),
           ),
 
-        // Almacén (selector).
-        CampoSelect(
-          label: 'Almacén',
-          value: p.almacenNombre.isNotEmpty ? p.almacenNombre : p.almacen,
-          enabled: !_cargandoMaestros,
-          onTap: () => _elegir(
-            'Seleccionar almacén',
-            _almacenes,
-            (o) => _actualizar(
-              (x) => x.copyWith(almacen: o.codigo, almacenNombre: o.nombre),
+        if (widget.mostrarAlmacen)
+          CampoSelect(
+            label: 'Almacén',
+            value: p.almacenNombre.isNotEmpty ? p.almacenNombre : p.almacen,
+            enabled: !_cargandoMaestros,
+            onTap: () => _elegir(
+              'Seleccionar almacén',
+              _almacenes,
+              (o) => _actualizar(
+                (x) => x.copyWith(almacen: o.codigo, almacenNombre: o.nombre),
+              ),
             ),
           ),
-        ),
 
         // Fecha y entrega prevista, lado a lado.
         Row(
@@ -284,14 +338,29 @@ class _CabeceraFormState extends State<CabeceraForm> {
                 onChanged: (v) => _actualizar((x) => x.copyWith(fecha: v)),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: CampoFecha(
-                label: 'Entregar el',
-                value: p.previstoPara,
-                onChanged: (v) => _actualizar((x) => x.copyWith(previstoPara: v)),
+            if (widget.mostrarFechaEntrega) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                child: CampoFecha(
+                  label: 'Entregar el',
+                  value: p.previstoPara,
+                  onChanged: (v) =>
+                      _actualizar((x) => x.copyWith(previstoPara: v)),
+                ),
               ),
-            ),
+            ],
+            if (widget.mostrarFechaValidez) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                child: CampoFecha(
+                  label: 'Válida hasta',
+                  value: p.fechaValidez,
+                  enabled: _fechaValidezEditable,
+                  onChanged: (v) =>
+                      _actualizar((x) => x.copyWith(fechaValidez: v)),
+                ),
+              ),
+            ],
           ],
         ),
 
@@ -318,12 +387,14 @@ class _CabeceraFormState extends State<CabeceraForm> {
             final seleccionado = await mostrarSelector(
               context,
               title: 'Seleccionar estado',
-              options: _estados, // ['Pendiente', 'Servido', 'Cancelado']
+              options: widget.estadosDisponibles,
               searchable: false, // Son pocos: sin buscador.
             );
             if (seleccionado != null) {
               // Guardamos el CÓDIGO VELNEO (P/S/C), que es lo que entiende el API.
-              _actualizar((x) => x.copyWith(estado: AppColors.estadoCodigo(seleccionado)));
+              _actualizar(
+                (x) => x.copyWith(estado: AppColors.estadoCodigo(seleccionado)),
+              );
             }
           },
         ),
@@ -333,32 +404,38 @@ class _CabeceraFormState extends State<CabeceraForm> {
 
         // Dirección de envío: siempre se muestra como selector. Las
         // direcciones del cliente elegido viven en el PedidoFormCubit.
-        Builder(builder: (context) {
-          final direcciones = context.watch<PedidoFormCubit>().state.direccionesCliente;
-          return CampoSelect(
-            label: 'Dirección de envío',
-            value: direcciones.any((d) => d.codigo == p.direccionEnvio)
-                ? direcciones
-                    .firstWhere((d) => d.codigo == p.direccionEnvio)
-                    .nombre
-                : p.direccionEnvio,
-            enabled: !_cargandoMaestros,
-            onTap: () => _elegir(
-              'Seleccionar dirección de envío',
-              direcciones,
-              (o) => context.read<PedidoFormCubit>().selectDireccion(o),
-            ),
-          );
-        }),
-
-        // Email: Velneo lo devuelve, pero esta API no permite modificarlo.
-        CampoForm(
-          label: 'Email',
-          value: p.email,
-          placeholder: 'correo@empresa.com',
-          keyboardType: TextInputType.emailAddress,
-          enabled: false,
+        Builder(
+          builder: (context) {
+            final direcciones = context
+                .watch<PedidoFormCubit>()
+                .state
+                .direccionesCliente;
+            return CampoSelect(
+              label: 'Dirección de envío',
+              value: direcciones.any((d) => d.codigo == p.direccionEnvio)
+                  ? direcciones
+                        .firstWhere((d) => d.codigo == p.direccionEnvio)
+                        .nombre
+                  : p.direccionEnvio,
+              enabled: !_cargandoMaestros,
+              onTap: () => _elegir(
+                'Seleccionar dirección de envío',
+                direcciones,
+                (o) => context.read<PedidoFormCubit>().selectDireccion(o),
+              ),
+            );
+          },
         ),
+
+        if (widget.mostrarEmail) ...[
+          CampoForm(
+            label: 'Email',
+            value: p.email,
+            placeholder: 'correo@empresa.com',
+            keyboardType: TextInputType.emailAddress,
+            onChanged: (v) => widget.onChanged(p.copyWith(email: v)),
+          ),
+        ],
 
         // ================= OTROS =================
         const _Seccion('Otros'),

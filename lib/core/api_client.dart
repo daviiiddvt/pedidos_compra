@@ -25,6 +25,7 @@ import 'dart:io'; // Constantes de HTTP como los encabezados.
 
 import 'package:http/http.dart' as http; // La librería "http" para hacer llamadas.
 import 'package:http/io_client.dart'; // IOClient: cliente HTTP con control del certificado TLS.
+import 'package:flutter/foundation.dart' show debugPrint; // Logging al fichero.
 
 import 'config.dart'; // Necesitamos AppConfig (baseUrl, endpoints).
 
@@ -110,6 +111,14 @@ class ApiClient {
     };
 
     late http.Response response; // "late" = se le asigna valor dentro del switch.
+    // ── TRAZADO: vemos la petición REAL exacta que sale de la app ──────────
+    // Solo POST/PUT llevan body (los GET/DELETE no). Aquí queda registrado el
+    // JSON EXACTO que se envía a Velneo, tal y como lo serializa jsonEncode.
+    if (method == 'POST' || method == 'PUT') {
+      debugPrint('\n📤📤📤 [$method] URL: $uri');
+      debugPrint('📤📤📤 [$method] JSON ENVIADO:\n${body == null ? 'null' : jsonEncode(body)}');
+      debugPrint('📤📤📤 /FIN JSON ENVIADO [$method]\n');
+    }
     try {
       // 2) Hacemos la llamada según el método.
       switch (method) {

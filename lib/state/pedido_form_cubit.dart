@@ -26,8 +26,8 @@ import 'package:flutter/foundation.dart' show debugPrint; // Logging.
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import '../api_service.dart';
-import '../models.dart';
+import '../core/api_service.dart';
+import '../models/models.dart';
 
 part 'pedido_form_cubit.freezed.dart';
 
@@ -48,7 +48,15 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
       : super(PedidoFormState(pedido: pedido));
 
   /// Reemplaza el documento (carga inicial / detalle cargado en edición).
-  void init(Pedido pedido) => emit(state.copyWith(pedido: pedido));
+  Future<void> init(Pedido pedido) async {
+    emit(state.copyWith(pedido: pedido, cargandoDatosCliente: true));
+    try {
+      final direcciones = await PedidosService.getDireccionesCliente(pedido.clienteId);
+      if (!isClosed) emit(state.copyWith(direccionesCliente: direcciones.toList(), cargandoDatosCliente: false));
+    } catch (_) {
+      if (!isClosed) emit(state.copyWith(cargandoDatosCliente: false));
+    }
+  }
 
   /// Aplica un cambio genérico de cabecera (campos individuales).
   void update(Pedido pedido) => emit(state.copyWith(pedido: pedido));
@@ -61,13 +69,16 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
     List<OpcionMaestra> formasPago = const [],
     List<OpcionMaestra> almacenes = const [],
   }) async {
+    debugPrint('🚀🚀🚀 CUBIT RECIBIÓ EL CLIENTE: $cliente');
     final clienteId = int.tryParse(cliente.codigo) ?? 0;
 
     debugPrint('\n[selectCliente] Recibido del AutocompleteField: ${cliente.codigo}'
         ' | ${cliente.nombre} (id=$clienteId)');
 
-    // Almacén central fijo: siempre el código '1'.
-    final almacenOpcion = PedidosService.findMatchingOption(almacenes, '1') ??
+    // Almacén central fijo: siempre el código '1', con su nombre real (si la
+    // lista de almacenes ya está cargada). Comparación segura: ambos lados a
+    // String y sin espacios.
+    final almacenOpcion = _opcionPorCodigo(almacenes, '1') ??
         const OpcionMaestra(codigo: '1', nombre: '1');
 
     // 1º: fijamos el cliente y el almacén central de inmediato.
@@ -76,7 +87,7 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
         clienteId: clienteId,
         cliente: cliente.codigo,
         clienteNombre: cliente.nombre,
-        almacen: '1',
+        almacen: almacenOpcion.codigo,
         almacenNombre: almacenOpcion.nombre,
       ),
       direccionesCliente: const [],
@@ -84,26 +95,29 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
     ));
     debugPrint('[selectCliente] Paso 1 aplicado → clienteId=$clienteId,'
         ' cliente=${cliente.codigo}, clienteNombre=${cliente.nombre},'
-        " almacen='1', almacenNombre=${almacenOpcion.nombre}");
+        " almacen='${almacenOpcion.codigo}', almacenNombre=${almacenOpcion.nombre}");
     if (clienteId <= 0) return;
 
     try {
       // 2º: formato de pago, serie, email y dirección por defecto del cliente.
-      final defaults = await PedidosService.getClienteDefaults(clienteId);
-      final direcciones = await PedidosService.getDireccionesCliente(clienteId);
+      final resultados = await Future.wait([
+        PedidosService.getClienteDefaults(clienteId),
+        PedidosService.getDireccionesCliente(clienteId),
+      ]);
       if (isClosed) return;
+
+      final defaults = resultados[0] as Map<String, dynamic>;
+      final direcciones = resultados[1] as List<OpcionMaestra>;
 
       debugPrint('[selectCliente] Defaults de Velneo recibidos → $defaults');
       var pedido = state.pedido;
 
       // ── Mapeo explícito de campos del cliente al Pedido ────────────────
-      // Almacén: siempre '1' (fijado ya en Paso 1).
-      //
-      // Forma de pago: la del cliente. Se aplica SIEMPRE que venga definida,
-      // sobrescribiendo cualquier selección previa.
+      // Forma de pago: la del cliente. Traducimos el código numérico a su
+      // nombre descriptivo buscándolo en la lista de formas de pago.
       final formaPagoDefault = defaults['formaPago'];
       if (formaPagoDefault is String && formaPagoDefault.isNotEmpty) {
-        final opcion = PedidosService.findMatchingOption(formasPago, formaPagoDefault) ??
+        final opcion = _opcionPorCodigo(formasPago, formaPagoDefault) ??
             OpcionMaestra(codigo: formaPagoDefault, nombre: formaPagoDefault);
         pedido = pedido.copyWith(
           formaPago: opcion.codigo,
@@ -113,11 +127,11 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
             ' (${opcion.nombre}) desde default="$formaPagoDefault"');
       }
 
-      // Serie: la del cliente. Se aplica SIEMPRE que venga definida,
-      // sobrescribiendo cualquier selección previa.
+      // Serie: la del cliente. Traducimos el código numérico a su nombre
+      // descriptivo buscándolo en la lista de series.
       final serieDefault = defaults['serie'];
       if (serieDefault is String && serieDefault.isNotEmpty) {
-        final opcion = PedidosService.findMatchingOption(series, serieDefault) ??
+        final opcion = _opcionPorCodigo(series, serieDefault) ??
             OpcionMaestra(codigo: serieDefault, nombre: serieDefault);
         pedido = pedido.copyWith(
           serie: opcion.codigo,
@@ -159,12 +173,31 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
         cargandoDatosCliente: false,
       ));
       debugPrint('[selectCliente] PASO 2 FINAL →'
-          ' almacen=${pedido.almacen}, serie=${pedido.serie},'
-          ' formaPago=${pedido.formaPago}, direccionEnvio=${pedido.direccionEnvio}');
+          ' almacen=${pedido.almacen} (${pedido.almacenNombre}),'
+          ' serie=${pedido.serie} (${pedido.serieNombre}),'
+          ' formaPago=${pedido.formaPago} (${pedido.formaPagoNombre}),'
+          ' direccionEnvio=${pedido.direccionEnvio}');
     } catch (e) {
       debugPrint('[selectCliente] Error al aplicar defaults del cliente: $e');
       if (!isClosed) emit(state.copyWith(cargandoDatosCliente: false));
     }
+  }
+
+  /// Busca en [opciones] la opción cuyo código coincida EXACTAMENTE con
+  /// [codigo] (comparando ambos lados como String y sin espacios ni
+  /// mayúsculas). Devuelve null si no hay coincidencia.
+  ///
+  /// Es la forma segura de traducir los códigos numéricos de Velneo
+  /// (ej. formaPago '2', serie '14', almacen '1') a su nombre descriptivo.
+  OpcionMaestra? _opcionPorCodigo(List<OpcionMaestra> opciones, String? codigo) {
+    final buscado = (codigo ?? '').toString().trim().toLowerCase();
+    if (buscado.isEmpty) return null;
+    for (final opcion in opciones) {
+      if (opcion.codigo.toString().trim().toLowerCase() == buscado) {
+        return opcion;
+      }
+    }
+    return null;
   }
 
   /// Limpia el cliente elegido (botón "quitar selección" del buscador).

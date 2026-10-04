@@ -20,7 +20,7 @@
 
 import 'package:flutter/material.dart';
 
-import '../models.dart'; // LineaPedido.
+import '../models/models.dart'; // LineaPedido.
 import '../theme/app_theme.dart'; // Colores.
 import 'fila_linea.dart'; // La tarjeta de cada línea.
 

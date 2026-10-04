@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models.dart';
-import '../presupuesto_service.dart';
+import '../models/models.dart';
+import '../core/api_service.dart';
+import '../core/presupuesto_service.dart';
 import '../state/auth_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/fila_pedido.dart';
@@ -15,71 +16,93 @@ class PresupuestosListScreen extends StatefulWidget {
 }
 
 class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
-  final _search = TextEditingController();
-  List<Pedido> _all = [];
-  List<Pedido> _visible = [];
-  bool _loading = true;
-  String _status = '';
+  final _buscadorController = TextEditingController();
+  List<Pedido> _todos = [];
+  List<Pedido> _visibles = [];
+  bool _cargando = true;
+  String _filtroEstado = '';
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _cargar());
   }
 
   @override
   void dispose() {
-    _search.dispose();
+    _buscadorController.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _cargar() async {
     try {
       final user = context.read<AuthState>().currentUser;
-      final budgets = await PresupuestosService.listAll(
+      final presupuestoModels = await PresupuestosService.listAll(
         comercial: user?.role.toLowerCase() == 'comercial'
             ? user?.contactId
             : null,
       );
+      final presupuestosVisuales = presupuestoModels
+          .map((presupuesto) => presupuesto.toPedidoVisual())
+          .toList();
       if (!mounted) return;
       setState(() {
-        _all = budgets;
-        _loading = false;
+        _todos = presupuestosVisuales;
+        _cargando = false;
       });
-      _applyFilters();
+      _aplicarFiltros();
+
+      try {
+        final clienteIds = presupuestosVisuales.map((b) => b.clienteId).toSet().toList();
+        final clientes = await PedidosService.getClientesByIds(clienteIds);
+        final mapClientes = {for (var c in clientes) c.id: c};
+        if (!mounted) return;
+        setState(() {
+          _todos = _todos.map((presupuesto) {
+            final c = mapClientes[presupuesto.clienteId];
+            if (c != null) {
+              return presupuesto.copyWith(
+                clienteNombre: c.nombreComercial,
+              );
+            }
+            return presupuesto;
+          }).toList();
+        });
+        _aplicarFiltros();
+      } catch (_) {}
     } catch (error) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() => _cargando = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('$error')));
     }
   }
 
-  void _applyFilters() {
-    final query = _search.text.trim().toLowerCase();
+  void _aplicarFiltros() {
+    final query = _buscadorController.text.trim().toLowerCase();
     final user = context.read<AuthState>().currentUser;
     setState(() {
-      _visible = _all.where((budget) {
+      _visibles = _todos.where((presupuesto) {
         if (user?.role.toLowerCase() == 'comercial' &&
-            budget.comercial != user?.contactId) {
+            presupuesto.comercial != user?.contactId) {
           return false;
         }
-        if (_status.isNotEmpty &&
-            AppColors.estadoCodigo(budget.estado) !=
-                AppColors.estadoCodigo(_status)) {
+        if (_filtroEstado.isNotEmpty &&
+            AppColors.estadoCodigo(presupuesto.estado) !=
+                AppColors.estadoCodigo(_filtroEstado)) {
           return false;
         }
         final text =
-            '${budget.clienteNombre} ${budget.cliente} ${budget.numeroPedido}'
+            '${presupuesto.clienteNombre} ${presupuesto.cliente} ${presupuesto.numeroPresupuesto}'
                 .toLowerCase();
         return query.isEmpty || text.contains(query);
       }).toList();
     });
   }
 
-  Future<void> _openForm([dynamic id]) async {
+  Future<void> _abrirFormulario([dynamic id]) async {
     await Navigator.of(context).pushNamed('/presupuesto/form', arguments: id);
-    if (mounted) await _load();
+    if (mounted) await _cargar();
   }
 
   @override
@@ -96,7 +119,7 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _openForm(),
+        onPressed: () => _abrirFormulario(),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
         child: const Icon(Icons.add),
@@ -106,8 +129,8 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
             child: TextField(
-              controller: _search,
-              onChanged: (_) => _applyFilters(),
+              controller: _buscadorController,
+              onChanged: (_) => _aplicarFiltros(),
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search),
                 hintText: 'Buscar cliente o número',
@@ -118,15 +141,15 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
-              children: ['', 'Pendiente', 'Servido', 'Cancelado'].map((status) {
+              children: ['', 'Pendiente', 'Aceptado', 'Rechazado', 'Parcialmente Servido'].map((status) {
                 return Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: ChoiceChip(
                     label: Text(status.isEmpty ? 'Todos' : status),
-                    selected: _status == status,
+                    selected: _filtroEstado == status,
                     onSelected: (_) {
-                      setState(() => _status = status);
-                      _applyFilters();
+                      setState(() => _filtroEstado = status);
+                      _aplicarFiltros();
                     },
                   ),
                 );
@@ -134,24 +157,27 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
             ),
           ),
           Expanded(
-            child: _loading
+            child: _cargando
                 ? const Center(child: CircularProgressIndicator())
-                : _visible.isEmpty
-                    ? const Center(child: Text('Sin presupuestos de venta que mostrar.'))
-                    : RefreshIndicator(
-                        onRefresh: _load,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          itemCount: _visible.length,
-                          itemBuilder: (_, index) => FilaPedido(
-                            pedido: _visible[index],
-                            onTap: () => Navigator.of(context).pushNamed(
-                              '/presupuesto',
-                              arguments: _visible[index].id,
-                            ),
-                          ),
+                : _visibles.isEmpty
+                ? const Center(
+                    child: Text('Sin presupuestos de venta que mostrar.'),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _cargar,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: _visibles.length,
+                      itemBuilder: (_, index) => FilaPedido(
+                        pedido: _visibles[index],
+                        mostrarNumeroPresupuesto: true,
+                        onTap: () => Navigator.of(context).pushNamed(
+                          '/presupuesto',
+                          arguments: _visibles[index].id,
                         ),
                       ),
+                    ),
+                  ),
           ),
         ],
       ),

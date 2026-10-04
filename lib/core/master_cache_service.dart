@@ -1,5 +1,5 @@
-import '../api_service.dart';
-import '../models.dart';
+import 'api_service.dart';
+import '../models/models.dart';
 
 class _CacheEntry<T> {
   final T data;

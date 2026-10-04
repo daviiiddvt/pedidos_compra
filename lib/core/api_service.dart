@@ -25,21 +25,21 @@
 
 import 'package:flutter/foundation.dart' show debugPrint; // Logging.
 
-import 'core/api_client.dart'; // ApiClient (el mensajero) + ApiException.
-import 'core/config.dart'; // AppConfig (para saber a qué endpoint llamar).
-import 'models.dart'; // Nuestros modelos (Pedido, OpcionMaestra).
-import 'theme/app_theme.dart'; // AppColors (para traducir el estado a código VELNEO).
+import 'api_client.dart'; // ApiClient (el mensajero) + ApiException.
+import 'config.dart'; // AppConfig (para saber a qué endpoint llamar).
+import '../models/models.dart'; // Nuestros modelos (Pedido, OpcionMaestra).
+import '../theme/app_theme.dart'; // AppColors (para traducir el estado a código VELNEO).
 
 /// Convierte el porcentaje de IVA usado por la interfaz al código de registro
 /// que espera Velneo en `reg_iva_vta`.
 ///
 /// La correspondencia actual es: 21% o más -> `G`, 10% o más -> `R`,
 /// cualquier porcentaje positivo -> `S` y 0% -> `E`.
-String regIvaCodigo(double tipoIva) {
-  if (tipoIva >= 20) return 'G';
-  if (tipoIva >= 10) return 'R';
-  if (tipoIva > 0) return 'S';
-  return 'E';
+String regIvaCodigo(double tipoIva, [String? regIva]) {
+  if (regIva != null && regIva.trim().isNotEmpty) {
+    return regIva.trim().toUpperCase();
+  }
+  return regimenIvaPorPorcentaje(tipoIva).codigo;
 }
 
 /// Resultado de una petición paginada de pedidos.
@@ -230,10 +230,16 @@ class PedidosService {
   }
 
   static OpcionMaestra _opcionFromRecord(Map<String, dynamic> record) {
+    final art = record.s('art').isNotEmpty ? record.s('art') : record.s('ART');
     return OpcionMaestra(
-      codigo: _referenceId(record, 'id').isNotEmpty
-          ? _referenceId(record, 'id')
-          : record.s('codigo'),
+      // Para ART_M el código real es 'art'; en clientes (ENT_M) no existe y
+      // caemos al id. Así el código que se guarda en la línea coincide con el
+      // valor 'art' que espera Velneo en el POST de líneas.
+      codigo: art.isNotEmpty
+          ? art
+          : (_referenceId(record, 'id').isNotEmpty
+              ? _referenceId(record, 'id')
+              : record.s('codigo')),
       nombre: record.s('name').isNotEmpty
           ? record.s('name')
           : (record.s('nom_com').isNotEmpty
@@ -439,8 +445,110 @@ class PedidosService {
   /// Repite peticiones a [list] hasta alcanzar el total informado o recibir
   /// una página incompleta/vacía. Cada petición contiene un `await`, por lo
   /// que el event loop de Flutter conserva el control mientras se descarga.
-  static Future<List<Pedido>> listAll({String? comercial}) async {
+  static Future<List<Pedido>> listAll({String? comercial, bool porZona = false}) async {
     final all = <Pedido>[];
+    
+    if (porZona && comercial != null && comercial.isNotEmpty) {
+      debugPrint('\n=== MODO ZONA TÉCNICA INICIADO ===');
+      debugPrint('Comercial ID: $comercial');
+
+      // 1. Zonas del comercial
+      final znJson = await _api.get(AppConfig.endpoint('zonasComerciales'), params: {'filter[cmr]': comercial, 'page[size]': 1000});
+      final znList = payloadLista(znJson);
+      final znIds = znList.map((r) => r['ZN_TCN'] ?? r['zn_tcn']).where((x) => x != null && x != 0).map((x) => x.toString()).toSet();
+      
+      debugPrint('Zonas técnicas encontradas para el comercial: $znIds');
+      
+      if (znIds.isEmpty) {
+        debugPrint('El comercial no tiene zonas técnicas asignadas. Abortando.');
+        return [];
+      }
+
+      // 2. PRIMERO COGER LOS CLIENTES Y SACAR SU DIR_PRI_ID
+      debugPrint('Descargando todos los clientes...');
+      final allClients = <Cliente>[];
+      var page = 1;
+      while (true) {
+        final cliJson = await _api.get(AppConfig.endpoint('clientes'), params: {'page[size]': 1000, 'page[number]': page});
+        final items = payloadLista(cliJson);
+        for (var c in items) {
+          allClients.add(Cliente.fromJson(c));
+        }
+        if (items.length < 1000) break;
+        page++;
+      }
+      debugPrint('Total de clientes obtenidos: ${allClients.length}');
+
+      // 3. DESPUES CARGAR LA DIRECCION EN LA TABLA DIR_M
+      debugPrint('Descargando direcciones (DIR_M)...');
+      final dirPobMap = <int, String>{}; // DIR_PRI_ID -> POB_EXT
+      page = 1;
+      while (true) {
+        final dJson = await _api.get(AppConfig.endpoint('direcciones'), params: {'page[size]': 1000, 'page[number]': page});
+        final items = payloadLista(dJson);
+        for (var d in items) {
+          final dId = d['ID'] ?? d['id'];
+          final pobExt = d['POB_EXT']?.toString() ?? d['pob_ext']?.toString() ?? '';
+          if (dId != null) dirPobMap[dId] = pobExt;
+        }
+        if (items.length < 1000) break;
+        page++;
+      }
+      debugPrint('Total de direcciones cargadas: ${dirPobMap.length}');
+
+      // 4. SACAR LA POBLACION Y SU ZONA TECNICA
+      debugPrint('Descargando poblaciones y zonas técnicas (POB)...');
+      final pobZnMap = <String, String>{}; // POB_ID -> ZN_TCN
+      page = 1;
+      while (true) {
+        final pJson = await _api.get('TecERPv7_dat_dat/v1/POB', params: {'page[size]': 1000, 'page[number]': page});
+        final items = payloadLista(pJson);
+        for (var p in items) {
+          final pId = p['ID']?.toString() ?? p['id']?.toString() ?? '';
+          final znTcn = p['ZN_TCN']?.toString() ?? p['zn_tcn']?.toString() ?? '';
+          pobZnMap[pId] = znTcn;
+        }
+        if (items.length < 1000) break;
+        page++;
+      }
+      debugPrint('Total de poblaciones cargadas: ${pobZnMap.length}');
+
+      // 5. SI ALGUNA DE ELLAS COINCIDE CON LAS ZONAS TECNICAS DEL COMERCIAL
+      final matchingClientIds = <int>{};
+      for (final c in allClients) {
+        final pobId = dirPobMap[c.dirPriId] ?? '';
+        final znTcn = pobZnMap[pobId] ?? '';
+        if (znIds.contains(znTcn)) {
+          matchingClientIds.add(c.id);
+        }
+      }
+      debugPrint('Clientes con zona técnica coincidente: ${matchingClientIds.length}');
+
+      if (matchingClientIds.isEmpty) {
+        debugPrint('No hay clientes en estas zonas. Abortando.');
+        return [];
+      }
+
+      // 6. ENTONCES CARGAS LOS PEDIDOS DE VENTA DE LOS CLIENTES COINCIDENTES
+      debugPrint('Cargando pedidos de venta de clientes coincidentes...');
+      // Descargamos globales y filtramos en memoria por rendimiento de la API
+      page = 1;
+      while (true) {
+        final result = await list(page: page);
+        for (final p in result.items) {
+          if (matchingClientIds.contains(p.clienteId)) {
+            all.add(p);
+          }
+        }
+        if (result.items.length < AppConfig.pageSize) break;
+        page++;
+      }
+      
+      debugPrint('Total de pedidos de la zona técnica encontrados: ${all.length}');
+      debugPrint('=== FIN MODO ZONA TÉCNICA ===\n');
+      return all;
+    }
+
     var page = 1;
     var total = 0;
     var lastPageSize = 0;
@@ -542,8 +650,8 @@ class PedidosService {
       'fpg': pedido.formaPago,
       'dir_env': pedido.direccionEnvio,
       'obs': pedido.observaciones,
-      'emp': 1,
-      'emp_div': 1,
+      'emp': '1',
+      'emp_div': '1',
     };
 
     if (pedido.email.trim().isNotEmpty) {
@@ -559,10 +667,28 @@ class PedidosService {
   static Map<String, dynamic> _pedidoPayload(Pedido pedido) =>
       buildPedidoPayload(pedido);
 
+  static Future<String> _ensureDireccionId(int clienteId, String dirEnv) async {
+    if (dirEnv.isEmpty) return dirEnv;
+    // Si contiene letras (no es puramente numérico), es muy probable que sea un texto
+    if (int.tryParse(dirEnv.trim()) != null) return dirEnv;
+
+    try {
+      final direcciones = await getDireccionesCliente(clienteId);
+      for (final d in direcciones) {
+        if (d.nombre.trim().toLowerCase() == dirEnv.trim().toLowerCase()) {
+          return d.codigo;
+        }
+      }
+    } catch (_) {}
+    return dirEnv;
+  }
+
   static Future<Pedido> createComplete(Pedido pedido) async {
     late final Pedido created;
     try {
-      created = await create(_pedidoPayload(pedido));
+      final dirId = await _ensureDireccionId(pedido.clienteId, pedido.direccionEnvio);
+      final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
+      created = await create(_pedidoPayload(pedidoMapeado));
     } on ApiException catch (error) {
       throw ApiException('No se pudo crear la cabecera del pedido: $error');
     }
@@ -573,11 +699,12 @@ class PedidosService {
     try {
       await enviarLineas(pedidoId, pedido.lineas);
     } on ApiException catch (error) {
-      throw ApiException(
-        'La cabecera se creó, pero no se pudieron guardar las líneas: $error',
-      );
+      throw ApiException('Cabecera creada, pero fallaron las líneas: $error');
     }
-    return created.copyWith(id: pedidoId, lineas: pedido.lineas);
+    return created.copyWith(
+      id: pedidoId,
+      lineas: pedido.lineas,
+    );
   }
 
   static Future<Pedido> updateComplete(
@@ -585,7 +712,9 @@ class PedidosService {
     Pedido pedido,
     Set<int> removedLineIds,
   ) async {
-    final updated = await update(id, _pedidoPayload(pedido));
+    final dirId = await _ensureDireccionId(pedido.clienteId, pedido.direccionEnvio);
+    final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
+    final updated = await update(id, _pedidoPayload(pedidoMapeado));
     for (final lineId in removedLineIds) {
       await eliminarLinea(lineId);
     }
@@ -617,33 +746,96 @@ class PedidosService {
   ///     cabecera. VELNEO asigna el número de línea solo (10, 20, 30...).
   ///   - Línea existente (con id) → POST a /VTA_PED_LIN_G/{id} (VELNEO no usa PUT).
   /// El campo "est" se manda como CÓDIGO (P/S/C); "Pendiente" → "P".
+    /// Ejecuta el proceso de Velneo ACT_VTA_PED_LIN_G_APP.pro para una línea.
+  /// Método GET con parámetros: ID, ART, CAN, PRE, EST, REG_IVA_VTA.
+  static Future<void> ejecutarProcesoActualizarLinea({
+    required dynamic id,
+    required dynamic articulo,
+    required num cantidad,
+    required num precio,
+    required String estado,
+    required String regIvaVta,
+  }) async {
+    final params = <String, dynamic>{
+      'VTA_PED_LIN_G': id,
+      'ART': articulo,
+      'CAN': cantidad,
+      'PRE': precio,
+      'EST': estado,
+      'REG_IVA': regIvaVta,
+    };
+    debugPrint('Ejecutando proceso ACT_VTA_PED_LIN_G_APP.pro: $params');
+    await _api.get(AppConfig.endpoint('procesoActualizarLinea'), params: params);
+  }
+
+  /// Crea o actualiza las líneas de un pedido en `VTA_PED_LIN_G` y llama
+  /// al proceso de Velneo `ACT_VTA_PED_LIN_G_APP.pro`.
   static Future<void> enviarLineas(dynamic pedidoId, List<LineaPedido> lineas) async {
     for (final linea in lineas) {
       final body = <String, dynamic>{
-        // "vta_ped" enlaza la línea con su cabecera de venta. Sin él, VELNEO
-        // crea la línea huérfana y no aparecería en el pedido.
         'vta_ped': pedidoId,
         'art': linea.articulo,
         'dsc': linea.descripcion,
         'ref_man': linea.nReferencia,
         'can_ped': linea.cantidad,
         'can_srv': linea.cantidadServida,
-        'can_pte': linea.pendiente,
         'pre': linea.precio,
         'por_dto': linea.dto,
         'imp': linea.importe,
-        'reg_iva_vta': regIvaCodigo(linea.tipoIva), // % → código (G/R/S/E).
+        'reg_iva_vta': regIvaCodigo(linea.tipoIva, linea.regIvaVta),
         'fch_ent': linea.previstoPara,
-        'est': AppColors.estadoCodigo(linea.estado), // "Pendiente" → "P"
+        'est': AppColors.estadoCodigo(linea.estado),
         'cnc': linea.cancelado,
       };
       try {
-        if (linea.id == null) {
-          // Línea nueva: la creamos dentro del pedido.
-          await _api.post(AppConfig.endpoint('lineas'), body: body);
+        int? lineaId = linea.id;
+        if (lineaId == null) {
+          final res = await _api.post(AppConfig.endpoint('lineas'), body: body);
+          final data = payloadData(res);
+          if (data is Map) {
+            final idVal = data['id'] ?? data['ID'];
+            if (idVal != null) {
+              lineaId = int.tryParse(idVal.toString());
+            }
+          } else if (res is Map) {
+            final idVal = res['id'] ?? res['ID'];
+            if (idVal != null) {
+              lineaId = int.tryParse(idVal.toString());
+            }
+          }
+          if (lineaId == null) {
+            final linesRes = await _api.get(AppConfig.endpoint('lineas'), params: {
+              'filter[vta_ped]': '$pedidoId',
+              'sort': '-id',
+              'page[size]': 1,
+            });
+            final items = payloadLista(linesRes);
+            if (items.isNotEmpty) {
+              final idVal = items.first['id'] ?? items.first['ID'];
+              if (idVal != null) {
+                lineaId = int.tryParse(idVal.toString());
+              }
+            }
+          }
         } else {
-          // Línea ya existente: la actualizamos apuntando a su propio id.
-          await _api.post('${AppConfig.endpoint('lineas')}/${linea.id}', body: body);
+          await _api.post('${AppConfig.endpoint('lineas')}/$lineaId', body: body);
+        }
+
+        if (lineaId != null && lineaId > 0) {
+          final artVal = int.tryParse(linea.articulo) ?? linea.articulo;
+          final canVal = (linea.cantidad % 1 == 0) ? linea.cantidad.toInt() : linea.cantidad;
+          final preVal = (linea.precio % 1 == 0) ? linea.precio.toInt() : linea.precio;
+          final estVal = AppColors.estadoCodigo(linea.estado);
+          final ivaVal = regIvaCodigo(linea.tipoIva, linea.regIvaVta);
+
+          await ejecutarProcesoActualizarLinea(
+            id: lineaId,
+            articulo: artVal,
+            cantidad: canVal,
+            precio: preVal,
+            estado: estVal,
+            regIvaVta: ivaVal,
+          );
         }
       } on ApiException catch (e) {
         throw ApiException('Error al guardar las líneas: $e');
@@ -716,6 +908,7 @@ class PedidosService {
         params: {'filter[id]': '$clienteId', 'page[size]': 1},
       );
       final clientes = payloadLista(clienteJson);
+      debugPrint('🛑🛑🛑 JSON DEL SERVIDOR VELNEO: $clientes');
       if (clientes.isEmpty) {
         return {'serie': '', 'direccion': '', 'email': '', 'almacen': '', 'formaPago': ''};
       }
@@ -731,37 +924,34 @@ class PedidosService {
       debugPrint('━━━ /FIN JSON cliente $clienteId ━━━');
 
       final serie = resolveDefaultValue(cliente, ['ser_vta', 'SER_VTA', 'serie', 'ser']);
-      final formaPago = resolveDefaultValue(cliente, ['fpg', 'FPG', 'forma_pago', 'formaPago', 'fpg_def']);
-      var direccion = resolveDefaultValue(cliente, [
+      final formaPago = resolveDefaultValue(cliente, [
+        'fpg_clt',
+        'fpg',
+        'FPG',
+        'forma_pago',
+        'formaPago',
+        'fpg_def',
+      ]);
+      var direccionId = resolveDefaultValue(cliente, [
+        'dir',
         'DIR_M_VTA_PED_ENV',
+        'dir_env_clt',
         'dir_env',
         'direccion_envio',
         'dir_env_def',
       ]);
-      if (direccion.isEmpty) {
-        final direccionPrimariaId = _referenceId(cliente, 'DIR_PRI').isNotEmpty
+      
+      if (direccionId.isEmpty) {
+        direccionId = _referenceId(cliente, 'DIR_PRI').isNotEmpty
             ? _referenceId(cliente, 'DIR_PRI')
             : _referenceId(cliente, 'DIR_PRI.ID');
-        if (direccionPrimariaId.isNotEmpty) {
-          try {
-            final direccionJson = await _api.get(
-              '${AppConfig.endpoint('direcciones')}/$direccionPrimariaId',
-            );
-            final direccionData = payloadData(direccionJson);
-            if (direccionData is Map) {
-              final direccionPrimaria = Map<String, dynamic>.from(direccionData);
-              direccion = _firstNonEmpty(direccionPrimaria, ['DIR', 'direccion', 'dir']);
-            }
-          } on ApiException {
-            // Se mantiene vacío si la dirección referenciada no es accesible.
-          }
-        }
       }
-      final email = resolveDefaultValue(cliente, ['EML', 'email', 'mail']);
+
+      final email = resolveDefaultValue(cliente, ['eml', 'EML', 'email', 'mail']);
 
       final resultado = {
         'serie': serie,
-        'direccion': direccion,
+        'direccion': direccionId,
         'email': email,
         'almacen': '',
         'formaPago': formaPago,
@@ -776,25 +966,63 @@ class PedidosService {
   static Future<List<OpcionMaestra>> getDireccionesCliente(int clienteId) async {
     if (clienteId <= 0) return [];
     try {
-      final records = await _fetchAllRecords(AppConfig.endpoint('direcciones'));
-      return records
-          .where((r) => _referenceId(r, 'ENT') == '$clienteId')
+      final json = await _api.get(
+        AppConfig.endpoint('direcciones'),
+        params: {
+          'page[size]': 100,
+          'page[number]': 1,
+          "filter['ENT']": '$clienteId',
+        },
+      );
+      return payloadLista(json)
           .map(
             (r) => OpcionMaestra(
               codigo: r.s('id').isNotEmpty ? r.s('id') : r.s('codigo'),
-              nombre: r.s('DIR'),
+              nombre: r.s('DIR_COM').isNotEmpty
+                  ? r.s('DIR_COM')
+                  : (r.s('dir_com').isNotEmpty ? r.s('dir_com') : r.s('DIR')),
             ),
           )
-          .where((opcion) => opcion.codigo.isNotEmpty && opcion.nombre.isNotEmpty)
+          .where((opcion) => opcion.codigo.isNotEmpty)
           .toList();
     } catch (_) {
       return [];
     }
   }
 
+  /// Crea un nuevo cliente en ENT_M
+  static Future<Cliente> crearCliente({
+    required String nombre,
+    String? cif,
+    String? telefono,
+    String? email,
+  }) async {
+    final payload = {
+      'name': nombre.toUpperCase(),
+      'nom_com': nombre.toUpperCase(),
+      'es_clt': 1,
+      'emp': '1', // Empresa habitual
+      'emp_div': '1', // División habitual
+      if (cif != null && cif.isNotEmpty) 'cif': cif.toUpperCase(),
+      if (telefono != null && telefono.isNotEmpty) 'tlf': telefono,
+      if (email != null && email.isNotEmpty) 'eml': email,
+    };
+
+    final json = await _api.post(AppConfig.endpoint('clientes'), body: payload);
+    final data = payloadData(json);
+    
+    if (data is Map) {
+      return Cliente.fromJson(Map<String, dynamic>.from(data));
+    }
+    throw ApiException('El servidor no devolvió los datos del cliente tras su creación.');
+  }
+
   static Future<Map<String, dynamic>> getEmpresaDefaults({String? contactId}) async {
     try {
       final contactIdValue = (contactId ?? '').trim();
+      Map<String, dynamic>? empresaEncontrada;  
+      String almacenDirecto = '';
+
       if (contactIdValue.isNotEmpty) {
         try {
           final contactoJson = await _api.get(
@@ -804,10 +1032,7 @@ class PedidosService {
           final contactos = payloadLista(contactoJson);
           if (contactos.isNotEmpty) {
             final contacto = contactos.first;
-            final almacenDirecto = _firstNonEmpty(contacto, ['ALM', 'alm', 'almacen', 'alm_def']);
-            if (almacenDirecto.isNotEmpty) {
-              return {'almacen': almacenDirecto};
-            }
+            almacenDirecto = _firstNonEmpty(contacto, ['ALM', 'alm', 'almacen', 'alm_def']);
 
             final empresaId = resolveDefaultValue(contacto, ['emp', 'EMP', 'empresa', 'id_emp', 'emp_id']);
             if (empresaId.isNotEmpty) {
@@ -815,8 +1040,7 @@ class PedidosService {
                 await _api.get('${AppConfig.endpoint('empresa')}/$empresaId'),
               );
               if (detalleEmpresa is Map) {
-                final empresa = Map<String, dynamic>.from(detalleEmpresa);
-                return {'almacen': resolveDefaultValue(empresa, ['ALM', 'alm', 'almacen', 'alm_def'])};
+                empresaEncontrada = Map<String, dynamic>.from(detalleEmpresa);
               }
             }
           }
@@ -825,38 +1049,54 @@ class PedidosService {
         }
       }
 
-      Map<String, dynamic>? empresa;
-      try {
-        final detalle = payloadData(
-          await _api.get('${AppConfig.endpoint('empresa')}/1'),
-        );
-        if (detalle is Map) {
-          empresa = Map<String, dynamic>.from(detalle);
+      if (empresaEncontrada == null) {
+        try {
+          final detalle = payloadData(
+            await _api.get('${AppConfig.endpoint('empresa')}/1'),
+          );
+          if (detalle is Map) {
+            empresaEncontrada = Map<String, dynamic>.from(detalle);
+          }
+        } on ApiException {
+          try {
+            final lista = payloadLista(
+              await _api.get(AppConfig.endpoint('empresa')),
+            );
+            if (lista.isNotEmpty) {
+              empresaEncontrada = lista.first;
+            }
+          } on ApiException {
+            // Fallback silencioso si no se encuentra detalle de empresa
+          }
         }
-      } on ApiException {
-        // Algunas instalaciones no exponen el recurso por ID.
       }
 
-      if (empresa == null) {
-        final json = await _api.get(
-          AppConfig.endpoint('empresa'),
-          params: {'page[size]': 1000},
-        );
-        final empresas = payloadLista(json)
-            .where((item) => _firstNonEmpty(item, ['id', 'codigo']) == '1')
-            .toList();
-        if (empresas.isNotEmpty) {
-          empresa = empresas.first;
+      final almacenFinal = almacenDirecto.isNotEmpty
+          ? almacenDirecto
+          : (empresaEncontrada != null
+              ? resolveDefaultValue(empresaEncontrada, ['ALM', 'alm', 'almacen', 'alm_def'])
+              : '');
+              
+      final preValDia = empresaEncontrada != null
+          ? resolveDefaultValue(empresaEncontrada, ['PRE_VAL_DIA', 'pre_val_dia'])
+          : '';
+
+      debugPrint('============================================');
+      debugPrint('[getEmpresaDefaults] Valor bruto de PRE_VAL_DIA extraído: "$preValDia"');
+      if (empresaEncontrada != null) {
+        debugPrint('[getEmpresaDefaults] Todo el JSON de la empresa:');
+        for (final entry in empresaEncontrada.entries) {
+          debugPrint('  ${entry.key}: ${entry.value}');
         }
       }
-      if (empresa == null) {
-        return {'almacen': ''};
-      }
+      debugPrint('============================================');
+
       return {
-        'almacen': resolveDefaultValue(empresa, ['ALM', 'alm', 'almacen', 'alm_def']),
+        'almacen': almacenFinal,
+        'preValDia': preValDia,
       };
     } catch (_) {
-      return {'almacen': ''};
+      return {'almacen': '', 'preValDia': ''};
     }
   }
 
@@ -1019,19 +1259,116 @@ class PedidosService {
     if (query.isEmpty) return const [];
 
     try {
+      final params = buildClienteSearchParams(query, limit: limit);
+      debugPrint('🔧 searchClientes → ${AppConfig.endpoint('clientes')} $params');
       final json = await _api.get(
         AppConfig.endpoint('clientes'),
-        params: buildClienteSearchParams(query, limit: limit),
+        params: params,
       );
 
-      return filterClienteRecords(payloadLista(json), query).take(limit).map(
+      final resultado = filterClienteRecords(payloadLista(json), query).take(limit).map(
             (r) => OpcionMaestra(
               codigo: r.s('id'),
               nombre: r.s('nom_com').isNotEmpty ? r.s('nom_com') : r.s('name'),
             ),
           ).toList();
-    } catch (_) {
+      debugPrint('🔧 searchClientes("$query") → ${resultado.length} clientes.');
+      return resultado;
+    } catch (e) {
+      debugPrint('💥💥 searchClientes("$query") LLANZÓ ERROR: $e');
       return const [];
+    }
+  }
+
+  /// Traduce el código de IVA Velneo (G/R/S/E) a su porcentaje, igual que la
+  /// interfaz. Si el campo ya llega como número (21.0), lo devuelve tal cual.
+  static double _ivaPorcentaje(String value) {
+    switch (value.trim().toUpperCase()) {
+      case 'G':
+        return 21.0;
+      case 'R':
+        return 10.0;
+      case 'S':
+        return 4.0;
+      case 'E':
+        return 0.0;
+      default:
+        return double.tryParse(value) ?? 0.0;
+    }
+  }
+
+  /// Obtiene los datos por defecto de un artículo (`ART_M`) para rellenar la
+  /// línea: descripción, nombre, precio de tarifa e IVA.
+  ///
+  /// Devuelve un mapa con 'codigo', 'nombre', 'descripcion', 'precio' y
+  /// 'tipoIva' (porcentaje). Si algo falla o no hay resultado, claves vacías.
+  static Future<Map<String, dynamic>> getArticuloDefaults(String articuloCodigo) async {
+    final vacio = {
+      'codigo': '',
+      'nombre': '',
+      'descripcion': '',
+      'precio': '',
+      'tipoIva': '',
+    };
+    final codigo = articuloCodigo.trim();
+    if (codigo.isEmpty) return vacio;
+
+    try {
+      // El código del artículo puede vivir en distinto campo según la
+      // instalación (ART_M cambia entre versiones): probamos los filtros más
+      // habituales hasta encontrar el registro. El que responda queda en el log.
+      Map<String, dynamic> articulo = const {};
+      String filtroUsado = '';
+      for (final filtro in ['id', 'art', 'codigo']) {
+        final json = await _api.get(
+          AppConfig.endpoint('articulos'),
+          params: {'filter[$filtro]': codigo, 'page[size]': 1},
+        );
+        final lista = payloadLista(json);
+        debugPrint('🛑🛑🛑 JSON DEL SERVIDOR (ARTICULO) filter[$filtro]=$codigo → $lista');
+        if (lista.isNotEmpty) {
+          articulo = lista.first;
+          filtroUsado = filtro;
+          break;
+        }
+      }
+      if (articulo.isEmpty) {
+        debugPrint('💥💥 getArticuloDefaults("$codigo") → SIN RESULTADO en ningún filtro.');
+        return vacio;
+      }
+      debugPrint('🔧 getArticuloDefaults("$codigo") → encontrado con filter[$filtroUsado].');
+
+      final nombre = resolveDefaultValue(
+        articulo,
+        ['name', 'ART_NOM', 'art_nom', 'descripcion'],
+      );
+      final descripcion = resolveDefaultValue(
+        articulo,
+        ['dsc', 'descripcion', 'name'],
+      );
+      final precio = resolveDefaultValue(
+        articulo,
+        ['pre', 'PVP', 'pvp', 'precio'],
+      );
+      final tipoIva = _ivaPorcentaje(
+        resolveDefaultValue(
+          articulo,
+          ['por_iva', 'tipo_iva', 'reg_iva_vta', 'iva', 'IVA'],
+        ),
+      );
+
+      final resultado = {
+        'codigo': codigo,
+        'nombre': nombre,
+        'descripcion': descripcion,
+        'precio': precio,
+        'tipoIva': '$tipoIva',
+      };
+      debugPrint('[VELNEO] Defaults del artículo $codigo → $resultado');
+      return resultado;
+    } catch (e) {
+      debugPrint('💥💥 getArticuloDefaults("$codigo") LLANZÓ ERROR: $e');
+      return vacio;
     }
   }
 

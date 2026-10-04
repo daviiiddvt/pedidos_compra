@@ -1,5 +1,5 @@
 import 'package:diacritic/diacritic.dart';
-import '../models.dart';
+import '../models/models.dart';
 import '../theme/app_theme.dart';
 
 class OrderRepository {

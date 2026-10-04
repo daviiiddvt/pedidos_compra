@@ -22,7 +22,7 @@ import 'package:pedidos_venta/core/search/local_cache_db.dart';
 import 'package:pedidos_venta/core/search/local_cache_db_stub.dart'
     show LocalCacheDbMemory;
 import 'package:pedidos_venta/core/search/master_sync_service.dart';
-import 'package:pedidos_venta/models.dart';
+import 'package:pedidos_venta/models/models.dart';
 import 'package:pedidos_venta/state/remote_search_cubit.dart';
 import 'package:pedidos_venta/widgets/autocomplete_field.dart';
 

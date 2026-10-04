@@ -7,7 +7,7 @@
 //  MISMA interfaz para que EntitySearchRepository no cambie.
 // ============================================================================
 
-import '../../models.dart'; // OpcionMaestra.
+import '../../models/models.dart'; // OpcionMaestra.
 import 'local_cache_db_base.dart'; // Contrato LocalCacheDb.
 
 /// Implementación en memoria de la caché local.

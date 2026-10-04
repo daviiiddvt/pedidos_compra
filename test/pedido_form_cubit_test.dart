@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pedidos_venta/core/formatters.dart';
-import 'package:pedidos_venta/models.dart';
+import 'package:pedidos_venta/models/models.dart';
 import 'package:pedidos_venta/state/pedido_form_cubit.dart';
 
 void main() {

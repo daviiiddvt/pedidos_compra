@@ -22,8 +22,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../api_service.dart'; // PedidosService (pide datos al servidor).
-import '../models.dart'; // El modelo Pedido.
+import '../core/api_service.dart'; // PedidosService (pide datos al servidor).
+import '../models/models.dart'; // El modelo Pedido.
 import '../core/order_repository.dart';
 import '../state/auth_state.dart'; // Para el botón "Salir" (desconectar).
 import '../theme/app_theme.dart'; // Colores.
@@ -50,6 +50,7 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
   bool _cargando = true; // ¿Estamos pidiendo datos ahora mismo?
   String _filtroEstado = ''; // Filtro activo ('' = sin filtrar = "Todos").
   String _busqueda = '';
+  bool _verPorZona = false; // Alternar modo de visión
 
   /// initState: al nacer la pantalla, nos suscribimos al scroll y cargamos la
   /// primera página. El addPostFrameCallback espera a que la pantalla esté
@@ -80,6 +81,7 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
         comercial: user?.role.toLowerCase() == 'comercial'
             ? user?.contactId
             : null,
+        porZona: _verPorZona,
       );
       if (!mounted) return; // Si la pantalla ya se cerró, no seguimos.
       final repository = context.read<OrderRepository>();
@@ -234,14 +236,41 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
     );
   }
 
-  /// _filtros: la fila de "chips" (píldoras) para filtrar por estado.
-    Widget _filtros() {
+  Widget _filtros() {
     return Container(
-      color: AppColors.surface, // Fondo blanco
+      color: AppColors.surface,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      child: Column( // Usamos Column para apilar los chips y el buscador
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Selector de modo de visión
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment<bool>(
+                value: false,
+                label: Text('Mis clientes asignados'),
+                icon: Icon(Icons.person),
+              ),
+              ButtonSegment<bool>(
+                value: true,
+                label: Text('Mi zona técnica'),
+                icon: Icon(Icons.map),
+              ),
+            ],
+            selected: {_verPorZona},
+            onSelectionChanged: (Set<bool> newSelection) {
+              final newValue = newSelection.first;
+              if (newValue == _verPorZona) return;
+              
+              setState(() {
+                _verPorZona = newValue;
+                _pedidos.clear(); // Limpiamos la lista para mostrar el cargador
+              });
+              _refrescar();
+            },
+          ),
+          const SizedBox(height: 10),
+          
           // 1. La fila de chips (dentro de un Wrap)
           Wrap(
             spacing: 8,

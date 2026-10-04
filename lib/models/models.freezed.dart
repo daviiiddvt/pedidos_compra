@@ -289,7 +289,7 @@ as String,
 /// @nodoc
 mixin _$LineaPedido {
 
- int? get id; int? get codigo; String get articulo; String get articuloNombre; String get descripcion; String get nReferencia; String get referencia; String get referenciaProveedor; double get cantidad; double get cantidadServida; double get pendiente; double get precio; double get dto; double get importe; double get tipoIva; double get retencionIrpf; double get retencionAlquiler; String get clienteVenta; String get estado; bool get cancelado; String get previstoPara;
+ int? get id; int? get codigo; String get articulo; String get articuloNombre; String get descripcion; String get nReferencia; String get referencia; String get referenciaProveedor; double get cantidad; double get cantidadServida;@JsonKey(includeToJson: false) double get pendiente; double get precio; double get dto; double get importe; double get tipoIva; String get regIvaVta; double get retencionIrpf; double get retencionAlquiler; String get clienteVenta; String get estado; bool get cancelado; String get previstoPara;
 /// Create a copy of LineaPedido
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -303,20 +303,20 @@ $LineaPedidoCopyWith<LineaPedido> get copyWith => _$LineaPedidoCopyWithImpl<Line
 @override
 bool operator ==(Object other) {
   final _this = this as LineaPedido;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is LineaPedido&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.codigo, _this.codigo) || other.codigo == _this.codigo)&&(identical(other.articulo, _this.articulo) || other.articulo == _this.articulo)&&(identical(other.articuloNombre, _this.articuloNombre) || other.articuloNombre == _this.articuloNombre)&&(identical(other.descripcion, _this.descripcion) || other.descripcion == _this.descripcion)&&(identical(other.nReferencia, _this.nReferencia) || other.nReferencia == _this.nReferencia)&&(identical(other.referencia, _this.referencia) || other.referencia == _this.referencia)&&(identical(other.referenciaProveedor, _this.referenciaProveedor) || other.referenciaProveedor == _this.referenciaProveedor)&&(identical(other.cantidad, _this.cantidad) || other.cantidad == _this.cantidad)&&(identical(other.cantidadServida, _this.cantidadServida) || other.cantidadServida == _this.cantidadServida)&&(identical(other.pendiente, _this.pendiente) || other.pendiente == _this.pendiente)&&(identical(other.precio, _this.precio) || other.precio == _this.precio)&&(identical(other.dto, _this.dto) || other.dto == _this.dto)&&(identical(other.importe, _this.importe) || other.importe == _this.importe)&&(identical(other.tipoIva, _this.tipoIva) || other.tipoIva == _this.tipoIva)&&(identical(other.retencionIrpf, _this.retencionIrpf) || other.retencionIrpf == _this.retencionIrpf)&&(identical(other.retencionAlquiler, _this.retencionAlquiler) || other.retencionAlquiler == _this.retencionAlquiler)&&(identical(other.clienteVenta, _this.clienteVenta) || other.clienteVenta == _this.clienteVenta)&&(identical(other.estado, _this.estado) || other.estado == _this.estado)&&(identical(other.cancelado, _this.cancelado) || other.cancelado == _this.cancelado)&&(identical(other.previstoPara, _this.previstoPara) || other.previstoPara == _this.previstoPara));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is LineaPedido&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.codigo, _this.codigo) || other.codigo == _this.codigo)&&(identical(other.articulo, _this.articulo) || other.articulo == _this.articulo)&&(identical(other.articuloNombre, _this.articuloNombre) || other.articuloNombre == _this.articuloNombre)&&(identical(other.descripcion, _this.descripcion) || other.descripcion == _this.descripcion)&&(identical(other.nReferencia, _this.nReferencia) || other.nReferencia == _this.nReferencia)&&(identical(other.referencia, _this.referencia) || other.referencia == _this.referencia)&&(identical(other.referenciaProveedor, _this.referenciaProveedor) || other.referenciaProveedor == _this.referenciaProveedor)&&(identical(other.cantidad, _this.cantidad) || other.cantidad == _this.cantidad)&&(identical(other.cantidadServida, _this.cantidadServida) || other.cantidadServida == _this.cantidadServida)&&(identical(other.pendiente, _this.pendiente) || other.pendiente == _this.pendiente)&&(identical(other.precio, _this.precio) || other.precio == _this.precio)&&(identical(other.dto, _this.dto) || other.dto == _this.dto)&&(identical(other.importe, _this.importe) || other.importe == _this.importe)&&(identical(other.tipoIva, _this.tipoIva) || other.tipoIva == _this.tipoIva)&&(identical(other.regIvaVta, _this.regIvaVta) || other.regIvaVta == _this.regIvaVta)&&(identical(other.retencionIrpf, _this.retencionIrpf) || other.retencionIrpf == _this.retencionIrpf)&&(identical(other.retencionAlquiler, _this.retencionAlquiler) || other.retencionAlquiler == _this.retencionAlquiler)&&(identical(other.clienteVenta, _this.clienteVenta) || other.clienteVenta == _this.clienteVenta)&&(identical(other.estado, _this.estado) || other.estado == _this.estado)&&(identical(other.cancelado, _this.cancelado) || other.cancelado == _this.cancelado)&&(identical(other.previstoPara, _this.previstoPara) || other.previstoPara == _this.previstoPara));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as LineaPedido;
-  return Object.hashAll([runtimeType,_this.id,_this.codigo,_this.articulo,_this.articuloNombre,_this.descripcion,_this.nReferencia,_this.referencia,_this.referenciaProveedor,_this.cantidad,_this.cantidadServida,_this.pendiente,_this.precio,_this.dto,_this.importe,_this.tipoIva,_this.retencionIrpf,_this.retencionAlquiler,_this.clienteVenta,_this.estado,_this.cancelado,_this.previstoPara]);
+  return Object.hashAll([runtimeType,_this.id,_this.codigo,_this.articulo,_this.articuloNombre,_this.descripcion,_this.nReferencia,_this.referencia,_this.referenciaProveedor,_this.cantidad,_this.cantidadServida,_this.pendiente,_this.precio,_this.dto,_this.importe,_this.tipoIva,_this.regIvaVta,_this.retencionIrpf,_this.retencionAlquiler,_this.clienteVenta,_this.estado,_this.cancelado,_this.previstoPara]);
 }
 
 @override
 String toString() {
   final _this = this as LineaPedido;
-  return 'LineaPedido(id: ${_this.id}, codigo: ${_this.codigo}, articulo: ${_this.articulo}, articuloNombre: ${_this.articuloNombre}, descripcion: ${_this.descripcion}, nReferencia: ${_this.nReferencia}, referencia: ${_this.referencia}, referenciaProveedor: ${_this.referenciaProveedor}, cantidad: ${_this.cantidad}, cantidadServida: ${_this.cantidadServida}, pendiente: ${_this.pendiente}, precio: ${_this.precio}, dto: ${_this.dto}, importe: ${_this.importe}, tipoIva: ${_this.tipoIva}, retencionIrpf: ${_this.retencionIrpf}, retencionAlquiler: ${_this.retencionAlquiler}, clienteVenta: ${_this.clienteVenta}, estado: ${_this.estado}, cancelado: ${_this.cancelado}, previstoPara: ${_this.previstoPara})';
+  return 'LineaPedido(id: ${_this.id}, codigo: ${_this.codigo}, articulo: ${_this.articulo}, articuloNombre: ${_this.articuloNombre}, descripcion: ${_this.descripcion}, nReferencia: ${_this.nReferencia}, referencia: ${_this.referencia}, referenciaProveedor: ${_this.referenciaProveedor}, cantidad: ${_this.cantidad}, cantidadServida: ${_this.cantidadServida}, pendiente: ${_this.pendiente}, precio: ${_this.precio}, dto: ${_this.dto}, importe: ${_this.importe}, tipoIva: ${_this.tipoIva}, regIvaVta: ${_this.regIvaVta}, retencionIrpf: ${_this.retencionIrpf}, retencionAlquiler: ${_this.retencionAlquiler}, clienteVenta: ${_this.clienteVenta}, estado: ${_this.estado}, cancelado: ${_this.cancelado}, previstoPara: ${_this.previstoPara})';
 }
 
 
@@ -327,7 +327,7 @@ abstract mixin class $LineaPedidoCopyWith<$Res>  {
   factory $LineaPedidoCopyWith(LineaPedido value, $Res Function(LineaPedido) _then) = _$LineaPedidoCopyWithImpl;
 @useResult
 $Res call({
- int? id, int? codigo, String articulo, String articuloNombre, String descripcion, String nReferencia, String referencia, String referenciaProveedor, double cantidad, double cantidadServida, double pendiente, double precio, double dto, double importe, double tipoIva, double retencionIrpf, double retencionAlquiler, String clienteVenta, String estado, bool cancelado, String previstoPara
+ int? id, int? codigo, String articulo, String articuloNombre, String descripcion, String nReferencia, String referencia, String referenciaProveedor, double cantidad, double cantidadServida,@JsonKey(includeToJson: false) double pendiente, double precio, double dto, double importe, double tipoIva, String regIvaVta, double retencionIrpf, double retencionAlquiler, String clienteVenta, String estado, bool cancelado, String previstoPara
 });
 
 
@@ -344,7 +344,7 @@ class _$LineaPedidoCopyWithImpl<$Res>
 
 /// Create a copy of LineaPedido
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = freezed,Object? codigo = freezed,Object? articulo = null,Object? articuloNombre = null,Object? descripcion = null,Object? nReferencia = null,Object? referencia = null,Object? referenciaProveedor = null,Object? cantidad = null,Object? cantidadServida = null,Object? pendiente = null,Object? precio = null,Object? dto = null,Object? importe = null,Object? tipoIva = null,Object? retencionIrpf = null,Object? retencionAlquiler = null,Object? clienteVenta = null,Object? estado = null,Object? cancelado = null,Object? previstoPara = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = freezed,Object? codigo = freezed,Object? articulo = null,Object? articuloNombre = null,Object? descripcion = null,Object? nReferencia = null,Object? referencia = null,Object? referenciaProveedor = null,Object? cantidad = null,Object? cantidadServida = null,Object? pendiente = null,Object? precio = null,Object? dto = null,Object? importe = null,Object? tipoIva = null,Object? regIvaVta = null,Object? retencionIrpf = null,Object? retencionAlquiler = null,Object? clienteVenta = null,Object? estado = null,Object? cancelado = null,Object? previstoPara = null,}) {
   return _then(LineaPedido(
 id: freezed == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int?,codigo: freezed == codigo ? _self.codigo : codigo // ignore: cast_nullable_to_non_nullable
@@ -361,7 +361,8 @@ as double,precio: null == precio ? _self.precio : precio // ignore: cast_nullabl
 as double,dto: null == dto ? _self.dto : dto // ignore: cast_nullable_to_non_nullable
 as double,importe: null == importe ? _self.importe : importe // ignore: cast_nullable_to_non_nullable
 as double,tipoIva: null == tipoIva ? _self.tipoIva : tipoIva // ignore: cast_nullable_to_non_nullable
-as double,retencionIrpf: null == retencionIrpf ? _self.retencionIrpf : retencionIrpf // ignore: cast_nullable_to_non_nullable
+as double,regIvaVta: null == regIvaVta ? _self.regIvaVta : regIvaVta // ignore: cast_nullable_to_non_nullable
+as String,retencionIrpf: null == retencionIrpf ? _self.retencionIrpf : retencionIrpf // ignore: cast_nullable_to_non_nullable
 as double,retencionAlquiler: null == retencionAlquiler ? _self.retencionAlquiler : retencionAlquiler // ignore: cast_nullable_to_non_nullable
 as double,clienteVenta: null == clienteVenta ? _self.clienteVenta : clienteVenta // ignore: cast_nullable_to_non_nullable
 as String,estado: null == estado ? _self.estado : estado // ignore: cast_nullable_to_non_nullable
@@ -452,10 +453,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double cantidadServida,  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double cantidadServida, @JsonKey(includeToJson: false)  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  String regIvaVta,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _LineaPedido() when $default != null:
-return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.cantidadServida,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
+return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.cantidadServida,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.regIvaVta,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
   return orElse();
 
 }
@@ -473,10 +474,10 @@ return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double cantidadServida,  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double cantidadServida, @JsonKey(includeToJson: false)  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  String regIvaVta,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)  $default,) {final _that = this;
 switch (_that) {
 case _LineaPedido():
-return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.cantidadServida,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
+return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.cantidadServida,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.regIvaVta,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -493,10 +494,10 @@ return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double cantidadServida,  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? id,  int? codigo,  String articulo,  String articuloNombre,  String descripcion,  String nReferencia,  String referencia,  String referenciaProveedor,  double cantidad,  double cantidadServida, @JsonKey(includeToJson: false)  double pendiente,  double precio,  double dto,  double importe,  double tipoIva,  String regIvaVta,  double retencionIrpf,  double retencionAlquiler,  String clienteVenta,  String estado,  bool cancelado,  String previstoPara)?  $default,) {final _that = this;
 switch (_that) {
 case _LineaPedido() when $default != null:
-return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.cantidadServida,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
+return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.descripcion,_that.nReferencia,_that.referencia,_that.referenciaProveedor,_that.cantidad,_that.cantidadServida,_that.pendiente,_that.precio,_that.dto,_that.importe,_that.tipoIva,_that.regIvaVta,_that.retencionIrpf,_that.retencionAlquiler,_that.clienteVenta,_that.estado,_that.cancelado,_that.previstoPara);case _:
   return null;
 
 }
@@ -508,7 +509,7 @@ return $default(_that.id,_that.codigo,_that.articulo,_that.articuloNombre,_that.
 @JsonSerializable()
 
 class _LineaPedido extends LineaPedido {
-  const _LineaPedido({this.id, this.codigo, this.articulo = '', this.articuloNombre = '', this.descripcion = '', this.nReferencia = '', this.referencia = '', this.referenciaProveedor = '', this.cantidad = 1.0, this.cantidadServida = 0.0, this.pendiente = 1.0, this.precio = 0.0, this.dto = 0.0, this.importe = 0.0, this.tipoIva = 21.0, this.retencionIrpf = 0.0, this.retencionAlquiler = 0.0, this.clienteVenta = '', this.estado = 'Pendiente', this.cancelado = false, this.previstoPara = ''}): super._();
+  const _LineaPedido({this.id, this.codigo, this.articulo = '', this.articuloNombre = '', this.descripcion = '', this.nReferencia = '', this.referencia = '', this.referenciaProveedor = '', this.cantidad = 1.0, this.cantidadServida = 0.0, @JsonKey(includeToJson: false) this.pendiente = 1.0, this.precio = 0.0, this.dto = 0.0, this.importe = 0.0, this.tipoIva = 21.0, this.regIvaVta = 'G', this.retencionIrpf = 0.0, this.retencionAlquiler = 0.0, this.clienteVenta = '', this.estado = 'Pendiente', this.cancelado = false, this.previstoPara = ''}): super._();
   factory _LineaPedido.fromJson(Map<String, dynamic> json) => _$LineaPedidoFromJson(json);
 
 @override final  int? id;
@@ -521,11 +522,12 @@ class _LineaPedido extends LineaPedido {
 @override@JsonKey() final  String referenciaProveedor;
 @override@JsonKey() final  double cantidad;
 @override@JsonKey() final  double cantidadServida;
-@override@JsonKey() final  double pendiente;
+@override@JsonKey(includeToJson: false) final  double pendiente;
 @override@JsonKey() final  double precio;
 @override@JsonKey() final  double dto;
 @override@JsonKey() final  double importe;
 @override@JsonKey() final  double tipoIva;
+@override@JsonKey() final  String regIvaVta;
 @override@JsonKey() final  double retencionIrpf;
 @override@JsonKey() final  double retencionAlquiler;
 @override@JsonKey() final  String clienteVenta;
@@ -546,18 +548,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _LineaPedido&&(identical(other.id, id) || other.id == id)&&(identical(other.codigo, codigo) || other.codigo == codigo)&&(identical(other.articulo, articulo) || other.articulo == articulo)&&(identical(other.articuloNombre, articuloNombre) || other.articuloNombre == articuloNombre)&&(identical(other.descripcion, descripcion) || other.descripcion == descripcion)&&(identical(other.nReferencia, nReferencia) || other.nReferencia == nReferencia)&&(identical(other.referencia, referencia) || other.referencia == referencia)&&(identical(other.referenciaProveedor, referenciaProveedor) || other.referenciaProveedor == referenciaProveedor)&&(identical(other.cantidad, cantidad) || other.cantidad == cantidad)&&(identical(other.cantidadServida, cantidadServida) || other.cantidadServida == cantidadServida)&&(identical(other.pendiente, pendiente) || other.pendiente == pendiente)&&(identical(other.precio, precio) || other.precio == precio)&&(identical(other.dto, dto) || other.dto == dto)&&(identical(other.importe, importe) || other.importe == importe)&&(identical(other.tipoIva, tipoIva) || other.tipoIva == tipoIva)&&(identical(other.retencionIrpf, retencionIrpf) || other.retencionIrpf == retencionIrpf)&&(identical(other.retencionAlquiler, retencionAlquiler) || other.retencionAlquiler == retencionAlquiler)&&(identical(other.clienteVenta, clienteVenta) || other.clienteVenta == clienteVenta)&&(identical(other.estado, estado) || other.estado == estado)&&(identical(other.cancelado, cancelado) || other.cancelado == cancelado)&&(identical(other.previstoPara, previstoPara) || other.previstoPara == previstoPara));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _LineaPedido&&(identical(other.id, id) || other.id == id)&&(identical(other.codigo, codigo) || other.codigo == codigo)&&(identical(other.articulo, articulo) || other.articulo == articulo)&&(identical(other.articuloNombre, articuloNombre) || other.articuloNombre == articuloNombre)&&(identical(other.descripcion, descripcion) || other.descripcion == descripcion)&&(identical(other.nReferencia, nReferencia) || other.nReferencia == nReferencia)&&(identical(other.referencia, referencia) || other.referencia == referencia)&&(identical(other.referenciaProveedor, referenciaProveedor) || other.referenciaProveedor == referenciaProveedor)&&(identical(other.cantidad, cantidad) || other.cantidad == cantidad)&&(identical(other.cantidadServida, cantidadServida) || other.cantidadServida == cantidadServida)&&(identical(other.pendiente, pendiente) || other.pendiente == pendiente)&&(identical(other.precio, precio) || other.precio == precio)&&(identical(other.dto, dto) || other.dto == dto)&&(identical(other.importe, importe) || other.importe == importe)&&(identical(other.tipoIva, tipoIva) || other.tipoIva == tipoIva)&&(identical(other.regIvaVta, regIvaVta) || other.regIvaVta == regIvaVta)&&(identical(other.retencionIrpf, retencionIrpf) || other.retencionIrpf == retencionIrpf)&&(identical(other.retencionAlquiler, retencionAlquiler) || other.retencionAlquiler == retencionAlquiler)&&(identical(other.clienteVenta, clienteVenta) || other.clienteVenta == clienteVenta)&&(identical(other.estado, estado) || other.estado == estado)&&(identical(other.cancelado, cancelado) || other.cancelado == cancelado)&&(identical(other.previstoPara, previstoPara) || other.previstoPara == previstoPara));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hashAll([runtimeType,id,codigo,articulo,articuloNombre,descripcion,nReferencia,referencia,referenciaProveedor,cantidad,cantidadServida,pendiente,precio,dto,importe,tipoIva,retencionIrpf,retencionAlquiler,clienteVenta,estado,cancelado,previstoPara]);
+    return Object.hashAll([runtimeType,id,codigo,articulo,articuloNombre,descripcion,nReferencia,referencia,referenciaProveedor,cantidad,cantidadServida,pendiente,precio,dto,importe,tipoIva,regIvaVta,retencionIrpf,retencionAlquiler,clienteVenta,estado,cancelado,previstoPara]);
 }
 
 @override
 String toString() {
-    return 'LineaPedido(id: $id, codigo: $codigo, articulo: $articulo, articuloNombre: $articuloNombre, descripcion: $descripcion, nReferencia: $nReferencia, referencia: $referencia, referenciaProveedor: $referenciaProveedor, cantidad: $cantidad, cantidadServida: $cantidadServida, pendiente: $pendiente, precio: $precio, dto: $dto, importe: $importe, tipoIva: $tipoIva, retencionIrpf: $retencionIrpf, retencionAlquiler: $retencionAlquiler, clienteVenta: $clienteVenta, estado: $estado, cancelado: $cancelado, previstoPara: $previstoPara)';
+    return 'LineaPedido(id: $id, codigo: $codigo, articulo: $articulo, articuloNombre: $articuloNombre, descripcion: $descripcion, nReferencia: $nReferencia, referencia: $referencia, referenciaProveedor: $referenciaProveedor, cantidad: $cantidad, cantidadServida: $cantidadServida, pendiente: $pendiente, precio: $precio, dto: $dto, importe: $importe, tipoIva: $tipoIva, regIvaVta: $regIvaVta, retencionIrpf: $retencionIrpf, retencionAlquiler: $retencionAlquiler, clienteVenta: $clienteVenta, estado: $estado, cancelado: $cancelado, previstoPara: $previstoPara)';
 }
 
 
@@ -568,7 +570,7 @@ abstract mixin class _$LineaPedidoCopyWith<$Res> implements $LineaPedidoCopyWith
   factory _$LineaPedidoCopyWith(_LineaPedido value, $Res Function(_LineaPedido) _then) = __$LineaPedidoCopyWithImpl;
 @override @useResult
 $Res call({
- int? id, int? codigo, String articulo, String articuloNombre, String descripcion, String nReferencia, String referencia, String referenciaProveedor, double cantidad, double cantidadServida, double pendiente, double precio, double dto, double importe, double tipoIva, double retencionIrpf, double retencionAlquiler, String clienteVenta, String estado, bool cancelado, String previstoPara
+ int? id, int? codigo, String articulo, String articuloNombre, String descripcion, String nReferencia, String referencia, String referenciaProveedor, double cantidad, double cantidadServida,@JsonKey(includeToJson: false) double pendiente, double precio, double dto, double importe, double tipoIva, String regIvaVta, double retencionIrpf, double retencionAlquiler, String clienteVenta, String estado, bool cancelado, String previstoPara
 });
 
 
@@ -585,7 +587,7 @@ class __$LineaPedidoCopyWithImpl<$Res>
 
 /// Create a copy of LineaPedido
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = freezed,Object? codigo = freezed,Object? articulo = null,Object? articuloNombre = null,Object? descripcion = null,Object? nReferencia = null,Object? referencia = null,Object? referenciaProveedor = null,Object? cantidad = null,Object? cantidadServida = null,Object? pendiente = null,Object? precio = null,Object? dto = null,Object? importe = null,Object? tipoIva = null,Object? retencionIrpf = null,Object? retencionAlquiler = null,Object? clienteVenta = null,Object? estado = null,Object? cancelado = null,Object? previstoPara = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = freezed,Object? codigo = freezed,Object? articulo = null,Object? articuloNombre = null,Object? descripcion = null,Object? nReferencia = null,Object? referencia = null,Object? referenciaProveedor = null,Object? cantidad = null,Object? cantidadServida = null,Object? pendiente = null,Object? precio = null,Object? dto = null,Object? importe = null,Object? tipoIva = null,Object? regIvaVta = null,Object? retencionIrpf = null,Object? retencionAlquiler = null,Object? clienteVenta = null,Object? estado = null,Object? cancelado = null,Object? previstoPara = null,}) {
   return _then(_LineaPedido(
 id: freezed == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int?,codigo: freezed == codigo ? _self.codigo : codigo // ignore: cast_nullable_to_non_nullable
@@ -602,7 +604,8 @@ as double,precio: null == precio ? _self.precio : precio // ignore: cast_nullabl
 as double,dto: null == dto ? _self.dto : dto // ignore: cast_nullable_to_non_nullable
 as double,importe: null == importe ? _self.importe : importe // ignore: cast_nullable_to_non_nullable
 as double,tipoIva: null == tipoIva ? _self.tipoIva : tipoIva // ignore: cast_nullable_to_non_nullable
-as double,retencionIrpf: null == retencionIrpf ? _self.retencionIrpf : retencionIrpf // ignore: cast_nullable_to_non_nullable
+as double,regIvaVta: null == regIvaVta ? _self.regIvaVta : regIvaVta // ignore: cast_nullable_to_non_nullable
+as String,retencionIrpf: null == retencionIrpf ? _self.retencionIrpf : retencionIrpf // ignore: cast_nullable_to_non_nullable
 as double,retencionAlquiler: null == retencionAlquiler ? _self.retencionAlquiler : retencionAlquiler // ignore: cast_nullable_to_non_nullable
 as double,clienteVenta: null == clienteVenta ? _self.clienteVenta : clienteVenta // ignore: cast_nullable_to_non_nullable
 as String,estado: null == estado ? _self.estado : estado // ignore: cast_nullable_to_non_nullable
@@ -898,7 +901,7 @@ as String,
 /// @nodoc
 mixin _$Cliente {
 
- int get id; String get nombreComercial; String get cif; String get telefono;
+ int get id; String get nombreComercial; String get cif; String get telefono; int get pob; int get dirPriId;
 /// Create a copy of Cliente
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -912,20 +915,20 @@ $ClienteCopyWith<Cliente> get copyWith => _$ClienteCopyWithImpl<Cliente>(this as
 @override
 bool operator ==(Object other) {
   final _this = this as Cliente;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Cliente&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.nombreComercial, _this.nombreComercial) || other.nombreComercial == _this.nombreComercial)&&(identical(other.cif, _this.cif) || other.cif == _this.cif)&&(identical(other.telefono, _this.telefono) || other.telefono == _this.telefono));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Cliente&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.nombreComercial, _this.nombreComercial) || other.nombreComercial == _this.nombreComercial)&&(identical(other.cif, _this.cif) || other.cif == _this.cif)&&(identical(other.telefono, _this.telefono) || other.telefono == _this.telefono)&&(identical(other.pob, _this.pob) || other.pob == _this.pob)&&(identical(other.dirPriId, _this.dirPriId) || other.dirPriId == _this.dirPriId));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as Cliente;
-  return Object.hash(runtimeType,_this.id,_this.nombreComercial,_this.cif,_this.telefono);
+  return Object.hash(runtimeType,_this.id,_this.nombreComercial,_this.cif,_this.telefono,_this.pob,_this.dirPriId);
 }
 
 @override
 String toString() {
   final _this = this as Cliente;
-  return 'Cliente(id: ${_this.id}, nombreComercial: ${_this.nombreComercial}, cif: ${_this.cif}, telefono: ${_this.telefono})';
+  return 'Cliente(id: ${_this.id}, nombreComercial: ${_this.nombreComercial}, cif: ${_this.cif}, telefono: ${_this.telefono}, pob: ${_this.pob}, dirPriId: ${_this.dirPriId})';
 }
 
 
@@ -936,7 +939,7 @@ abstract mixin class $ClienteCopyWith<$Res>  {
   factory $ClienteCopyWith(Cliente value, $Res Function(Cliente) _then) = _$ClienteCopyWithImpl;
 @useResult
 $Res call({
- int id, String nombreComercial, String cif, String telefono
+ int id, String nombreComercial, String cif, String telefono, int pob, int dirPriId
 });
 
 
@@ -953,13 +956,15 @@ class _$ClienteCopyWithImpl<$Res>
 
 /// Create a copy of Cliente
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? nombreComercial = null,Object? cif = null,Object? telefono = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? nombreComercial = null,Object? cif = null,Object? telefono = null,Object? pob = null,Object? dirPriId = null,}) {
   return _then(Cliente(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,nombreComercial: null == nombreComercial ? _self.nombreComercial : nombreComercial // ignore: cast_nullable_to_non_nullable
 as String,cif: null == cif ? _self.cif : cif // ignore: cast_nullable_to_non_nullable
 as String,telefono: null == telefono ? _self.telefono : telefono // ignore: cast_nullable_to_non_nullable
-as String,
+as String,pob: null == pob ? _self.pob : pob // ignore: cast_nullable_to_non_nullable
+as int,dirPriId: null == dirPriId ? _self.dirPriId : dirPriId // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 
@@ -1044,10 +1049,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String nombreComercial,  String cif,  String telefono)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String nombreComercial,  String cif,  String telefono,  int pob,  int dirPriId)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Cliente() when $default != null:
-return $default(_that.id,_that.nombreComercial,_that.cif,_that.telefono);case _:
+return $default(_that.id,_that.nombreComercial,_that.cif,_that.telefono,_that.pob,_that.dirPriId);case _:
   return orElse();
 
 }
@@ -1065,10 +1070,10 @@ return $default(_that.id,_that.nombreComercial,_that.cif,_that.telefono);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String nombreComercial,  String cif,  String telefono)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String nombreComercial,  String cif,  String telefono,  int pob,  int dirPriId)  $default,) {final _that = this;
 switch (_that) {
 case _Cliente():
-return $default(_that.id,_that.nombreComercial,_that.cif,_that.telefono);case _:
+return $default(_that.id,_that.nombreComercial,_that.cif,_that.telefono,_that.pob,_that.dirPriId);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1085,10 +1090,10 @@ return $default(_that.id,_that.nombreComercial,_that.cif,_that.telefono);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String nombreComercial,  String cif,  String telefono)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String nombreComercial,  String cif,  String telefono,  int pob,  int dirPriId)?  $default,) {final _that = this;
 switch (_that) {
 case _Cliente() when $default != null:
-return $default(_that.id,_that.nombreComercial,_that.cif,_that.telefono);case _:
+return $default(_that.id,_that.nombreComercial,_that.cif,_that.telefono,_that.pob,_that.dirPriId);case _:
   return null;
 
 }
@@ -1100,13 +1105,15 @@ return $default(_that.id,_that.nombreComercial,_that.cif,_that.telefono);case _:
 @JsonSerializable()
 
 class _Cliente implements Cliente {
-  const _Cliente({required this.id, this.nombreComercial = '', this.cif = '', this.telefono = ''});
+  const _Cliente({required this.id, this.nombreComercial = '', this.cif = '', this.telefono = '', this.pob = 0, this.dirPriId = 0});
   factory _Cliente.fromJson(Map<String, dynamic> json) => _$ClienteFromJson(json);
 
 @override final  int id;
 @override@JsonKey() final  String nombreComercial;
 @override@JsonKey() final  String cif;
 @override@JsonKey() final  String telefono;
+@override@JsonKey() final  int pob;
+@override@JsonKey() final  int dirPriId;
 
 /// Create a copy of Cliente
 /// with the given fields replaced by the non-null parameter values.
@@ -1121,18 +1128,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Cliente&&(identical(other.id, id) || other.id == id)&&(identical(other.nombreComercial, nombreComercial) || other.nombreComercial == nombreComercial)&&(identical(other.cif, cif) || other.cif == cif)&&(identical(other.telefono, telefono) || other.telefono == telefono));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Cliente&&(identical(other.id, id) || other.id == id)&&(identical(other.nombreComercial, nombreComercial) || other.nombreComercial == nombreComercial)&&(identical(other.cif, cif) || other.cif == cif)&&(identical(other.telefono, telefono) || other.telefono == telefono)&&(identical(other.pob, pob) || other.pob == pob)&&(identical(other.dirPriId, dirPriId) || other.dirPriId == dirPriId));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,nombreComercial,cif,telefono);
+    return Object.hash(runtimeType,id,nombreComercial,cif,telefono,pob,dirPriId);
 }
 
 @override
 String toString() {
-    return 'Cliente(id: $id, nombreComercial: $nombreComercial, cif: $cif, telefono: $telefono)';
+    return 'Cliente(id: $id, nombreComercial: $nombreComercial, cif: $cif, telefono: $telefono, pob: $pob, dirPriId: $dirPriId)';
 }
 
 
@@ -1143,7 +1150,7 @@ abstract mixin class _$ClienteCopyWith<$Res> implements $ClienteCopyWith<$Res> {
   factory _$ClienteCopyWith(_Cliente value, $Res Function(_Cliente) _then) = __$ClienteCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String nombreComercial, String cif, String telefono
+ int id, String nombreComercial, String cif, String telefono, int pob, int dirPriId
 });
 
 
@@ -1160,13 +1167,15 @@ class __$ClienteCopyWithImpl<$Res>
 
 /// Create a copy of Cliente
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? nombreComercial = null,Object? cif = null,Object? telefono = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? nombreComercial = null,Object? cif = null,Object? telefono = null,Object? pob = null,Object? dirPriId = null,}) {
   return _then(_Cliente(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,nombreComercial: null == nombreComercial ? _self.nombreComercial : nombreComercial // ignore: cast_nullable_to_non_nullable
 as String,cif: null == cif ? _self.cif : cif // ignore: cast_nullable_to_non_nullable
 as String,telefono: null == telefono ? _self.telefono : telefono // ignore: cast_nullable_to_non_nullable
-as String,
+as String,pob: null == pob ? _self.pob : pob // ignore: cast_nullable_to_non_nullable
+as int,dirPriId: null == dirPriId ? _self.dirPriId : dirPriId // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 
@@ -1177,7 +1186,7 @@ as String,
 /// @nodoc
 mixin _$Pedido {
 
- int? get id;@JsonKey(name: 'num_ped') String get numeroPedido;@JsonKey(name: 'clt') int get clienteId;@JsonKey(name: 'est') String get estado;@JsonKey(name: 'tot_ped') double get total; List<LineaPedido> get lineas; String get clienteNombre; String get clienteTelefono; String get clienteCif; String get cliente; int get codigo;@JsonKey(name: 'n_doc') int get nDocumento;@JsonKey(name: 'ser') String get serie;@JsonKey(name: 'ser_nom') String get serieNombre;@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String get comercial;@JsonKey(name: 'cmr_nom') String get comercialNombre;@JsonKey(name: 'alm') String get almacen;@JsonKey(name: 'alm_nom') String get almacenNombre;@JsonKey(name: 'fch') String get fecha;@JsonKey(name: 'fch_ent') String get previstoPara;@JsonKey(name: 'fpg') String get formaPago;@JsonKey(name: 'fpg_nom') String get formaPagoNombre;@JsonKey(name: 'dir_env') String get direccionEnvio;@JsonKey(name: 'email') String get email;@JsonKey(name: 'obs') String get observaciones;
+ int? get id;@JsonKey(name: 'num_ped') String get numeroPedido;@JsonKey(name: 'num_pre') String get numeroPresupuesto;@JsonKey(name: 'clt') int get clienteId;@JsonKey(name: 'est') String get estado;@JsonKey(name: 'tot_ped') double get total; List<LineaPedido> get lineas; String get clienteNombre; String get clienteTelefono; String get clienteCif; String get cliente; int get codigo;@JsonKey(name: 'n_doc') int get nDocumento;@JsonKey(name: 'ser') String get serie;@JsonKey(name: 'ser_nom') String get serieNombre; int get vtaPedG;@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String get comercial;@JsonKey(name: 'cmr_nom') String get comercialNombre;@JsonKey(name: 'alm') String get almacen;@JsonKey(name: 'alm_nom') String get almacenNombre;@JsonKey(name: 'fch') String get fecha;@JsonKey(name: 'fch_val') String get fechaValidez;@JsonKey(name: 'fch_ent') String get previstoPara;@JsonKey(name: 'fpg') String get formaPago;@JsonKey(name: 'fpg_nom') String get formaPagoNombre;@JsonKey(name: 'dir_env') String get direccionEnvio;@JsonKey(name: 'email') String get email;@JsonKey(name: 'obs') String get observaciones;
 /// Create a copy of Pedido
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1191,20 +1200,20 @@ $PedidoCopyWith<Pedido> get copyWith => _$PedidoCopyWithImpl<Pedido>(this as Ped
 @override
 bool operator ==(Object other) {
   final _this = this as Pedido;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Pedido&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.numeroPedido, _this.numeroPedido) || other.numeroPedido == _this.numeroPedido)&&(identical(other.clienteId, _this.clienteId) || other.clienteId == _this.clienteId)&&(identical(other.estado, _this.estado) || other.estado == _this.estado)&&(identical(other.total, _this.total) || other.total == _this.total)&&const DeepCollectionEquality().equals(other.lineas, _this.lineas)&&(identical(other.clienteNombre, _this.clienteNombre) || other.clienteNombre == _this.clienteNombre)&&(identical(other.clienteTelefono, _this.clienteTelefono) || other.clienteTelefono == _this.clienteTelefono)&&(identical(other.clienteCif, _this.clienteCif) || other.clienteCif == _this.clienteCif)&&(identical(other.cliente, _this.cliente) || other.cliente == _this.cliente)&&(identical(other.codigo, _this.codigo) || other.codigo == _this.codigo)&&(identical(other.nDocumento, _this.nDocumento) || other.nDocumento == _this.nDocumento)&&(identical(other.serie, _this.serie) || other.serie == _this.serie)&&(identical(other.serieNombre, _this.serieNombre) || other.serieNombre == _this.serieNombre)&&(identical(other.comercial, _this.comercial) || other.comercial == _this.comercial)&&(identical(other.comercialNombre, _this.comercialNombre) || other.comercialNombre == _this.comercialNombre)&&(identical(other.almacen, _this.almacen) || other.almacen == _this.almacen)&&(identical(other.almacenNombre, _this.almacenNombre) || other.almacenNombre == _this.almacenNombre)&&(identical(other.fecha, _this.fecha) || other.fecha == _this.fecha)&&(identical(other.previstoPara, _this.previstoPara) || other.previstoPara == _this.previstoPara)&&(identical(other.formaPago, _this.formaPago) || other.formaPago == _this.formaPago)&&(identical(other.formaPagoNombre, _this.formaPagoNombre) || other.formaPagoNombre == _this.formaPagoNombre)&&(identical(other.direccionEnvio, _this.direccionEnvio) || other.direccionEnvio == _this.direccionEnvio)&&(identical(other.email, _this.email) || other.email == _this.email)&&(identical(other.observaciones, _this.observaciones) || other.observaciones == _this.observaciones));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Pedido&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.numeroPedido, _this.numeroPedido) || other.numeroPedido == _this.numeroPedido)&&(identical(other.numeroPresupuesto, _this.numeroPresupuesto) || other.numeroPresupuesto == _this.numeroPresupuesto)&&(identical(other.clienteId, _this.clienteId) || other.clienteId == _this.clienteId)&&(identical(other.estado, _this.estado) || other.estado == _this.estado)&&(identical(other.total, _this.total) || other.total == _this.total)&&const DeepCollectionEquality().equals(other.lineas, _this.lineas)&&(identical(other.clienteNombre, _this.clienteNombre) || other.clienteNombre == _this.clienteNombre)&&(identical(other.clienteTelefono, _this.clienteTelefono) || other.clienteTelefono == _this.clienteTelefono)&&(identical(other.clienteCif, _this.clienteCif) || other.clienteCif == _this.clienteCif)&&(identical(other.cliente, _this.cliente) || other.cliente == _this.cliente)&&(identical(other.codigo, _this.codigo) || other.codigo == _this.codigo)&&(identical(other.nDocumento, _this.nDocumento) || other.nDocumento == _this.nDocumento)&&(identical(other.serie, _this.serie) || other.serie == _this.serie)&&(identical(other.serieNombre, _this.serieNombre) || other.serieNombre == _this.serieNombre)&&(identical(other.vtaPedG, _this.vtaPedG) || other.vtaPedG == _this.vtaPedG)&&(identical(other.comercial, _this.comercial) || other.comercial == _this.comercial)&&(identical(other.comercialNombre, _this.comercialNombre) || other.comercialNombre == _this.comercialNombre)&&(identical(other.almacen, _this.almacen) || other.almacen == _this.almacen)&&(identical(other.almacenNombre, _this.almacenNombre) || other.almacenNombre == _this.almacenNombre)&&(identical(other.fecha, _this.fecha) || other.fecha == _this.fecha)&&(identical(other.fechaValidez, _this.fechaValidez) || other.fechaValidez == _this.fechaValidez)&&(identical(other.previstoPara, _this.previstoPara) || other.previstoPara == _this.previstoPara)&&(identical(other.formaPago, _this.formaPago) || other.formaPago == _this.formaPago)&&(identical(other.formaPagoNombre, _this.formaPagoNombre) || other.formaPagoNombre == _this.formaPagoNombre)&&(identical(other.direccionEnvio, _this.direccionEnvio) || other.direccionEnvio == _this.direccionEnvio)&&(identical(other.email, _this.email) || other.email == _this.email)&&(identical(other.observaciones, _this.observaciones) || other.observaciones == _this.observaciones));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as Pedido;
-  return Object.hashAll([runtimeType,_this.id,_this.numeroPedido,_this.clienteId,_this.estado,_this.total,const DeepCollectionEquality().hash(_this.lineas),_this.clienteNombre,_this.clienteTelefono,_this.clienteCif,_this.cliente,_this.codigo,_this.nDocumento,_this.serie,_this.serieNombre,_this.comercial,_this.comercialNombre,_this.almacen,_this.almacenNombre,_this.fecha,_this.previstoPara,_this.formaPago,_this.formaPagoNombre,_this.direccionEnvio,_this.email,_this.observaciones]);
+  return Object.hashAll([runtimeType,_this.id,_this.numeroPedido,_this.numeroPresupuesto,_this.clienteId,_this.estado,_this.total,const DeepCollectionEquality().hash(_this.lineas),_this.clienteNombre,_this.clienteTelefono,_this.clienteCif,_this.cliente,_this.codigo,_this.nDocumento,_this.serie,_this.serieNombre,_this.vtaPedG,_this.comercial,_this.comercialNombre,_this.almacen,_this.almacenNombre,_this.fecha,_this.fechaValidez,_this.previstoPara,_this.formaPago,_this.formaPagoNombre,_this.direccionEnvio,_this.email,_this.observaciones]);
 }
 
 @override
 String toString() {
   final _this = this as Pedido;
-  return 'Pedido(id: ${_this.id}, numeroPedido: ${_this.numeroPedido}, clienteId: ${_this.clienteId}, estado: ${_this.estado}, total: ${_this.total}, lineas: ${_this.lineas}, clienteNombre: ${_this.clienteNombre}, clienteTelefono: ${_this.clienteTelefono}, clienteCif: ${_this.clienteCif}, cliente: ${_this.cliente}, codigo: ${_this.codigo}, nDocumento: ${_this.nDocumento}, serie: ${_this.serie}, serieNombre: ${_this.serieNombre}, comercial: ${_this.comercial}, comercialNombre: ${_this.comercialNombre}, almacen: ${_this.almacen}, almacenNombre: ${_this.almacenNombre}, fecha: ${_this.fecha}, previstoPara: ${_this.previstoPara}, formaPago: ${_this.formaPago}, formaPagoNombre: ${_this.formaPagoNombre}, direccionEnvio: ${_this.direccionEnvio}, email: ${_this.email}, observaciones: ${_this.observaciones})';
+  return 'Pedido(id: ${_this.id}, numeroPedido: ${_this.numeroPedido}, numeroPresupuesto: ${_this.numeroPresupuesto}, clienteId: ${_this.clienteId}, estado: ${_this.estado}, total: ${_this.total}, lineas: ${_this.lineas}, clienteNombre: ${_this.clienteNombre}, clienteTelefono: ${_this.clienteTelefono}, clienteCif: ${_this.clienteCif}, cliente: ${_this.cliente}, codigo: ${_this.codigo}, nDocumento: ${_this.nDocumento}, serie: ${_this.serie}, serieNombre: ${_this.serieNombre}, vtaPedG: ${_this.vtaPedG}, comercial: ${_this.comercial}, comercialNombre: ${_this.comercialNombre}, almacen: ${_this.almacen}, almacenNombre: ${_this.almacenNombre}, fecha: ${_this.fecha}, fechaValidez: ${_this.fechaValidez}, previstoPara: ${_this.previstoPara}, formaPago: ${_this.formaPago}, formaPagoNombre: ${_this.formaPagoNombre}, direccionEnvio: ${_this.direccionEnvio}, email: ${_this.email}, observaciones: ${_this.observaciones})';
 }
 
 
@@ -1215,7 +1224,7 @@ abstract mixin class $PedidoCopyWith<$Res>  {
   factory $PedidoCopyWith(Pedido value, $Res Function(Pedido) _then) = _$PedidoCopyWithImpl;
 @useResult
 $Res call({
- int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo,@JsonKey(name: 'n_doc') int nDocumento,@JsonKey(name: 'ser') String serie,@JsonKey(name: 'ser_nom') String serieNombre,@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String comercial,@JsonKey(name: 'cmr_nom') String comercialNombre,@JsonKey(name: 'alm') String almacen,@JsonKey(name: 'alm_nom') String almacenNombre,@JsonKey(name: 'fch') String fecha,@JsonKey(name: 'fch_ent') String previstoPara,@JsonKey(name: 'fpg') String formaPago,@JsonKey(name: 'fpg_nom') String formaPagoNombre,@JsonKey(name: 'dir_env') String direccionEnvio,@JsonKey(name: 'email') String email,@JsonKey(name: 'obs') String observaciones
+ int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'num_pre') String numeroPresupuesto,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo,@JsonKey(name: 'n_doc') int nDocumento,@JsonKey(name: 'ser') String serie,@JsonKey(name: 'ser_nom') String serieNombre, int vtaPedG,@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String comercial,@JsonKey(name: 'cmr_nom') String comercialNombre,@JsonKey(name: 'alm') String almacen,@JsonKey(name: 'alm_nom') String almacenNombre,@JsonKey(name: 'fch') String fecha,@JsonKey(name: 'fch_val') String fechaValidez,@JsonKey(name: 'fch_ent') String previstoPara,@JsonKey(name: 'fpg') String formaPago,@JsonKey(name: 'fpg_nom') String formaPagoNombre,@JsonKey(name: 'dir_env') String direccionEnvio,@JsonKey(name: 'email') String email,@JsonKey(name: 'obs') String observaciones
 });
 
 
@@ -1232,10 +1241,11 @@ class _$PedidoCopyWithImpl<$Res>
 
 /// Create a copy of Pedido
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = freezed,Object? numeroPedido = null,Object? clienteId = null,Object? estado = null,Object? total = null,Object? lineas = null,Object? clienteNombre = null,Object? clienteTelefono = null,Object? clienteCif = null,Object? cliente = null,Object? codigo = null,Object? nDocumento = null,Object? serie = null,Object? serieNombre = null,Object? comercial = null,Object? comercialNombre = null,Object? almacen = null,Object? almacenNombre = null,Object? fecha = null,Object? previstoPara = null,Object? formaPago = null,Object? formaPagoNombre = null,Object? direccionEnvio = null,Object? email = null,Object? observaciones = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = freezed,Object? numeroPedido = null,Object? numeroPresupuesto = null,Object? clienteId = null,Object? estado = null,Object? total = null,Object? lineas = null,Object? clienteNombre = null,Object? clienteTelefono = null,Object? clienteCif = null,Object? cliente = null,Object? codigo = null,Object? nDocumento = null,Object? serie = null,Object? serieNombre = null,Object? vtaPedG = null,Object? comercial = null,Object? comercialNombre = null,Object? almacen = null,Object? almacenNombre = null,Object? fecha = null,Object? fechaValidez = null,Object? previstoPara = null,Object? formaPago = null,Object? formaPagoNombre = null,Object? direccionEnvio = null,Object? email = null,Object? observaciones = null,}) {
   return _then(Pedido(
 id: freezed == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int?,numeroPedido: null == numeroPedido ? _self.numeroPedido : numeroPedido // ignore: cast_nullable_to_non_nullable
+as String,numeroPresupuesto: null == numeroPresupuesto ? _self.numeroPresupuesto : numeroPresupuesto // ignore: cast_nullable_to_non_nullable
 as String,clienteId: null == clienteId ? _self.clienteId : clienteId // ignore: cast_nullable_to_non_nullable
 as int,estado: null == estado ? _self.estado : estado // ignore: cast_nullable_to_non_nullable
 as String,total: null == total ? _self.total : total // ignore: cast_nullable_to_non_nullable
@@ -1248,11 +1258,13 @@ as String,codigo: null == codigo ? _self.codigo : codigo // ignore: cast_nullabl
 as int,nDocumento: null == nDocumento ? _self.nDocumento : nDocumento // ignore: cast_nullable_to_non_nullable
 as int,serie: null == serie ? _self.serie : serie // ignore: cast_nullable_to_non_nullable
 as String,serieNombre: null == serieNombre ? _self.serieNombre : serieNombre // ignore: cast_nullable_to_non_nullable
-as String,comercial: null == comercial ? _self.comercial : comercial // ignore: cast_nullable_to_non_nullable
+as String,vtaPedG: null == vtaPedG ? _self.vtaPedG : vtaPedG // ignore: cast_nullable_to_non_nullable
+as int,comercial: null == comercial ? _self.comercial : comercial // ignore: cast_nullable_to_non_nullable
 as String,comercialNombre: null == comercialNombre ? _self.comercialNombre : comercialNombre // ignore: cast_nullable_to_non_nullable
 as String,almacen: null == almacen ? _self.almacen : almacen // ignore: cast_nullable_to_non_nullable
 as String,almacenNombre: null == almacenNombre ? _self.almacenNombre : almacenNombre // ignore: cast_nullable_to_non_nullable
 as String,fecha: null == fecha ? _self.fecha : fecha // ignore: cast_nullable_to_non_nullable
+as String,fechaValidez: null == fechaValidez ? _self.fechaValidez : fechaValidez // ignore: cast_nullable_to_non_nullable
 as String,previstoPara: null == previstoPara ? _self.previstoPara : previstoPara // ignore: cast_nullable_to_non_nullable
 as String,formaPago: null == formaPago ? _self.formaPago : formaPago // ignore: cast_nullable_to_non_nullable
 as String,formaPagoNombre: null == formaPagoNombre ? _self.formaPagoNombre : formaPagoNombre // ignore: cast_nullable_to_non_nullable
@@ -1344,10 +1356,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo, @JsonKey(name: 'n_doc')  int nDocumento, @JsonKey(name: 'ser')  String serie, @JsonKey(name: 'ser_nom')  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial, @JsonKey(name: 'cmr_nom')  String comercialNombre, @JsonKey(name: 'alm')  String almacen, @JsonKey(name: 'alm_nom')  String almacenNombre, @JsonKey(name: 'fch')  String fecha, @JsonKey(name: 'fch_ent')  String previstoPara, @JsonKey(name: 'fpg')  String formaPago, @JsonKey(name: 'fpg_nom')  String formaPagoNombre, @JsonKey(name: 'dir_env')  String direccionEnvio, @JsonKey(name: 'email')  String email, @JsonKey(name: 'obs')  String observaciones)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'num_pre')  String numeroPresupuesto, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo, @JsonKey(name: 'n_doc')  int nDocumento, @JsonKey(name: 'ser')  String serie, @JsonKey(name: 'ser_nom')  String serieNombre,  int vtaPedG, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial, @JsonKey(name: 'cmr_nom')  String comercialNombre, @JsonKey(name: 'alm')  String almacen, @JsonKey(name: 'alm_nom')  String almacenNombre, @JsonKey(name: 'fch')  String fecha, @JsonKey(name: 'fch_val')  String fechaValidez, @JsonKey(name: 'fch_ent')  String previstoPara, @JsonKey(name: 'fpg')  String formaPago, @JsonKey(name: 'fpg_nom')  String formaPagoNombre, @JsonKey(name: 'dir_env')  String direccionEnvio, @JsonKey(name: 'email')  String email, @JsonKey(name: 'obs')  String observaciones)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Pedido() when $default != null:
-return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
+return $default(_that.id,_that.numeroPedido,_that.numeroPresupuesto,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.vtaPedG,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.fechaValidez,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
   return orElse();
 
 }
@@ -1365,10 +1377,10 @@ return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.t
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo, @JsonKey(name: 'n_doc')  int nDocumento, @JsonKey(name: 'ser')  String serie, @JsonKey(name: 'ser_nom')  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial, @JsonKey(name: 'cmr_nom')  String comercialNombre, @JsonKey(name: 'alm')  String almacen, @JsonKey(name: 'alm_nom')  String almacenNombre, @JsonKey(name: 'fch')  String fecha, @JsonKey(name: 'fch_ent')  String previstoPara, @JsonKey(name: 'fpg')  String formaPago, @JsonKey(name: 'fpg_nom')  String formaPagoNombre, @JsonKey(name: 'dir_env')  String direccionEnvio, @JsonKey(name: 'email')  String email, @JsonKey(name: 'obs')  String observaciones)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'num_pre')  String numeroPresupuesto, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo, @JsonKey(name: 'n_doc')  int nDocumento, @JsonKey(name: 'ser')  String serie, @JsonKey(name: 'ser_nom')  String serieNombre,  int vtaPedG, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial, @JsonKey(name: 'cmr_nom')  String comercialNombre, @JsonKey(name: 'alm')  String almacen, @JsonKey(name: 'alm_nom')  String almacenNombre, @JsonKey(name: 'fch')  String fecha, @JsonKey(name: 'fch_val')  String fechaValidez, @JsonKey(name: 'fch_ent')  String previstoPara, @JsonKey(name: 'fpg')  String formaPago, @JsonKey(name: 'fpg_nom')  String formaPagoNombre, @JsonKey(name: 'dir_env')  String direccionEnvio, @JsonKey(name: 'email')  String email, @JsonKey(name: 'obs')  String observaciones)  $default,) {final _that = this;
 switch (_that) {
 case _Pedido():
-return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
+return $default(_that.id,_that.numeroPedido,_that.numeroPresupuesto,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.vtaPedG,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.fechaValidez,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1385,10 +1397,10 @@ return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.t
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo, @JsonKey(name: 'n_doc')  int nDocumento, @JsonKey(name: 'ser')  String serie, @JsonKey(name: 'ser_nom')  String serieNombre, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial, @JsonKey(name: 'cmr_nom')  String comercialNombre, @JsonKey(name: 'alm')  String almacen, @JsonKey(name: 'alm_nom')  String almacenNombre, @JsonKey(name: 'fch')  String fecha, @JsonKey(name: 'fch_ent')  String previstoPara, @JsonKey(name: 'fpg')  String formaPago, @JsonKey(name: 'fpg_nom')  String formaPagoNombre, @JsonKey(name: 'dir_env')  String direccionEnvio, @JsonKey(name: 'email')  String email, @JsonKey(name: 'obs')  String observaciones)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? id, @JsonKey(name: 'num_ped')  String numeroPedido, @JsonKey(name: 'num_pre')  String numeroPresupuesto, @JsonKey(name: 'clt')  int clienteId, @JsonKey(name: 'est')  String estado, @JsonKey(name: 'tot_ped')  double total,  List<LineaPedido> lineas,  String clienteNombre,  String clienteTelefono,  String clienteCif,  String cliente,  int codigo, @JsonKey(name: 'n_doc')  int nDocumento, @JsonKey(name: 'ser')  String serie, @JsonKey(name: 'ser_nom')  String serieNombre,  int vtaPedG, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson)  String comercial, @JsonKey(name: 'cmr_nom')  String comercialNombre, @JsonKey(name: 'alm')  String almacen, @JsonKey(name: 'alm_nom')  String almacenNombre, @JsonKey(name: 'fch')  String fecha, @JsonKey(name: 'fch_val')  String fechaValidez, @JsonKey(name: 'fch_ent')  String previstoPara, @JsonKey(name: 'fpg')  String formaPago, @JsonKey(name: 'fpg_nom')  String formaPagoNombre, @JsonKey(name: 'dir_env')  String direccionEnvio, @JsonKey(name: 'email')  String email, @JsonKey(name: 'obs')  String observaciones)?  $default,) {final _that = this;
 switch (_that) {
 case _Pedido() when $default != null:
-return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
+return $default(_that.id,_that.numeroPedido,_that.numeroPresupuesto,_that.clienteId,_that.estado,_that.total,_that.lineas,_that.clienteNombre,_that.clienteTelefono,_that.clienteCif,_that.cliente,_that.codigo,_that.nDocumento,_that.serie,_that.serieNombre,_that.vtaPedG,_that.comercial,_that.comercialNombre,_that.almacen,_that.almacenNombre,_that.fecha,_that.fechaValidez,_that.previstoPara,_that.formaPago,_that.formaPagoNombre,_that.direccionEnvio,_that.email,_that.observaciones);case _:
   return null;
 
 }
@@ -1400,11 +1412,12 @@ return $default(_that.id,_that.numeroPedido,_that.clienteId,_that.estado,_that.t
 @JsonSerializable()
 
 class _Pedido extends Pedido {
-  const _Pedido({this.id, @JsonKey(name: 'num_ped') this.numeroPedido = '', @JsonKey(name: 'clt') this.clienteId = 0, @JsonKey(name: 'est') this.estado = 'P', @JsonKey(name: 'tot_ped') this.total = 0.0,  List<LineaPedido> lineas = const <LineaPedido>[], this.clienteNombre = '', this.clienteTelefono = '', this.clienteCif = '', this.cliente = '', this.codigo = 0, @JsonKey(name: 'n_doc') this.nDocumento = 0, @JsonKey(name: 'ser') this.serie = '', @JsonKey(name: 'ser_nom') this.serieNombre = '', @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) this.comercial = '', @JsonKey(name: 'cmr_nom') this.comercialNombre = '', @JsonKey(name: 'alm') this.almacen = '', @JsonKey(name: 'alm_nom') this.almacenNombre = '', @JsonKey(name: 'fch') this.fecha = '', @JsonKey(name: 'fch_ent') this.previstoPara = '', @JsonKey(name: 'fpg') this.formaPago = '', @JsonKey(name: 'fpg_nom') this.formaPagoNombre = '', @JsonKey(name: 'dir_env') this.direccionEnvio = '', @JsonKey(name: 'email') this.email = '', @JsonKey(name: 'obs') this.observaciones = ''}): _lineas = lineas,super._();
+  const _Pedido({this.id, @JsonKey(name: 'num_ped') this.numeroPedido = '', @JsonKey(name: 'num_pre') this.numeroPresupuesto = '', @JsonKey(name: 'clt') this.clienteId = 0, @JsonKey(name: 'est') this.estado = 'P', @JsonKey(name: 'tot_ped') this.total = 0.0,  List<LineaPedido> lineas = const <LineaPedido>[], this.clienteNombre = '', this.clienteTelefono = '', this.clienteCif = '', this.cliente = '', this.codigo = 0, @JsonKey(name: 'n_doc') this.nDocumento = 0, @JsonKey(name: 'ser') this.serie = '', @JsonKey(name: 'ser_nom') this.serieNombre = '', this.vtaPedG = 0, @JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) this.comercial = '', @JsonKey(name: 'cmr_nom') this.comercialNombre = '', @JsonKey(name: 'alm') this.almacen = '', @JsonKey(name: 'alm_nom') this.almacenNombre = '', @JsonKey(name: 'fch') this.fecha = '', @JsonKey(name: 'fch_val') this.fechaValidez = '', @JsonKey(name: 'fch_ent') this.previstoPara = '', @JsonKey(name: 'fpg') this.formaPago = '', @JsonKey(name: 'fpg_nom') this.formaPagoNombre = '', @JsonKey(name: 'dir_env') this.direccionEnvio = '', @JsonKey(name: 'email') this.email = '', @JsonKey(name: 'obs') this.observaciones = ''}): _lineas = lineas,super._();
   factory _Pedido.fromJson(Map<String, dynamic> json) => _$PedidoFromJson(json);
 
 @override final  int? id;
 @override@JsonKey(name: 'num_ped') final  String numeroPedido;
+@override@JsonKey(name: 'num_pre') final  String numeroPresupuesto;
 @override@JsonKey(name: 'clt') final  int clienteId;
 @override@JsonKey(name: 'est') final  String estado;
 @override@JsonKey(name: 'tot_ped') final  double total;
@@ -1423,11 +1436,13 @@ class _Pedido extends Pedido {
 @override@JsonKey(name: 'n_doc') final  int nDocumento;
 @override@JsonKey(name: 'ser') final  String serie;
 @override@JsonKey(name: 'ser_nom') final  String serieNombre;
+@override@JsonKey() final  int vtaPedG;
 @override@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) final  String comercial;
 @override@JsonKey(name: 'cmr_nom') final  String comercialNombre;
 @override@JsonKey(name: 'alm') final  String almacen;
 @override@JsonKey(name: 'alm_nom') final  String almacenNombre;
 @override@JsonKey(name: 'fch') final  String fecha;
+@override@JsonKey(name: 'fch_val') final  String fechaValidez;
 @override@JsonKey(name: 'fch_ent') final  String previstoPara;
 @override@JsonKey(name: 'fpg') final  String formaPago;
 @override@JsonKey(name: 'fpg_nom') final  String formaPagoNombre;
@@ -1448,18 +1463,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Pedido&&(identical(other.id, id) || other.id == id)&&(identical(other.numeroPedido, numeroPedido) || other.numeroPedido == numeroPedido)&&(identical(other.clienteId, clienteId) || other.clienteId == clienteId)&&(identical(other.estado, estado) || other.estado == estado)&&(identical(other.total, total) || other.total == total)&&const DeepCollectionEquality().equals(other.lineas, _lineas)&&(identical(other.clienteNombre, clienteNombre) || other.clienteNombre == clienteNombre)&&(identical(other.clienteTelefono, clienteTelefono) || other.clienteTelefono == clienteTelefono)&&(identical(other.clienteCif, clienteCif) || other.clienteCif == clienteCif)&&(identical(other.cliente, cliente) || other.cliente == cliente)&&(identical(other.codigo, codigo) || other.codigo == codigo)&&(identical(other.nDocumento, nDocumento) || other.nDocumento == nDocumento)&&(identical(other.serie, serie) || other.serie == serie)&&(identical(other.serieNombre, serieNombre) || other.serieNombre == serieNombre)&&(identical(other.comercial, comercial) || other.comercial == comercial)&&(identical(other.comercialNombre, comercialNombre) || other.comercialNombre == comercialNombre)&&(identical(other.almacen, almacen) || other.almacen == almacen)&&(identical(other.almacenNombre, almacenNombre) || other.almacenNombre == almacenNombre)&&(identical(other.fecha, fecha) || other.fecha == fecha)&&(identical(other.previstoPara, previstoPara) || other.previstoPara == previstoPara)&&(identical(other.formaPago, formaPago) || other.formaPago == formaPago)&&(identical(other.formaPagoNombre, formaPagoNombre) || other.formaPagoNombre == formaPagoNombre)&&(identical(other.direccionEnvio, direccionEnvio) || other.direccionEnvio == direccionEnvio)&&(identical(other.email, email) || other.email == email)&&(identical(other.observaciones, observaciones) || other.observaciones == observaciones));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Pedido&&(identical(other.id, id) || other.id == id)&&(identical(other.numeroPedido, numeroPedido) || other.numeroPedido == numeroPedido)&&(identical(other.numeroPresupuesto, numeroPresupuesto) || other.numeroPresupuesto == numeroPresupuesto)&&(identical(other.clienteId, clienteId) || other.clienteId == clienteId)&&(identical(other.estado, estado) || other.estado == estado)&&(identical(other.total, total) || other.total == total)&&const DeepCollectionEquality().equals(other.lineas, _lineas)&&(identical(other.clienteNombre, clienteNombre) || other.clienteNombre == clienteNombre)&&(identical(other.clienteTelefono, clienteTelefono) || other.clienteTelefono == clienteTelefono)&&(identical(other.clienteCif, clienteCif) || other.clienteCif == clienteCif)&&(identical(other.cliente, cliente) || other.cliente == cliente)&&(identical(other.codigo, codigo) || other.codigo == codigo)&&(identical(other.nDocumento, nDocumento) || other.nDocumento == nDocumento)&&(identical(other.serie, serie) || other.serie == serie)&&(identical(other.serieNombre, serieNombre) || other.serieNombre == serieNombre)&&(identical(other.vtaPedG, vtaPedG) || other.vtaPedG == vtaPedG)&&(identical(other.comercial, comercial) || other.comercial == comercial)&&(identical(other.comercialNombre, comercialNombre) || other.comercialNombre == comercialNombre)&&(identical(other.almacen, almacen) || other.almacen == almacen)&&(identical(other.almacenNombre, almacenNombre) || other.almacenNombre == almacenNombre)&&(identical(other.fecha, fecha) || other.fecha == fecha)&&(identical(other.fechaValidez, fechaValidez) || other.fechaValidez == fechaValidez)&&(identical(other.previstoPara, previstoPara) || other.previstoPara == previstoPara)&&(identical(other.formaPago, formaPago) || other.formaPago == formaPago)&&(identical(other.formaPagoNombre, formaPagoNombre) || other.formaPagoNombre == formaPagoNombre)&&(identical(other.direccionEnvio, direccionEnvio) || other.direccionEnvio == direccionEnvio)&&(identical(other.email, email) || other.email == email)&&(identical(other.observaciones, observaciones) || other.observaciones == observaciones));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hashAll([runtimeType,id,numeroPedido,clienteId,estado,total,const DeepCollectionEquality().hash(_lineas),clienteNombre,clienteTelefono,clienteCif,cliente,codigo,nDocumento,serie,serieNombre,comercial,comercialNombre,almacen,almacenNombre,fecha,previstoPara,formaPago,formaPagoNombre,direccionEnvio,email,observaciones]);
+    return Object.hashAll([runtimeType,id,numeroPedido,numeroPresupuesto,clienteId,estado,total,const DeepCollectionEquality().hash(_lineas),clienteNombre,clienteTelefono,clienteCif,cliente,codigo,nDocumento,serie,serieNombre,vtaPedG,comercial,comercialNombre,almacen,almacenNombre,fecha,fechaValidez,previstoPara,formaPago,formaPagoNombre,direccionEnvio,email,observaciones]);
 }
 
 @override
 String toString() {
-    return 'Pedido(id: $id, numeroPedido: $numeroPedido, clienteId: $clienteId, estado: $estado, total: $total, lineas: $lineas, clienteNombre: $clienteNombre, clienteTelefono: $clienteTelefono, clienteCif: $clienteCif, cliente: $cliente, codigo: $codigo, nDocumento: $nDocumento, serie: $serie, serieNombre: $serieNombre, comercial: $comercial, comercialNombre: $comercialNombre, almacen: $almacen, almacenNombre: $almacenNombre, fecha: $fecha, previstoPara: $previstoPara, formaPago: $formaPago, formaPagoNombre: $formaPagoNombre, direccionEnvio: $direccionEnvio, email: $email, observaciones: $observaciones)';
+    return 'Pedido(id: $id, numeroPedido: $numeroPedido, numeroPresupuesto: $numeroPresupuesto, clienteId: $clienteId, estado: $estado, total: $total, lineas: $lineas, clienteNombre: $clienteNombre, clienteTelefono: $clienteTelefono, clienteCif: $clienteCif, cliente: $cliente, codigo: $codigo, nDocumento: $nDocumento, serie: $serie, serieNombre: $serieNombre, vtaPedG: $vtaPedG, comercial: $comercial, comercialNombre: $comercialNombre, almacen: $almacen, almacenNombre: $almacenNombre, fecha: $fecha, fechaValidez: $fechaValidez, previstoPara: $previstoPara, formaPago: $formaPago, formaPagoNombre: $formaPagoNombre, direccionEnvio: $direccionEnvio, email: $email, observaciones: $observaciones)';
 }
 
 
@@ -1470,7 +1485,7 @@ abstract mixin class _$PedidoCopyWith<$Res> implements $PedidoCopyWith<$Res> {
   factory _$PedidoCopyWith(_Pedido value, $Res Function(_Pedido) _then) = __$PedidoCopyWithImpl;
 @override @useResult
 $Res call({
- int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo,@JsonKey(name: 'n_doc') int nDocumento,@JsonKey(name: 'ser') String serie,@JsonKey(name: 'ser_nom') String serieNombre,@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String comercial,@JsonKey(name: 'cmr_nom') String comercialNombre,@JsonKey(name: 'alm') String almacen,@JsonKey(name: 'alm_nom') String almacenNombre,@JsonKey(name: 'fch') String fecha,@JsonKey(name: 'fch_ent') String previstoPara,@JsonKey(name: 'fpg') String formaPago,@JsonKey(name: 'fpg_nom') String formaPagoNombre,@JsonKey(name: 'dir_env') String direccionEnvio,@JsonKey(name: 'email') String email,@JsonKey(name: 'obs') String observaciones
+ int? id,@JsonKey(name: 'num_ped') String numeroPedido,@JsonKey(name: 'num_pre') String numeroPresupuesto,@JsonKey(name: 'clt') int clienteId,@JsonKey(name: 'est') String estado,@JsonKey(name: 'tot_ped') double total, List<LineaPedido> lineas, String clienteNombre, String clienteTelefono, String clienteCif, String cliente, int codigo,@JsonKey(name: 'n_doc') int nDocumento,@JsonKey(name: 'ser') String serie,@JsonKey(name: 'ser_nom') String serieNombre, int vtaPedG,@JsonKey(name: 'cmr', fromJson: _referenceToString, toJson: _referenceToJson) String comercial,@JsonKey(name: 'cmr_nom') String comercialNombre,@JsonKey(name: 'alm') String almacen,@JsonKey(name: 'alm_nom') String almacenNombre,@JsonKey(name: 'fch') String fecha,@JsonKey(name: 'fch_val') String fechaValidez,@JsonKey(name: 'fch_ent') String previstoPara,@JsonKey(name: 'fpg') String formaPago,@JsonKey(name: 'fpg_nom') String formaPagoNombre,@JsonKey(name: 'dir_env') String direccionEnvio,@JsonKey(name: 'email') String email,@JsonKey(name: 'obs') String observaciones
 });
 
 
@@ -1487,10 +1502,11 @@ class __$PedidoCopyWithImpl<$Res>
 
 /// Create a copy of Pedido
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = freezed,Object? numeroPedido = null,Object? clienteId = null,Object? estado = null,Object? total = null,Object? lineas = null,Object? clienteNombre = null,Object? clienteTelefono = null,Object? clienteCif = null,Object? cliente = null,Object? codigo = null,Object? nDocumento = null,Object? serie = null,Object? serieNombre = null,Object? comercial = null,Object? comercialNombre = null,Object? almacen = null,Object? almacenNombre = null,Object? fecha = null,Object? previstoPara = null,Object? formaPago = null,Object? formaPagoNombre = null,Object? direccionEnvio = null,Object? email = null,Object? observaciones = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = freezed,Object? numeroPedido = null,Object? numeroPresupuesto = null,Object? clienteId = null,Object? estado = null,Object? total = null,Object? lineas = null,Object? clienteNombre = null,Object? clienteTelefono = null,Object? clienteCif = null,Object? cliente = null,Object? codigo = null,Object? nDocumento = null,Object? serie = null,Object? serieNombre = null,Object? vtaPedG = null,Object? comercial = null,Object? comercialNombre = null,Object? almacen = null,Object? almacenNombre = null,Object? fecha = null,Object? fechaValidez = null,Object? previstoPara = null,Object? formaPago = null,Object? formaPagoNombre = null,Object? direccionEnvio = null,Object? email = null,Object? observaciones = null,}) {
   return _then(_Pedido(
 id: freezed == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int?,numeroPedido: null == numeroPedido ? _self.numeroPedido : numeroPedido // ignore: cast_nullable_to_non_nullable
+as String,numeroPresupuesto: null == numeroPresupuesto ? _self.numeroPresupuesto : numeroPresupuesto // ignore: cast_nullable_to_non_nullable
 as String,clienteId: null == clienteId ? _self.clienteId : clienteId // ignore: cast_nullable_to_non_nullable
 as int,estado: null == estado ? _self.estado : estado // ignore: cast_nullable_to_non_nullable
 as String,total: null == total ? _self.total : total // ignore: cast_nullable_to_non_nullable
@@ -1503,11 +1519,13 @@ as String,codigo: null == codigo ? _self.codigo : codigo // ignore: cast_nullabl
 as int,nDocumento: null == nDocumento ? _self.nDocumento : nDocumento // ignore: cast_nullable_to_non_nullable
 as int,serie: null == serie ? _self.serie : serie // ignore: cast_nullable_to_non_nullable
 as String,serieNombre: null == serieNombre ? _self.serieNombre : serieNombre // ignore: cast_nullable_to_non_nullable
-as String,comercial: null == comercial ? _self.comercial : comercial // ignore: cast_nullable_to_non_nullable
+as String,vtaPedG: null == vtaPedG ? _self.vtaPedG : vtaPedG // ignore: cast_nullable_to_non_nullable
+as int,comercial: null == comercial ? _self.comercial : comercial // ignore: cast_nullable_to_non_nullable
 as String,comercialNombre: null == comercialNombre ? _self.comercialNombre : comercialNombre // ignore: cast_nullable_to_non_nullable
 as String,almacen: null == almacen ? _self.almacen : almacen // ignore: cast_nullable_to_non_nullable
 as String,almacenNombre: null == almacenNombre ? _self.almacenNombre : almacenNombre // ignore: cast_nullable_to_non_nullable
 as String,fecha: null == fecha ? _self.fecha : fecha // ignore: cast_nullable_to_non_nullable
+as String,fechaValidez: null == fechaValidez ? _self.fechaValidez : fechaValidez // ignore: cast_nullable_to_non_nullable
 as String,previstoPara: null == previstoPara ? _self.previstoPara : previstoPara // ignore: cast_nullable_to_non_nullable
 as String,formaPago: null == formaPago ? _self.formaPago : formaPago // ignore: cast_nullable_to_non_nullable
 as String,formaPagoNombre: null == formaPagoNombre ? _self.formaPagoNombre : formaPagoNombre // ignore: cast_nullable_to_non_nullable
