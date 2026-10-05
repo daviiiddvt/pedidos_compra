@@ -6,7 +6,6 @@ import '../models/models.dart';
 import '../core/presupuesto_service.dart';
 import '../state/auth_state.dart';
 import '../state/pedido_form_cubit.dart';
-import '../theme/app_theme.dart';
 import '../widgets/presupuesto_cabecera_form.dart';
 import '../widgets/presupuesto_linea_form_modal.dart';
 import '../widgets/lineas_table.dart';
@@ -30,15 +29,39 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
   bool _guardando = false;
   String _tab = 'cabecera';
 
-  bool get _editando => widget.presupuestoId != null;
+  dynamic get _presupuestoIdReal =>
+      widget.presupuestoId is PresupuestoVenta
+          ? (widget.presupuestoId as PresupuestoVenta).id
+          : (widget.presupuestoId is Pedido
+              ? (widget.presupuestoId as Pedido).id
+              : widget.presupuestoId);
+
+  bool get _editando => _presupuestoIdReal != null;
 
   Pedido get _presupuesto => _cubit.state.pedido;
 
   @override
   void initState() {
     super.initState();
-    _cubit = PedidoFormCubit(Pedido(fecha: todayIso()));
-    if (_editando) _cargar();
+    if (widget.presupuestoId is PresupuestoVenta) {
+      final p = widget.presupuestoId as PresupuestoVenta;
+      final visual = p.toPedidoVisual();
+      _cubit = PedidoFormCubit(visual);
+      _lineas = [...visual.lineas];
+      _lineasOriginalesIds = p.lineas.where((l) => l.id != null).map((l) => l.id!).toSet();
+      _cargando = false;
+      _cubit.init(visual);
+    } else if (widget.presupuestoId is Pedido) {
+      final visual = widget.presupuestoId as Pedido;
+      _cubit = PedidoFormCubit(visual);
+      _lineas = [...visual.lineas];
+      _lineasOriginalesIds = visual.lineas.where((l) => l.id != null).map((l) => l.id!).toSet();
+      _cargando = false;
+      _cubit.init(visual);
+    } else {
+      _cubit = PedidoFormCubit(Pedido(fecha: todayIso()));
+      if (_editando) _cargar();
+    }
   }
 
   @override
@@ -73,13 +96,17 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
     final result = await mostrarPresupuestoLineaForm(
       context,
       linea: line,
+      clienteId: _presupuesto.clienteId,
       onDelete: () => setState(() => _lineas = [..._lineas]..removeAt(index)),
     );
     if (result != null && mounted) setState(() => _lineas[index] = result);
   }
 
   Future<void> _anadirLinea() async {
-    final result = await mostrarPresupuestoLineaForm(context);
+    final result = await mostrarPresupuestoLineaForm(
+      context,
+      clienteId: _presupuesto.clienteId,
+    );
     if (result != null && mounted) {
       setState(() => _lineas = [..._lineas, result]);
     }
@@ -112,7 +139,7 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
       );
       if (_editando) {
         await PresupuestosService.updateComplete(
-          widget.presupuestoId,
+          _presupuestoIdReal,
           presupuesto.copyWith(
             lineas: _lineas
                 .map(
@@ -181,7 +208,7 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
     return BlocProvider<PedidoFormCubit>(
       create: (_) => _cubit,
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           title: Text(_editando ? 'Editar presupuesto' : 'Nuevo presupuesto'),
         ),

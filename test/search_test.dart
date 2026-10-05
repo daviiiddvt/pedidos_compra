@@ -283,6 +283,32 @@ void main() {
       expect(selected?.codigo, 'A1');
       expect(selected?.nombre, 'Artículo uno');
     });
+
+    testWidgets('al deslizar las sugerencias no selecciona una opción',
+        (tester) async {
+      OpcionMaestra? selected;
+      await tester.pumpWidget(_wrap(AutocompleteField(
+        label: 'Cliente',
+        minChars: 3,
+        debounce: const Duration(milliseconds: 300),
+        search: (q) async => List.generate(
+          20,
+          (index) => OpcionMaestra(
+            codigo: 'C$index',
+            nombre: 'Cliente $index',
+          ),
+        ),
+        onSelected: (o) => selected = o,
+      )));
+
+      await tester.enterText(find.byType(TextField), 'cli');
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 10));
+
+      await tester.drag(find.text('Cliente 0'), const Offset(0, -120));
+      await tester.pump();
+      expect(selected, isNull);
+    });
   });
 }
 

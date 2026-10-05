@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
-        android:label="pedidos_compra"
+        android:label="Pedidos de Venta"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

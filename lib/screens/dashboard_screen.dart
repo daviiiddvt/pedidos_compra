@@ -13,6 +13,7 @@ class DashboardScreen extends StatelessWidget {
     final user = auth.currentUser;
     final userName = user?.name.isNotEmpty == true ? user!.name : 'Comercial';
     final isSyncing = auth.mastersSyncing;
+    final colorScheme = Theme.of(context).colorScheme;
 
     final cards = [
       _DashboardCard(
@@ -31,7 +32,7 @@ class DashboardScreen extends StatelessWidget {
       ),
       _DashboardCard(
         icon: Icons.calendar_month_outlined,
-        title: 'CMR',
+        title: 'CRM',
         subtitle: 'Agenda de visitas del comercial.',
         color: AppColors.primary,
         onTap: () => Navigator.of(context).pushNamed('/cmr'),
@@ -39,10 +40,15 @@ class DashboardScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Inicio'),
         actions: [
+          IconButton(
+            tooltip: 'Configuración',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.of(context).pushNamed('/configuracion'),
+          ),
           IconButton(
             tooltip: 'Cerrar sesión',
             icon: const Icon(Icons.logout),
@@ -58,10 +64,10 @@ class DashboardScreen extends StatelessWidget {
             children: [
               Text(
                 'Bienvenido, $userName',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.text,
+                  color: colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
@@ -69,7 +75,7 @@ class DashboardScreen extends StatelessWidget {
                 'Selecciona la sección que quieres consultar.',
                 style: TextStyle(
                   fontSize: 15,
-                  color: AppColors.textSecondary,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 16),
@@ -136,7 +142,7 @@ class _DashboardCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -161,10 +167,10 @@ class _DashboardCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.text,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -172,13 +178,17 @@ class _DashboardCard extends StatelessWidget {
                       subtitle,
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, size: 18, color: AppColors.textSecondary),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 18,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),

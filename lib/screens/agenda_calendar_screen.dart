@@ -172,8 +172,8 @@ class _AgendaCalendarScreenState extends State<AgendaCalendarScreen> {
     return BlocProvider.value(
       value: _cubit,
       child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(title: const Text('Agenda')),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(title: const Text('CRM')),
         floatingActionButton: FloatingActionButton(
           tooltip: 'Nueva visita',
           onPressed: _nuevaVisita,
@@ -240,13 +240,13 @@ class _AgendaCalendarScreenState extends State<AgendaCalendarScreen> {
                       });
                     },
                     onPageChanged: (focused) => _focusedDay = focused,
-                    headerStyle: const HeaderStyle(
+                    headerStyle: HeaderStyle(
                       titleCentered: true,
                       formatButtonVisible: false,
                       titleTextStyle: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.text,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     calendarStyle: CalendarStyle(
@@ -254,8 +254,8 @@ class _AgendaCalendarScreenState extends State<AgendaCalendarScreen> {
                         color: AppColors.primary.withValues(alpha: 0.35),
                         shape: BoxShape.circle,
                       ),
-                      selectedDecoration: const BoxDecoration(
-                        color: AppColors.primary,
+                      selectedDecoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
                         shape: BoxShape.circle,
                       ),
                       markerDecoration: const BoxDecoration(
@@ -284,8 +284,8 @@ class _AgendaCalendarScreenState extends State<AgendaCalendarScreen> {
                             state.cargando
                                 ? 'Cargando visitas...'
                                 : 'No hay visitas este día.',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         )
@@ -305,7 +305,7 @@ class _AgendaCalendarScreenState extends State<AgendaCalendarScreen> {
                               if (cliente.isNotEmpty) cliente,
                             ].join(' · ');
                             return Material(
-                              color: AppColors.surface,
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(12),
                               child: ListTile(
                                 shape: RoundedRectangleBorder(
@@ -327,9 +327,9 @@ class _AgendaCalendarScreenState extends State<AgendaCalendarScreen> {
                                 subtitle: subtitulo.isEmpty
                                     ? null
                                     : Text(subtitulo),
-                                trailing: const Icon(
+                                trailing: Icon(
                                   Icons.chevron_right,
-                                  color: AppColors.textSecondary,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                                 onTap: () => _abrirVisita(visita),
                               ),

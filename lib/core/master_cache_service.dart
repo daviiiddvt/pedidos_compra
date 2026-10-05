@@ -26,6 +26,14 @@ class MasterCacheService {
   final Map<String, Future<dynamic>> _inFlight = {};
   static const Duration _defaultTtl = Duration(minutes: 10);
 
+  T? getSync<T>(String key) {
+    final existing = _cache[key];
+    if (existing != null && !existing.isExpired) {
+      return existing.data as T?;
+    }
+    return null;
+  }
+
   Future<T> getOrLoad<T>({
     required String key,
     required Future<T> Function() loader,

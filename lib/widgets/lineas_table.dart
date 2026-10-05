@@ -50,8 +50,8 @@ class LineasTable extends StatelessWidget {
               ? Center(
                   child: Text(
                     emptyText,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 14,
                     ),
                   ),

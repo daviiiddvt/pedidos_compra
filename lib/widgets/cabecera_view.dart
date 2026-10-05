@@ -54,9 +54,18 @@ class _CabeceraViewState extends State<CabeceraView> {
   @override
   void initState() {
     super.initState();
-    _serieNombre = widget.pedido.serieNombre;
-    _almacenNombre = widget.pedido.almacenNombre;
-    _formaPagoNombre = widget.pedido.formaPagoNombre;
+    final cache = MasterCacheService();
+    final cachedSeries = cache.getSync<List<OpcionMaestra>>('series');
+    final cachedFpg = cache.getSync<List<OpcionMaestra>>('formas_pago');
+    final cachedAlm = cache.getSync<List<OpcionMaestra>>('almacenes');
+
+    final s = PedidosService.findMatchingOption(cachedSeries ?? [], widget.pedido.serie);
+    final f = PedidosService.findMatchingOption(cachedFpg ?? [], widget.pedido.formaPago);
+    final a = PedidosService.findMatchingOption(cachedAlm ?? [], widget.pedido.almacen);
+
+    _serieNombre = s?.nombre ?? widget.pedido.serieNombre;
+    _formaPagoNombre = f?.nombre ?? widget.pedido.formaPagoNombre;
+    _almacenNombre = a?.nombre ?? widget.pedido.almacenNombre;
     _direccionEnvioNombre = widget.pedido.direccionEnvio;
     _loadMaestros();
   }
@@ -181,7 +190,10 @@ class _CabeceraViewState extends State<CabeceraView> {
           children: [
             Text(
               widget.mostrarNumeroPresupuesto ? 'Total presupuesto' : 'Total pedido',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             Text(
               '${formatNumber(total)} €',
@@ -214,9 +226,9 @@ class _Campo extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 2),
@@ -224,7 +236,10 @@ class _Campo extends StatelessWidget {
             (valor == null || valor!.isEmpty)
                 ? '—'
                 : valor!, // Guion si está vacío.
-            style: const TextStyle(fontSize: 15, color: AppColors.text),
+            style: TextStyle(
+              fontSize: 15,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
         ],
       ),

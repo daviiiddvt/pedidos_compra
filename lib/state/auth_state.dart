@@ -17,6 +17,7 @@ class AuthState extends ChangeNotifier {
   bool _connecting = false;
   bool _mastersSyncing = false;
   String? _error;
+  bool _canViewTechnicalZone = false;
   
   // 2. AÑADIR LA PROPIEDAD DEL USUARIO AQUÍ (junto a las demás variables)
   User? _currentUser;
@@ -29,6 +30,7 @@ class AuthState extends ChangeNotifier {
   
   // Getter público para el usuario
   User? get currentUser => _currentUser;
+  bool get canViewTechnicalZone => _canViewTechnicalZone;
 
   /// conectar: intenta establecer la conexión con el servidor VELNEO.
   Future<bool> conectar({
@@ -53,6 +55,16 @@ class AuthState extends ChangeNotifier {
         username: username,
         password: password,
       );
+      _canViewTechnicalZone = _currentUser!.role.toLowerCase() == 'comercial';
+      if (!_canViewTechnicalZone && _currentUser!.contactId.isNotEmpty) {
+        try {
+          _canViewTechnicalZone = await PedidosService.esContactoComercial(
+            _currentUser!.contactId,
+          );
+        } catch (_) {
+          _canViewTechnicalZone = false;
+        }
+      }
       _connected = true;
       Future.microtask(() => _startMasterSync());
 
@@ -60,6 +72,7 @@ class AuthState extends ChangeNotifier {
     } catch (e) {
       _error = e is ApiException ? e.message : 'No se pudo conectar al servidor.';
       _connected = false;
+      _canViewTechnicalZone = false;
       return false;
     } finally {
       _connecting = false;
@@ -92,6 +105,7 @@ class AuthState extends ChangeNotifier {
     _connected = false;
     _mastersSyncing = false;
     _currentUser = null; // 4. LIMPIAR EL USUARIO AL DESCONECTAR POR SEGURIDAD
+    _canViewTechnicalZone = false;
     MasterCacheService().invalidateAll();
     MasterSyncService.instance.stop();
     ApiClient.instance.setApiKey('');

@@ -35,6 +35,7 @@ import 'modal_selector.dart'; // mostrarSelector.
 /// LineaFormModal: la ventana para introducir/editar una línea de pedido.
 class LineaFormModal extends StatefulWidget {
   final LineaPedido? linea; // La línea a editar (null = línea nueva).
+  final int clienteId;
   final VoidCallback?
   onDelete; // Qué hacer si se pulsa "Eliminar" (solo modo editar).
   final bool mostrarFechaEntrega;
@@ -44,6 +45,7 @@ class LineaFormModal extends StatefulWidget {
   const LineaFormModal({
     super.key,
     this.linea,
+    this.clienteId = 0,
     this.onDelete,
     this.mostrarFechaEntrega = true,
     this.mostrarReferencia = true,
@@ -166,7 +168,10 @@ class _LineaFormModalState extends State<LineaFormModal> {
     debugPrint(
       '🔧 _cargarDatosArticulo("$articuloCodigo") → pidiendo defaults a Velneo...',
     );
-    final defaults = await PedidosService.getArticuloDefaults(articuloCodigo);
+    final defaults = await PedidosService.getArticuloDefaultsParaCliente(
+      articuloCodigo,
+      clienteId: widget.clienteId,
+    );
     if (!mounted) return;
     debugPrint(
       '🔧 _cargarDatosArticulo("$articuloCodigo") → defaults recibidos: $defaults',
@@ -178,9 +183,12 @@ class _LineaFormModalState extends State<LineaFormModal> {
       }
       final precio =
           double.tryParse((defaults['precio'] ?? '').toString()) ?? 0;
-      if (precio > 0) {
+      if (defaults['precio'] != null && defaults['precio'].toString().isNotEmpty) {
         _precio.text = formatNumber(precio, decimals: 2);
       }
+      final dto =
+          double.tryParse((defaults['dto'] ?? '0').toString()) ?? 0;
+      _dto.text = formatNumber(dto, decimals: 2);
       final regIvaRaw = defaults['reg_iva_vta'] ?? defaults['reg_iva'];
       if (regIvaRaw != null && regIvaRaw.toString().isNotEmpty) {
         _regimenIva = regimenIvaPorCodigo(regIvaRaw.toString());
@@ -429,11 +437,11 @@ class _LineaFormModalState extends State<LineaFormModal> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Importe',
                             style: TextStyle(
                               fontSize: 13,
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                           Text(
@@ -506,6 +514,7 @@ class _LineaFormModalState extends State<LineaFormModal> {
 Future<LineaPedido?> mostrarLineaForm(
   BuildContext context, {
   LineaPedido? linea, // null = línea nueva.
+  int clienteId = 0,
   VoidCallback? onDelete, // Para mostrar el botón "Eliminar".
   bool mostrarFechaEntrega = true,
   bool mostrarReferencia = true,
@@ -515,7 +524,7 @@ Future<LineaPedido?> mostrarLineaForm(
     // La "hoja" que sube desde abajo.
     context: context,
     isScrollControlled: true, // Permite que la hoja ocupe casi toda la pantalla.
-    backgroundColor: AppColors.surface,
+    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(
         top: Radius.circular(14),
@@ -523,6 +532,7 @@ Future<LineaPedido?> mostrarLineaForm(
     ),
     builder: (ctx) => LineaFormModal(
       linea: linea,
+      clienteId: clienteId,
       onDelete: onDelete,
       mostrarFechaEntrega: mostrarFechaEntrega,
       mostrarReferencia: mostrarReferencia,

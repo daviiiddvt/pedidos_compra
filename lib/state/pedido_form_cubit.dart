@@ -27,6 +27,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../core/api_service.dart';
+import '../core/master_cache_service.dart';
 import '../models/models.dart';
 
 part 'pedido_form_cubit.freezed.dart';
@@ -75,11 +76,17 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
     debugPrint('\n[selectCliente] Recibido del AutocompleteField: ${cliente.codigo}'
         ' | ${cliente.nombre} (id=$clienteId)');
 
-    // Almacén central fijo: siempre el código '1', con su nombre real (si la
-    // lista de almacenes ya está cargada). Comparación segura: ambos lados a
-    // String y sin espacios.
-    final almacenOpcion = _opcionPorCodigo(almacenes, '1') ??
-        const OpcionMaestra(codigo: '1', nombre: '1');
+    // Almacén central fijo: siempre el código '1' o '001', con su nombre real de inmediato
+    final cache = MasterCacheService();
+    final listaAlmacenes = almacenes.isNotEmpty
+        ? almacenes
+        : (cache.getSync<List<OpcionMaestra>>('almacenes') ?? const []);
+
+    final almacenOpcion = _opcionPorCodigo(listaAlmacenes, '1') ??
+        _opcionPorCodigo(listaAlmacenes, '001') ??
+        PedidosService.findMatchingOption(listaAlmacenes, '1') ??
+        PedidosService.findMatchingOption(listaAlmacenes, '001') ??
+        (listaAlmacenes.isNotEmpty ? listaAlmacenes.first : const OpcionMaestra(codigo: '1', nombre: 'Almacén central'));
 
     // 1º: fijamos el cliente y el almacén central de inmediato.
     emit(state.copyWith(
@@ -115,9 +122,17 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
       // ── Mapeo explícito de campos del cliente al Pedido ────────────────
       // Forma de pago: la del cliente. Traducimos el código numérico a su
       // nombre descriptivo buscándolo en la lista de formas de pago.
+      final cache = MasterCacheService();
+      final listaFormasPago = formasPago.isNotEmpty
+          ? formasPago
+          : (cache.getSync<List<OpcionMaestra>>('formas_pago') ?? const []);
+      final listaSeries = series.isNotEmpty
+          ? series
+          : (cache.getSync<List<OpcionMaestra>>('series') ?? const []);
+
       final formaPagoDefault = defaults['formaPago'];
       if (formaPagoDefault is String && formaPagoDefault.isNotEmpty) {
-        final opcion = _opcionPorCodigo(formasPago, formaPagoDefault) ??
+        final opcion = _opcionPorCodigo(listaFormasPago, formaPagoDefault) ??
             OpcionMaestra(codigo: formaPagoDefault, nombre: formaPagoDefault);
         pedido = pedido.copyWith(
           formaPago: opcion.codigo,
@@ -131,7 +146,7 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
       // descriptivo buscándolo en la lista de series.
       final serieDefault = defaults['serie'];
       if (serieDefault is String && serieDefault.isNotEmpty) {
-        final opcion = _opcionPorCodigo(series, serieDefault) ??
+        final opcion = _opcionPorCodigo(listaSeries, serieDefault) ??
             OpcionMaestra(codigo: serieDefault, nombre: serieDefault);
         pedido = pedido.copyWith(
           serie: opcion.codigo,
@@ -192,8 +207,13 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
   OpcionMaestra? _opcionPorCodigo(List<OpcionMaestra> opciones, String? codigo) {
     final buscado = (codigo ?? '').toString().trim().toLowerCase();
     if (buscado.isEmpty) return null;
+    final intBuscado = int.tryParse(buscado);
     for (final opcion in opciones) {
-      if (opcion.codigo.toString().trim().toLowerCase() == buscado) {
+      final opCod = opcion.codigo.toString().trim().toLowerCase();
+      if (opCod == buscado) {
+        return opcion;
+      }
+      if (intBuscado != null && int.tryParse(opCod) == intBuscado) {
         return opcion;
       }
     }

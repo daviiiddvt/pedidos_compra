@@ -7,11 +7,13 @@ import 'linea_form_modal.dart';
 Future<LineaPedido?> mostrarPresupuestoLineaForm(
   BuildContext context, {
   LineaPedido? linea,
+  int clienteId = 0,
   VoidCallback? onDelete,
 }) {
   return mostrarLineaForm(
     context,
     linea: linea,
+    clienteId: clienteId,
     onDelete: onDelete,
     mostrarFechaEntrega: false,
     mostrarReferencia: false,

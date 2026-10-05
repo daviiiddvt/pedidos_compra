@@ -54,7 +54,7 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
     final pedidoVisual = presupuesto?.toPedidoVisual();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           presupuesto == null ||
@@ -108,7 +108,7 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                       },
                     ),
                     Material(
-                      color: AppColors.surface,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       child: SafeArea(
                         top: false,
                         child: Padding(
@@ -120,7 +120,7 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                                   onPressed: () async {
                                     await Navigator.of(context).pushNamed(
                                       '/presupuesto/form',
-                                      arguments: presupuesto.id,
+                                      arguments: presupuesto,
                                     );
                                     if (mounted) _cargar();
                                   },
@@ -208,7 +208,7 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
         : (presupuesto.id != null ? '#${presupuesto.id}' : '');
 
     return Container(
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,10 +247,10 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                     : 'Sin cliente'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w600,
-              color: AppColors.text,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
 
@@ -261,9 +261,9 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
               if (presupuesto.fecha.isNotEmpty)
                 Text(
                   'Fecha: ${formatDate(presupuesto.fecha)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 )
               else

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.velneo" "\0"
-            VALUE "FileDescription", "pedidos_compra" "\0"
+            VALUE "FileDescription", "Pedidos de Venta" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "pedidos_compra" "\0"
+            VALUE "InternalName", "Pedidos de Venta" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.velneo. All rights reserved." "\0"
-            VALUE "OriginalFilename", "pedidos_compra.exe" "\0"
-            VALUE "ProductName", "pedidos_compra" "\0"
+            VALUE "OriginalFilename", "Pedidos de Venta.exe" "\0"
+            VALUE "ProductName", "Pedidos de Venta" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

@@ -171,7 +171,10 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
       children: [
         Text(
           widget.label,
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         if (widget.required)
           const Text(' *', style: TextStyle(fontSize: 13, color: AppColors.error)),
@@ -207,7 +210,11 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
                           }
                         : null,
                   )
-                : const Icon(Icons.search, size: 20, color: AppColors.textSecondary),
+                : Icon(
+                    Icons.search,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
           ),
         ),
 
@@ -237,10 +244,13 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
                       children: [
                         const Icon(Icons.error_outline, size: 18, color: AppColors.error),
                         const SizedBox(width: 8),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'No se pudo buscar. Inténtalo de nuevo.',
-                            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                         TextButton(
@@ -261,9 +271,12 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
                           ? Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                const Text(
+                                Text(
                                   'Sin resultados',
-                                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 8),
@@ -285,9 +298,12 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
                                 ),
                               ],
                             )
-                          : const Text(
+                          : Text(
                               'Sin resultados',
-                              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
                             ),
                     ),
                   );
@@ -301,25 +317,9 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
                       itemCount: results.length,
                       itemBuilder: (context, index) {
                         final option = results[index];
-                        return Listener(
-                          // En Windows el tap completo a veces no llega a
-                          // completarse (la arena de gestos no reconoce el
-                          // clic como tap y la selección nunca se dispara).
-                          // Un Listener escucha el evento CRUDO onPointerDown,
-                          // que llega SIEMPRE con la presión del ratón/táctil,
-                          // independientemente del reconocedor de gestos.
-                          behavior: HitTestBehavior.opaque,
-                          onPointerDown: (_) => _select(option),
-                          child: ListTile(
-                            dense: true,
-                            leading: const Icon(Icons.sell_outlined, size: 18,
-                                color: AppColors.textSecondary),
-                            title: Text(option.nombre, style: const TextStyle(fontSize: 14)),
-                            subtitle: option.codigo.isNotEmpty
-                                ? Text('Código: ${option.codigo}',
-                                    style: const TextStyle(fontSize: 11))
-                                : null,
-                          ),
+                        return _SuggestionTile(
+                          option: option,
+                          onSelected: () => _select(option),
                         );
                       },
                     ),
@@ -330,6 +330,64 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
         ),
         const SizedBox(height: 12),
       ],
+    );
+  }
+}
+
+class _SuggestionTile extends StatefulWidget {
+  final OpcionMaestra option;
+  final VoidCallback onSelected;
+
+  const _SuggestionTile({required this.option, required this.onSelected});
+
+  @override
+  State<_SuggestionTile> createState() => _SuggestionTileState();
+}
+
+class _SuggestionTileState extends State<_SuggestionTile> {
+  Offset? _pointerDown;
+
+  void _onPointerDown(PointerDownEvent event) {
+    _pointerDown = event.position;
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    final start = _pointerDown;
+    _pointerDown = null;
+    if (start != null && (event.position - start).distance <= 12) {
+      widget.onSelected();
+    }
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    _pointerDown = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: _onPointerDown,
+      onPointerUp: _onPointerUp,
+      onPointerCancel: _onPointerCancel,
+      child: ListTile(
+        dense: true,
+        leading: Icon(
+          Icons.sell_outlined,
+          size: 18,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        title: Text(
+          widget.option.nombre,
+          style: const TextStyle(fontSize: 14),
+        ),
+        subtitle: widget.option.codigo.isNotEmpty
+            ? Text(
+                'Código: ${widget.option.codigo}',
+                style: const TextStyle(fontSize: 11),
+              )
+            : null,
+      ),
     );
   }
 }
@@ -345,7 +403,7 @@ class _SuggestionsCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(top: 4),
       child: Material(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),

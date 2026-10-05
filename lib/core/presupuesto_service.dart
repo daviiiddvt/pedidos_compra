@@ -1,9 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 import 'config.dart';
-import '../models/models_venta.dart';
 import '../theme/app_theme.dart';
 import 'api_service.dart';
+import 'master_cache_service.dart';
+import '../models/models.dart';
 
 /// API operations for sales budgets. Budgets use the same document models and
 /// line payloads as orders, but are stored in their own Velneo tables.
@@ -32,7 +33,15 @@ class PresupuestosService {
       params: params,
     );
     final items = payloadLista(json).map(PresupuestoVenta.fromJson).toList();
-    final total = payloadTotal(json) != 0 ? payloadTotal(json) : items.length;
+    final reportedTotal = payloadTotal(json);
+    final total = reportedTotal == items.length &&
+            items.length >= AppConfig.pageSize
+        ? 0
+        : reportedTotal;
+    debugPrint(
+      '[PRESUPUESTOS] página=$page, recibidos=${items.length}, '
+      'total=${total == 0 ? "no informado" : total}',
+    );
     return ResultadoLista<PresupuestoVenta>(
       items: items,
       total: total,
@@ -81,7 +90,31 @@ class PresupuestosService {
         clienteNombre: cliente.nombreComercial,
       );
     }
-    return presupuesto.copyWith(lineas: lineas);
+    if (presupuesto.comercial.isNotEmpty &&
+        presupuesto.comercialNombre.isEmpty) {
+      try {
+        final comercialNombre = await PedidosService.getContactName(
+          presupuesto.comercial,
+        );
+        if (comercialNombre.isNotEmpty) {
+          presupuesto = presupuesto.copyWith(comercialNombre: comercialNombre);
+        }
+      } catch (_) {
+        // El código sigue siendo válido aunque no se pueda resolver el nombre.
+      }
+    }
+
+    final cache = MasterCacheService();
+    final cachedSeries = cache.getSync<List<OpcionMaestra>>('series');
+    final cachedFpg = cache.getSync<List<OpcionMaestra>>('formas_pago');
+    final serieOpcion = PedidosService.findMatchingOption(cachedSeries ?? [], presupuesto.serie);
+    final fpgOpcion = PedidosService.findMatchingOption(cachedFpg ?? [], presupuesto.formaPago);
+
+    return presupuesto.copyWith(
+      lineas: lineas,
+      serieNombre: serieOpcion?.nombre ?? presupuesto.serieNombre,
+      formaPagoNombre: fpgOpcion?.nombre ?? presupuesto.formaPagoNombre,
+    );
   }
 
   static Map<String, dynamic> _payload(PresupuestoVenta pedido) => {
@@ -136,18 +169,31 @@ class PresupuestosService {
 
   static Future<void> marcarAceptado(dynamic budgetId) async {
     if (budgetId == null) return;
-    try {
-      await _api.post('${AppConfig.endpoint('presupuestos')}/$budgetId', body: {'est': 'A'});
-      final lineasJson = await _api.get(AppConfig.endpoint('lineasPresupuesto'), params: {'filter[vta_pre]': '$budgetId', 'page[size]': 100});
+    await _api.post('${AppConfig.endpoint('presupuestos')}/$budgetId', body: {'est': 'A'});
+    await _marcarLineasAceptadas(budgetId);
+  }
+
+  static Future<void> _marcarLineasAceptadas(dynamic budgetId) async {
+    final endpoint = AppConfig.endpoint('lineasPresupuesto');
+    var page = 1;
+    while (true) {
+      final lineasJson = await _api.get(
+        endpoint,
+        params: {
+          'filter[vta_pre]': '$budgetId',
+          'page[size]': 100,
+          'page[number]': page,
+        },
+      );
       final lineas = payloadLista(lineasJson);
       for (final linea in lineas) {
-        final lineaId = linea['id'];
+        final lineaId = linea['id'] ?? linea['id_reg'] ?? linea['ID'];
         if (lineaId != null) {
-          await _api.post('${AppConfig.endpoint('lineasPresupuesto')}/$lineaId', body: {'est': 'A'});
+          await _api.post('$endpoint/$lineaId', body: {'est': 'A'});
         }
       }
-    } catch (e) {
-      debugPrint('Error marcando presupuesto como aceptado: $e');
+      if (lineas.length < 100) break;
+      page++;
     }
   }
 
@@ -163,20 +209,7 @@ class PresupuestosService {
         },
       );
       // 2. Actualizamos las lÃ­neas a Aceptado
-      final lineasJson = await _api.get(
-        AppConfig.endpoint('lineasPresupuesto'),
-        params: {'filter[vta_pre]': '$budgetId', 'page[size]': 100},
-      );
-      final lineas = payloadLista(lineasJson);
-      for (final linea in lineas) {
-        final lineaId = linea['id'];
-        if (lineaId != null) {
-          await _api.post(
-            '${AppConfig.endpoint('lineasPresupuesto')}/$lineaId',
-            body: {'est': 'A'},
-          );
-        }
-      }
+      await _marcarLineasAceptadas(budgetId);
     } catch (e) {
       debugPrint('Error enlazando presupuesto a pedido: $e');
     }
@@ -199,6 +232,9 @@ class PresupuestosService {
       await eliminarLinea(lineId);
     }
     await enviarLineas(id, pedido.lineas);
+    if (AppColors.estadoCodigo(pedido.estado) == 'A') {
+      await _marcarLineasAceptadas(id);
+    }
     if (data is Map) {
       return PresupuestoVenta.fromJson(Map<String, dynamic>.from(data))
           .copyWith(id: id is int ? id : pedido.id, lineas: pedido.lineas);
@@ -317,5 +353,7 @@ class PresupuestosService {
     await _api.delete('${AppConfig.endpoint('presupuestos')}/$id');
   }
 }
+
+
 
 

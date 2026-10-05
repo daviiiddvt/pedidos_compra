@@ -1,11 +1,11 @@
 {
-    "name": "pedidos_compra",
-    "short_name": "pedidos_compra",
+    "name": "Pedidos de Venta",
+    "short_name": "Pedidos de Venta",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#07134D",
+    "theme_color": "#07134D",
+    "description": "Aplicación de pedidos de venta conectada a VELNEO.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

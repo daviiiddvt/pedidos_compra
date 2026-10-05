@@ -70,7 +70,10 @@ class CampoFecha extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             if (required)
               const Text(
@@ -98,14 +101,18 @@ class CampoFecha extends StatelessWidget {
                       fontSize: 15,
                       color: !enabled
                           ? AppColors.disabled
-                          : (hayValor ? AppColors.text : AppColors.disabled),
+                            : (hayValor
+                              ? Theme.of(context).colorScheme.onSurface
+                              : AppColors.disabled),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 // Icono de calendario.
                 Icon(Icons.calendar_today_outlined,
-                    color: enabled ? AppColors.textSecondary : AppColors.disabled,
+                    color: enabled
+                      ? Theme.of(context).colorScheme.onSurfaceVariant
+                      : AppColors.disabled,
                     size: 18),
               ],
             ),

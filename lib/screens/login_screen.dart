@@ -124,24 +124,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16), // Separador vertical (vacío).
 
                   // ---- Título ----
-                  const Text(
+                  Text(
                     'Pedidos de Venta',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.text,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
 
                   // ---- Subtítulo ----
-                  const Text(
+                  Text(
                     'Conecta con tu servidor VELNEO',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -223,7 +223,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.textSecondary.withValues(alpha: 0.8),
+                        color: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant
+                          .withValues(alpha: 0.8),
                     ),
                   ),
                 ],

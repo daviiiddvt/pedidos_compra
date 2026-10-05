@@ -43,6 +43,7 @@ dependencies:
   # "provider": la librería que comparte el estado global (la sesión).
   #   Se usa en lib/main.dart y en las pantallas (context.watch / read).
   provider: ^6.1.2
+  shared_preferences: ^2.5.3
   # "intl": utilidades de fechas/números internacionales (añadida para compatibilidad).
   intl: ^0.20.2
   flutter_bloc: ^9.1.1
@@ -71,6 +72,22 @@ dev_dependencies:
   freezed: ^4.0.1
   json_serializable: ^6.14.1
   pdf: ^3.13.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/icon/TecPED.jpg
+  adaptive_icon_background: "#07134D"
+  adaptive_icon_foreground: assets/icon/TecPED.jpg
+  web:
+    generate: true
+    image_path: assets/icon/TecPED.jpg
+    background_color: "#07134D"
+    theme_color: "#07134D"
+  windows:
+    generate: true
+    image_path: assets/icon/TecPED.jpg
 
 # ---- CONFIGURACIÓN DE FLUTTER ----
 flutter:

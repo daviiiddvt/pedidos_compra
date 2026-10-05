@@ -104,7 +104,12 @@ class _ClienteFormModalState extends State<_ClienteFormModal> {
                   children: [
                     TextButton(
                       onPressed: _guardando ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+                      child: Text(
+                        'Cancelar',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(

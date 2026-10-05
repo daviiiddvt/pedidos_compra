@@ -98,10 +98,10 @@ class FilaPedido extends StatelessWidget {
                           : 'Sin cliente'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis, // "..."
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.text,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 4),
@@ -113,9 +113,9 @@ class FilaPedido extends StatelessWidget {
                     Expanded(
                       child: Text(
                         '$etiquetaNumero: $numero',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -123,9 +123,9 @@ class FilaPedido extends StatelessWidget {
                   if (fecha.isNotEmpty)
                     Text(
                       fecha, // "10/09/2026"
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                 ],
@@ -139,7 +139,7 @@ class FilaPedido extends StatelessWidget {
                     mostrarNumeroPresupuesto ? 'Total presupuesto' : 'Total pedido',
                     style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                   Text(

@@ -26,7 +26,8 @@
 import 'package:flutter/foundation.dart' show debugPrint; // Logging.
 
 import 'api_client.dart'; // ApiClient (el mensajero) + ApiException.
-import 'config.dart'; // AppConfig (para saber a qué endpoint llamar).
+import 'config.dart';
+import 'master_cache_service.dart'; // AppConfig (para saber a qué endpoint llamar).
 import '../models/models.dart'; // Nuestros modelos (Pedido, OpcionMaestra).
 import '../theme/app_theme.dart'; // AppColors (para traducir el estado a código VELNEO).
 
@@ -58,7 +59,11 @@ class ResultadoLista<T> {
   final int page;
 
   /// Crea el resultado de una página.
-  ResultadoLista({required this.items, required this.total, required this.page});
+  ResultadoLista({
+    required this.items,
+    required this.total,
+    required this.page,
+  });
 }
 
 /// PedidosService: la clase con TODAS las operaciones del API.
@@ -133,7 +138,10 @@ class PedidosService {
     return allRecords;
   }
 
-  static String resolveDefaultValue(Map<String, dynamic> record, List<String> fields) {
+  static String resolveDefaultValue(
+    Map<String, dynamic> record,
+    List<String> fields,
+  ) {
     for (final field in fields) {
       final normalized = _normalizeDefaultValue(record.raw(field));
       if (normalized.isNotEmpty) return normalized;
@@ -175,22 +183,34 @@ class PedidosService {
     return '$value'.trim();
   }
 
-  static String _firstNonEmpty(Map<String, dynamic> record, List<String> fields) {
+  static String _firstNonEmpty(
+    Map<String, dynamic> record,
+    List<String> fields,
+  ) {
     return resolveDefaultValue(record, fields);
   }
 
-  static OpcionMaestra? findMatchingOption(List<OpcionMaestra> options, String? rawValue) {
+  static OpcionMaestra? findMatchingOption(
+    List<OpcionMaestra> options,
+    String? rawValue,
+  ) {
     final value = (rawValue ?? '').trim();
     if (value.isEmpty) return null;
 
     final normalized = value.toLowerCase();
+    final intVal = int.tryParse(value);
     for (final option in options) {
       final code = option.codigo.trim();
       final name = option.nombre.trim();
       if (code.isNotEmpty && code.toLowerCase() == normalized) return option;
       if (name.isNotEmpty && name.toLowerCase() == normalized) return option;
-      if (code.isNotEmpty && code.toLowerCase().contains(normalized)) return option;
-      if (name.isNotEmpty && name.toLowerCase().contains(normalized)) return option;
+      if (intVal != null && int.tryParse(code) == intVal) return option;
+      if (code.isNotEmpty && code.toLowerCase().contains(normalized)) {
+        return option;
+      }
+      if (name.isNotEmpty && name.toLowerCase().contains(normalized)) {
+        return option;
+      }
     }
     return null;
   }
@@ -238,13 +258,13 @@ class PedidosService {
       codigo: art.isNotEmpty
           ? art
           : (_referenceId(record, 'id').isNotEmpty
-              ? _referenceId(record, 'id')
-              : record.s('codigo')),
+                ? _referenceId(record, 'id')
+                : record.s('codigo')),
       nombre: record.s('name').isNotEmpty
           ? record.s('name')
           : (record.s('nom_com').isNotEmpty
-              ? record.s('nom_com')
-              : record.s('descripcion')),
+                ? record.s('nom_com')
+                : record.s('descripcion')),
     );
   }
 
@@ -266,10 +286,7 @@ class PedidosService {
   }) async {
     final json = await _api.get(
       AppConfig.endpoint('usuarios'),
-      params: {
-        'filter[${AppConfig.usuarioField}]': username,
-        'page[size]': 10,
-      },
+      params: {'filter[${AppConfig.usuarioField}]': username, 'page[size]': 10},
     );
     final users = payloadLista(json);
     Map<String, dynamic>? user;
@@ -284,21 +301,40 @@ class PedidosService {
       throw ApiException('Usuario o contraseña incorrectos.');
     }
 
+    final userId = user.s('id').trim();
+    debugPrint('[AUTH] Usuario autenticado en USR_M: id=$userId, name=${user.s('name')}');
+    final isAdmin = await isAdministrator(userId);
     final contactId = _referenceId(user, AppConfig.usuarioContactoField);
+    debugPrint(
+      '[AUTH] Resultado administrador: userId=$userId, '
+      'contactId=${contactId.isEmpty ? '(vacío)' : contactId}, isAdmin=$isAdmin',
+    );
+
+    if (isAdmin) {
+      debugPrint('[AUTH] Rol final: Administrador');
+      return User(
+        id: userId,
+        name: user.s('name').isEmpty ? username : user.s('name'),
+        role: 'Administrador',
+        contactId: contactId,
+      );
+    }
+
     if (contactId.isEmpty) {
       throw ApiException('El usuario no tiene un contacto asociado.');
     }
     final contact = await _getContact(contactId);
-    final roleValue = user.s(AppConfig.usuarioRolField).toLowerCase();
-    final isAdmin = roleValue == 'admin' || roleValue == 'administrador';
-    if (!isAdmin && !contact.b(AppConfig.contactoComercialField)) {
-      throw ApiException('El contacto asociado no está marcado como comercial.');
+    if (!contact.b(AppConfig.contactoComercialField)) {
+      throw ApiException(
+        'El contacto asociado no está marcado como comercial.',
+      );
     }
 
+    debugPrint('[AUTH] Rol final: Comercial');
     return User(
-      id: user.s('id'),
+      id: userId,
       name: user.s('name').isEmpty ? username : user.s('name'),
-      role: isAdmin ? 'Administrador' : 'Comercial',
+      role: 'Comercial',
       contactId: contactId,
     );
   }
@@ -318,6 +354,41 @@ class PedidosService {
     }
     return contacts.first;
   }
+
+  static Future<bool> isAdministrator(String userId) async {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      debugPrint('[AUTH] USR_M vacío: no se puede validar administrador.');
+      return false;
+    }
+    debugPrint(
+      '[AUTH] Consultando USR_GRP_USR_M: '
+      'filter[usr_usr_grp]=$normalizedUserId,1',
+    );
+    final json = await _api.get(
+      AppConfig.endpoint('gruposUsuarios'),
+      params: {
+        'filter[usr_usr_grp]': '$normalizedUserId,1',
+        'page[size]': 1,
+      },
+    );
+    final matches = payloadLista(json);
+    final countFromApi = payloadTotal(json);
+    final count = countFromApi == 0 ? matches.length : countFromApi;
+    debugPrint(
+      '[AUTH] USR_GRP_USR_M count=$count '
+      '(items=${matches.length}); isAdmin=${count == 1}',
+    );
+    return count == 1;
+  }
+
+  static Future<bool> esContactoComercial(String contactId) async {
+    if (contactId.trim().isEmpty) return false;
+    final contact = await _getContact(contactId.trim());
+    return contact.b(AppConfig.contactoComercialField);
+  }
+
+  static Future<String> getContactName(String id) => _getContactName(id);
 
   static Future<String> _getContactName(String id) async {
     final contact = await _getContact(id);
@@ -376,7 +447,9 @@ class PedidosService {
     List<LineaPedido> lineas,
   ) async {
     final missing = lineas
-        .where((linea) => linea.articuloNombre.isEmpty && linea.articulo.isNotEmpty)
+        .where(
+          (linea) => linea.articuloNombre.isEmpty && linea.articulo.isNotEmpty,
+        )
         .map((linea) => linea.articulo)
         .toSet();
     if (missing.isEmpty) return lineas;
@@ -429,13 +502,20 @@ class PedidosService {
 
     // Hacemos la llamada GET y la respuesta se convierte en una lista de Pedido.
     final json = await _api.get(AppConfig.endpoint('pedidos'), params: params);
-    final items = payloadLista(json)
-        .map(Pedido.fromJson)
-        .toList();
+    final items = payloadLista(json).map(Pedido.fromJson).toList();
 
-    // El TOTAL real de pedidos lo informa VELNEO en "total_count".
-    // Si no lo encontramos, asumimos lo que trajo la página.
-    final total = payloadTotal(json) != 0 ? payloadTotal(json) : items.length;
+    // En VTA_PED_G, "count" puede ser el número de registros de esta página,
+    // no el total global. Si coincide con una página completa, dejamos el total
+    // como desconocido para que la pantalla solicite la página siguiente.
+    final reportedTotal = payloadTotal(json);
+    final total = reportedTotal == items.length &&
+        items.length >= AppConfig.pageSize
+      ? 0
+      : reportedTotal;
+    debugPrint(
+      '[PEDIDOS] página=$page, recibidos=${items.length}, '
+      'total=${total == 0 ? "no informado" : total}',
+    );
 
     return ResultadoLista<Pedido>(items: items, total: total, page: page);
   }
@@ -445,22 +525,34 @@ class PedidosService {
   /// Repite peticiones a [list] hasta alcanzar el total informado o recibir
   /// una página incompleta/vacía. Cada petición contiene un `await`, por lo
   /// que el event loop de Flutter conserva el control mientras se descarga.
-  static Future<List<Pedido>> listAll({String? comercial, bool porZona = false}) async {
+  static Future<List<Pedido>> listAll({
+    String? comercial,
+    bool porZona = false,
+  }) async {
     final all = <Pedido>[];
-    
+
     if (porZona && comercial != null && comercial.isNotEmpty) {
       debugPrint('\n=== MODO ZONA TÉCNICA INICIADO ===');
       debugPrint('Comercial ID: $comercial');
 
       // 1. Zonas del comercial
-      final znJson = await _api.get(AppConfig.endpoint('zonasComerciales'), params: {'filter[cmr]': comercial, 'page[size]': 1000});
+      final znJson = await _api.get(
+        AppConfig.endpoint('zonasComerciales'),
+        params: {'filter[cmr]': comercial, 'page[size]': 1000},
+      );
       final znList = payloadLista(znJson);
-      final znIds = znList.map((r) => r['ZN_TCN'] ?? r['zn_tcn']).where((x) => x != null && x != 0).map((x) => x.toString()).toSet();
-      
+      final znIds = znList
+          .map((r) => r['ZN_TCN'] ?? r['zn_tcn'])
+          .where((x) => x != null && x != 0)
+          .map((x) => x.toString())
+          .toSet();
+
       debugPrint('Zonas técnicas encontradas para el comercial: $znIds');
-      
+
       if (znIds.isEmpty) {
-        debugPrint('El comercial no tiene zonas técnicas asignadas. Abortando.');
+        debugPrint(
+          'El comercial no tiene zonas técnicas asignadas. Abortando.',
+        );
         return [];
       }
 
@@ -469,7 +561,10 @@ class PedidosService {
       final allClients = <Cliente>[];
       var page = 1;
       while (true) {
-        final cliJson = await _api.get(AppConfig.endpoint('clientes'), params: {'page[size]': 1000, 'page[number]': page});
+        final cliJson = await _api.get(
+          AppConfig.endpoint('clientes'),
+          params: {'page[size]': 1000, 'page[number]': page},
+        );
         final items = payloadLista(cliJson);
         for (var c in items) {
           allClients.add(Cliente.fromJson(c));
@@ -484,11 +579,15 @@ class PedidosService {
       final dirPobMap = <int, String>{}; // DIR_PRI_ID -> POB_EXT
       page = 1;
       while (true) {
-        final dJson = await _api.get(AppConfig.endpoint('direcciones'), params: {'page[size]': 1000, 'page[number]': page});
+        final dJson = await _api.get(
+          AppConfig.endpoint('direcciones'),
+          params: {'page[size]': 1000, 'page[number]': page},
+        );
         final items = payloadLista(dJson);
         for (var d in items) {
           final dId = d['ID'] ?? d['id'];
-          final pobExt = d['POB_EXT']?.toString() ?? d['pob_ext']?.toString() ?? '';
+          final pobExt =
+              d['POB_EXT']?.toString() ?? d['pob_ext']?.toString() ?? '';
           if (dId != null) dirPobMap[dId] = pobExt;
         }
         if (items.length < 1000) break;
@@ -501,11 +600,15 @@ class PedidosService {
       final pobZnMap = <String, String>{}; // POB_ID -> ZN_TCN
       page = 1;
       while (true) {
-        final pJson = await _api.get('TecERPv7_dat_dat/v1/POB', params: {'page[size]': 1000, 'page[number]': page});
+        final pJson = await _api.get(
+          'TecERPv7_dat_dat/v1/POB',
+          params: {'page[size]': 1000, 'page[number]': page},
+        );
         final items = payloadLista(pJson);
         for (var p in items) {
           final pId = p['ID']?.toString() ?? p['id']?.toString() ?? '';
-          final znTcn = p['ZN_TCN']?.toString() ?? p['zn_tcn']?.toString() ?? '';
+          final znTcn =
+              p['ZN_TCN']?.toString() ?? p['zn_tcn']?.toString() ?? '';
           pobZnMap[pId] = znTcn;
         }
         if (items.length < 1000) break;
@@ -522,7 +625,9 @@ class PedidosService {
           matchingClientIds.add(c.id);
         }
       }
-      debugPrint('Clientes con zona técnica coincidente: ${matchingClientIds.length}');
+      debugPrint(
+        'Clientes con zona técnica coincidente: ${matchingClientIds.length}',
+      );
 
       if (matchingClientIds.isEmpty) {
         debugPrint('No hay clientes en estas zonas. Abortando.');
@@ -543,8 +648,10 @@ class PedidosService {
         if (result.items.length < AppConfig.pageSize) break;
         page++;
       }
-      
-      debugPrint('Total de pedidos de la zona técnica encontrados: ${all.length}');
+
+      debugPrint(
+        'Total de pedidos de la zona técnica encontrados: ${all.length}',
+      );
       debugPrint('=== FIN MODO ZONA TÉCNICA ===\n');
       return all;
     }
@@ -587,9 +694,8 @@ class PedidosService {
       AppConfig.endpoint('lineas'),
       params: {'filter[vta_ped]': '$id', 'page[size]': 100},
     );
-    final clienteFuture = getClientesByIds([pedido.clienteId]).catchError(
-      (_) => <Cliente>[],
-    );
+    final clienteFuture = getClientesByIds([pedido.clienteId])
+        .catchError((_) => <Cliente>[]);
     final comercialFuture = pedido.comercial.isEmpty
         ? Future.value('')
         : _getContactName(pedido.comercial).catchError((_) => '');
@@ -617,10 +723,35 @@ class PedidosService {
         pedido = pedido.copyWith(comercialNombre: comercialNombre);
       }
       final enrichedLineas = await _enrichLineArticleNames(lineas);
-      return pedido.copyWith(lineas: enrichedLineas);
+
+      final cache = MasterCacheService();
+      final cachedSeries = cache.getSync<List<OpcionMaestra>>('series');
+      final cachedFpg = cache.getSync<List<OpcionMaestra>>('formas_pago');
+      final cachedAlm = cache.getSync<List<OpcionMaestra>>('almacenes');
+      final s = findMatchingOption(cachedSeries ?? [], pedido.serie);
+      final f = findMatchingOption(cachedFpg ?? [], pedido.formaPago);
+      final a = findMatchingOption(cachedAlm ?? [], pedido.almacen);
+
+      return pedido.copyWith(
+        serieNombre: s?.nombre ?? pedido.serieNombre,
+        formaPagoNombre: f?.nombre ?? pedido.formaPagoNombre,
+        almacenNombre: a?.nombre ?? pedido.almacenNombre,
+        lineas: enrichedLineas,
+      );
     } on ApiException {
-      // Sin permiso sobre las líneas: devolvemos el pedido con las de vacío.
-      return pedido;
+      final cache = MasterCacheService();
+      final cachedSeries = cache.getSync<List<OpcionMaestra>>('series');
+      final cachedFpg = cache.getSync<List<OpcionMaestra>>('formas_pago');
+      final cachedAlm = cache.getSync<List<OpcionMaestra>>('almacenes');
+      final s = findMatchingOption(cachedSeries ?? [], pedido.serie);
+      final f = findMatchingOption(cachedFpg ?? [], pedido.formaPago);
+      final a = findMatchingOption(cachedAlm ?? [], pedido.almacen);
+
+      return pedido.copyWith(
+        serieNombre: s?.nombre ?? pedido.serieNombre,
+        formaPagoNombre: f?.nombre ?? pedido.formaPagoNombre,
+        almacenNombre: a?.nombre ?? pedido.almacenNombre,
+      );
     }
   }
 
@@ -633,7 +764,9 @@ class PedidosService {
     final json = await _api.post(AppConfig.endpoint('pedidos'), body: payload);
     final data = payloadData(json);
     if (data is Map) {
-      return Pedido.fromJson(Map<String, dynamic>.from(data)); // El pedido creado.
+      return Pedido.fromJson(
+        Map<String, dynamic>.from(data),
+      ); // El pedido creado.
     }
     throw ApiException('No se pudo crear el pedido.');
   }
@@ -686,13 +819,17 @@ class PedidosService {
   static Future<Pedido> createComplete(Pedido pedido) async {
     late final Pedido created;
     try {
-      final dirId = await _ensureDireccionId(pedido.clienteId, pedido.direccionEnvio);
+      final dirId = await _ensureDireccionId(
+        pedido.clienteId,
+        pedido.direccionEnvio,
+      );
       final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
       created = await create(_pedidoPayload(pedidoMapeado));
     } on ApiException catch (error) {
       throw ApiException('No se pudo crear la cabecera del pedido: $error');
     }
-    final pedidoId = created.id ?? (created.codigo == 0 ? null : created.codigo);
+    final pedidoId =
+        created.id ?? (created.codigo == 0 ? null : created.codigo);
     if (pedidoId == null) {
       throw ApiException('Velneo no devolvió el ID del pedido creado.');
     }
@@ -701,10 +838,7 @@ class PedidosService {
     } on ApiException catch (error) {
       throw ApiException('Cabecera creada, pero fallaron las líneas: $error');
     }
-    return created.copyWith(
-      id: pedidoId,
-      lineas: pedido.lineas,
-    );
+    return created.copyWith(id: pedidoId, lineas: pedido.lineas);
   }
 
   static Future<Pedido> updateComplete(
@@ -712,7 +846,10 @@ class PedidosService {
     Pedido pedido,
     Set<int> removedLineIds,
   ) async {
-    final dirId = await _ensureDireccionId(pedido.clienteId, pedido.direccionEnvio);
+    final dirId = await _ensureDireccionId(
+      pedido.clienteId,
+      pedido.direccionEnvio,
+    );
     final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
     final updated = await update(id, _pedidoPayload(pedidoMapeado));
     for (final lineId in removedLineIds) {
@@ -733,7 +870,9 @@ class PedidosService {
     );
     final data = payloadData(json);
     if (data is Map) {
-      return Pedido.fromJson(Map<String, dynamic>.from(data)); // El pedido actualizado.
+      return Pedido.fromJson(
+        Map<String, dynamic>.from(data),
+      ); // El pedido actualizado.
     }
     throw ApiException('No se pudo actualizar el pedido.');
   }
@@ -746,7 +885,7 @@ class PedidosService {
   ///     cabecera. VELNEO asigna el número de línea solo (10, 20, 30...).
   ///   - Línea existente (con id) → POST a /VTA_PED_LIN_G/{id} (VELNEO no usa PUT).
   /// El campo "est" se manda como CÓDIGO (P/S/C); "Pendiente" → "P".
-    /// Ejecuta el proceso de Velneo ACT_VTA_PED_LIN_G_APP.pro para una línea.
+  /// Ejecuta el proceso de Velneo ACT_VTA_PED_LIN_G_APP.pro para una línea.
   /// Método GET con parámetros: ID, ART, CAN, PRE, EST, REG_IVA_VTA.
   static Future<void> ejecutarProcesoActualizarLinea({
     required dynamic id,
@@ -765,12 +904,28 @@ class PedidosService {
       'REG_IVA': regIvaVta,
     };
     debugPrint('Ejecutando proceso ACT_VTA_PED_LIN_G_APP.pro: $params');
-    await _api.get(AppConfig.endpoint('procesoActualizarLinea'), params: params);
+    await _api.get(
+      AppConfig.endpoint('procesoActualizarLinea'),
+      params: params,
+    );
+  }
+
+  static Future<void> enviarEmailPedido(dynamic pedidoId) async {
+    if (pedidoId == null) {
+      throw ApiException('El pedido no tiene un identificador válido.');
+    }
+    await _api.get(
+      AppConfig.endpoint('procesoEnviarEmailPedido'),
+      params: {'VTA_PED_G': pedidoId},
+    );
   }
 
   /// Crea o actualiza las líneas de un pedido en `VTA_PED_LIN_G` y llama
   /// al proceso de Velneo `ACT_VTA_PED_LIN_G_APP.pro`.
-  static Future<void> enviarLineas(dynamic pedidoId, List<LineaPedido> lineas) async {
+  static Future<void> enviarLineas(
+    dynamic pedidoId,
+    List<LineaPedido> lineas,
+  ) async {
     for (final linea in lineas) {
       final body = <String, dynamic>{
         'vta_ped': pedidoId,
@@ -804,11 +959,14 @@ class PedidosService {
             }
           }
           if (lineaId == null) {
-            final linesRes = await _api.get(AppConfig.endpoint('lineas'), params: {
-              'filter[vta_ped]': '$pedidoId',
-              'sort': '-id',
-              'page[size]': 1,
-            });
+            final linesRes = await _api.get(
+              AppConfig.endpoint('lineas'),
+              params: {
+                'filter[vta_ped]': '$pedidoId',
+                'sort': '-id',
+                'page[size]': 1,
+              },
+            );
             final items = payloadLista(linesRes);
             if (items.isNotEmpty) {
               final idVal = items.first['id'] ?? items.first['ID'];
@@ -818,13 +976,20 @@ class PedidosService {
             }
           }
         } else {
-          await _api.post('${AppConfig.endpoint('lineas')}/$lineaId', body: body);
+          await _api.post(
+            '${AppConfig.endpoint('lineas')}/$lineaId',
+            body: body,
+          );
         }
 
         if (lineaId != null && lineaId > 0) {
           final artVal = int.tryParse(linea.articulo) ?? linea.articulo;
-          final canVal = (linea.cantidad % 1 == 0) ? linea.cantidad.toInt() : linea.cantidad;
-          final preVal = (linea.precio % 1 == 0) ? linea.precio.toInt() : linea.precio;
+          final canVal = (linea.cantidad % 1 == 0)
+              ? linea.cantidad.toInt()
+              : linea.cantidad;
+          final preVal = (linea.precio % 1 == 0)
+              ? linea.precio.toInt()
+              : linea.precio;
           final estVal = AppColors.estadoCodigo(linea.estado);
           final ivaVal = regIvaCodigo(linea.tipoIva, linea.regIvaVta);
 
@@ -857,7 +1022,10 @@ class PedidosService {
   ///
   /// [key] debe existir en `AppConfig.endpoints`. Se utiliza para artículos,
   /// almacenes y formas de pago, solicitando hasta [size] registros.
-  static Future<List<OpcionMaestra>> _maestros(String key, {int size = 1000}) async {
+  static Future<List<OpcionMaestra>> _maestros(
+    String key, {
+    int size = 1000,
+  }) async {
     final records = await _fetchAllRecords(
       AppConfig.endpoint(key),
       pageSize: size,
@@ -884,7 +1052,9 @@ class PedidosService {
           final record = records.first;
           return Cliente(
             id: record.i('id'),
-            nombreComercial: record.s('nom_com').isNotEmpty ? record.s('nom_com') : record.s('name'),
+            nombreComercial: record.s('nom_com').isNotEmpty
+                ? record.s('nom_com')
+                : record.s('name'),
             cif: record.s('cif'),
             telefono: record.s('tlf'),
           );
@@ -899,7 +1069,13 @@ class PedidosService {
 
   static Future<Map<String, dynamic>> getClienteDefaults(int clienteId) async {
     if (clienteId <= 0) {
-      return {'serie': '', 'direccion': '', 'email': '', 'almacen': '', 'formaPago': ''};
+      return {
+        'serie': '',
+        'direccion': '',
+        'email': '',
+        'almacen': '',
+        'formaPago': '',
+      };
     }
 
     try {
@@ -910,20 +1086,33 @@ class PedidosService {
       final clientes = payloadLista(clienteJson);
       debugPrint('🛑🛑🛑 JSON DEL SERVIDOR VELNEO: $clientes');
       if (clientes.isEmpty) {
-        return {'serie': '', 'direccion': '', 'email': '', 'almacen': '', 'formaPago': ''};
+        return {
+          'serie': '',
+          'direccion': '',
+          'email': '',
+          'almacen': '',
+          'formaPago': '',
+        };
       }
       final cliente = clientes.first;
 
       // ── DEPURACIÓN: mostrar el JSON exacto que devuelve VELNEO ────────
       // Para que puedas ver TODAS las claves que manda la API al elegir un
       // cliente y decidir con cuáles mapear serie/formaPago/almacén.
-      debugPrint('\n━━━ [VELNEO] Cliente $clienteId → JSON completo (${cliente.keys.length} claves) ━━━');
+      debugPrint(
+        '\n━━━ [VELNEO] Cliente $clienteId → JSON completo (${cliente.keys.length} claves) ━━━',
+      );
       for (final entry in cliente.entries) {
         debugPrint('  ${entry.key}: ${entry.value}');
       }
       debugPrint('━━━ /FIN JSON cliente $clienteId ━━━');
 
-      final serie = resolveDefaultValue(cliente, ['ser_vta', 'SER_VTA', 'serie', 'ser']);
+      final serie = resolveDefaultValue(cliente, [
+        'ser_vta',
+        'SER_VTA',
+        'serie',
+        'ser',
+      ]);
       final formaPago = resolveDefaultValue(cliente, [
         'fpg_clt',
         'fpg',
@@ -940,14 +1129,19 @@ class PedidosService {
         'direccion_envio',
         'dir_env_def',
       ]);
-      
+
       if (direccionId.isEmpty) {
         direccionId = _referenceId(cliente, 'DIR_PRI').isNotEmpty
             ? _referenceId(cliente, 'DIR_PRI')
             : _referenceId(cliente, 'DIR_PRI.ID');
       }
 
-      final email = resolveDefaultValue(cliente, ['eml', 'EML', 'email', 'mail']);
+      final email = resolveDefaultValue(cliente, [
+        'eml',
+        'EML',
+        'email',
+        'mail',
+      ]);
 
       final resultado = {
         'serie': serie,
@@ -955,15 +1149,30 @@ class PedidosService {
         'email': email,
         'almacen': '',
         'formaPago': formaPago,
+        'tarifa': resolveDefaultValue(cliente, [
+          '#VTA_TAR',
+          'VTA_TAR',
+          'vta_tar',
+          'VTA_TAR.ID',
+          'tarifa',
+        ]),
       };
       debugPrint('[VELNEO] Defaults del cliente $clienteId → $resultado');
       return resultado;
     } catch (_) {
-      return {'serie': '', 'direccion': '', 'email': '', 'almacen': '', 'formaPago': ''};
+      return {
+        'serie': '',
+        'direccion': '',
+        'email': '',
+        'almacen': '',
+        'formaPago': '',
+      };
     }
   }
 
-  static Future<List<OpcionMaestra>> getDireccionesCliente(int clienteId) async {
+  static Future<List<OpcionMaestra>> getDireccionesCliente(
+    int clienteId,
+  ) async {
     if (clienteId <= 0) return [];
     try {
       final json = await _api.get(
@@ -1010,17 +1219,21 @@ class PedidosService {
 
     final json = await _api.post(AppConfig.endpoint('clientes'), body: payload);
     final data = payloadData(json);
-    
+
     if (data is Map) {
       return Cliente.fromJson(Map<String, dynamic>.from(data));
     }
-    throw ApiException('El servidor no devolvió los datos del cliente tras su creación.');
+    throw ApiException(
+      'El servidor no devolvió los datos del cliente tras su creación.',
+    );
   }
 
-  static Future<Map<String, dynamic>> getEmpresaDefaults({String? contactId}) async {
+  static Future<Map<String, dynamic>> getEmpresaDefaults({
+    String? contactId,
+  }) async {
     try {
       final contactIdValue = (contactId ?? '').trim();
-      Map<String, dynamic>? empresaEncontrada;  
+      Map<String, dynamic>? empresaEncontrada;
       String almacenDirecto = '';
 
       if (contactIdValue.isNotEmpty) {
@@ -1032,9 +1245,20 @@ class PedidosService {
           final contactos = payloadLista(contactoJson);
           if (contactos.isNotEmpty) {
             final contacto = contactos.first;
-            almacenDirecto = _firstNonEmpty(contacto, ['ALM', 'alm', 'almacen', 'alm_def']);
+            almacenDirecto = _firstNonEmpty(contacto, [
+              'ALM',
+              'alm',
+              'almacen',
+              'alm_def',
+            ]);
 
-            final empresaId = resolveDefaultValue(contacto, ['emp', 'EMP', 'empresa', 'id_emp', 'emp_id']);
+            final empresaId = resolveDefaultValue(contacto, [
+              'emp',
+              'EMP',
+              'empresa',
+              'id_emp',
+              'emp_id',
+            ]);
             if (empresaId.isNotEmpty) {
               final detalleEmpresa = payloadData(
                 await _api.get('${AppConfig.endpoint('empresa')}/$empresaId'),
@@ -1074,15 +1298,25 @@ class PedidosService {
       final almacenFinal = almacenDirecto.isNotEmpty
           ? almacenDirecto
           : (empresaEncontrada != null
-              ? resolveDefaultValue(empresaEncontrada, ['ALM', 'alm', 'almacen', 'alm_def'])
-              : '');
-              
+                ? resolveDefaultValue(empresaEncontrada, [
+                    'ALM',
+                    'alm',
+                    'almacen',
+                    'alm_def',
+                  ])
+                : '');
+
       final preValDia = empresaEncontrada != null
-          ? resolveDefaultValue(empresaEncontrada, ['PRE_VAL_DIA', 'pre_val_dia'])
+          ? resolveDefaultValue(empresaEncontrada, [
+              'PRE_VAL_DIA',
+              'pre_val_dia',
+            ])
           : '';
 
       debugPrint('============================================');
-      debugPrint('[getEmpresaDefaults] Valor bruto de PRE_VAL_DIA extraído: "$preValDia"');
+      debugPrint(
+        '[getEmpresaDefaults] Valor bruto de PRE_VAL_DIA extraído: "$preValDia"',
+      );
       if (empresaEncontrada != null) {
         debugPrint('[getEmpresaDefaults] Todo el JSON de la empresa:');
         for (final entry in empresaEncontrada.entries) {
@@ -1091,10 +1325,7 @@ class PedidosService {
       }
       debugPrint('============================================');
 
-      return {
-        'almacen': almacenFinal,
-        'preValDia': preValDia,
-      };
+      return {'almacen': almacenFinal, 'preValDia': preValDia};
     } catch (_) {
       return {'almacen': '', 'preValDia': ''};
     }
@@ -1122,7 +1353,10 @@ class PedidosService {
 
   /// Página de artículos desde `ART_M`. Se usa en la sincronización diferida
   /// para ir llenando la caché local por lotes pequeños.
-  static Future<List<OpcionMaestra>> getArticulosPage(int page, {int size = 500}) async {
+  static Future<List<OpcionMaestra>> getArticulosPage(
+    int page, {
+    int size = 500,
+  }) async {
     final json = await _api.get(
       AppConfig.endpoint('articulos'),
       params: {'page[number]': '$page', 'page[size]': '$size'},
@@ -1187,7 +1421,10 @@ class PedidosService {
 
   /// Página de clientes desde `ENT_M` (solo entidades cliente). Se usa en la
   /// sincronización diferida para llenar la caché local por lotes pequeños.
-  static Future<List<OpcionMaestra>> getClientesPage(int page, {int size = 500}) async {
+  static Future<List<OpcionMaestra>> getClientesPage(
+    int page, {
+    int size = 500,
+  }) async {
     final json = await _api.get(
       AppConfig.endpoint('clientes'),
       params: {'page[number]': '$page', 'page[size]': '$size'},
@@ -1213,7 +1450,9 @@ class PedidosService {
     if (records.isEmpty) return null;
     return OpcionMaestra(
       codigo: records.first.s('id'),
-      nombre: records.first.s('nom_com').isNotEmpty ? records.first.s('nom_com') : records.first.s('name'),
+      nombre: records.first.s('nom_com').isNotEmpty
+          ? records.first.s('nom_com')
+          : records.first.s('name'),
     );
   }
 
@@ -1247,31 +1486,42 @@ class PedidosService {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return const [];
     return records.where(isClienteEntity).where((record) {
-      final nombre = (record.s('nom_com').isNotEmpty ? record.s('nom_com') : record.s('name'))
-          .toLowerCase();
+      final nombre =
+          (record.s('nom_com').isNotEmpty
+                  ? record.s('nom_com')
+                  : record.s('name'))
+              .toLowerCase();
       final codigo = record.s('id').toLowerCase();
       return nombre.contains(q) || codigo.contains(q);
     }).toList();
   }
 
-  static Future<List<OpcionMaestra>> searchClientes(String texto, {int limit = 25}) async {
+  static Future<List<OpcionMaestra>> searchClientes(
+    String texto, {
+    int limit = 25,
+  }) async {
     final query = texto.trim();
     if (query.isEmpty) return const [];
 
     try {
       final params = buildClienteSearchParams(query, limit: limit);
-      debugPrint('🔧 searchClientes → ${AppConfig.endpoint('clientes')} $params');
+      debugPrint(
+        '🔧 searchClientes → ${AppConfig.endpoint('clientes')} $params',
+      );
       final json = await _api.get(
         AppConfig.endpoint('clientes'),
         params: params,
       );
 
-      final resultado = filterClienteRecords(payloadLista(json), query).take(limit).map(
+      final resultado = filterClienteRecords(payloadLista(json), query)
+          .take(limit)
+          .map(
             (r) => OpcionMaestra(
               codigo: r.s('id'),
               nombre: r.s('nom_com').isNotEmpty ? r.s('nom_com') : r.s('name'),
             ),
-          ).toList();
+          )
+          .toList();
       debugPrint('🔧 searchClientes("$query") → ${resultado.length} clientes.');
       return resultado;
     } catch (e) {
@@ -1302,7 +1552,9 @@ class PedidosService {
   ///
   /// Devuelve un mapa con 'codigo', 'nombre', 'descripcion', 'precio' y
   /// 'tipoIva' (porcentaje). Si algo falla o no hay resultado, claves vacías.
-  static Future<Map<String, dynamic>> getArticuloDefaults(String articuloCodigo) async {
+  static Future<Map<String, dynamic>> getArticuloDefaults(
+    String articuloCodigo,
+  ) async {
     final vacio = {
       'codigo': '',
       'nombre': '',
@@ -1325,7 +1577,9 @@ class PedidosService {
           params: {'filter[$filtro]': codigo, 'page[size]': 1},
         );
         final lista = payloadLista(json);
-        debugPrint('🛑🛑🛑 JSON DEL SERVIDOR (ARTICULO) filter[$filtro]=$codigo → $lista');
+        debugPrint(
+          '🛑🛑🛑 JSON DEL SERVIDOR (ARTICULO) filter[$filtro]=$codigo → $lista',
+        );
         if (lista.isNotEmpty) {
           articulo = lista.first;
           filtroUsado = filtro;
@@ -1333,28 +1587,40 @@ class PedidosService {
         }
       }
       if (articulo.isEmpty) {
-        debugPrint('💥💥 getArticuloDefaults("$codigo") → SIN RESULTADO en ningún filtro.');
+        debugPrint(
+          '💥💥 getArticuloDefaults("$codigo") → SIN RESULTADO en ningún filtro.',
+        );
         return vacio;
       }
-      debugPrint('🔧 getArticuloDefaults("$codigo") → encontrado con filter[$filtroUsado].');
+      debugPrint(
+        '🔧 getArticuloDefaults("$codigo") → encontrado con filter[$filtroUsado].',
+      );
 
-      final nombre = resolveDefaultValue(
-        articulo,
-        ['name', 'ART_NOM', 'art_nom', 'descripcion'],
-      );
-      final descripcion = resolveDefaultValue(
-        articulo,
-        ['dsc', 'descripcion', 'name'],
-      );
-      final precio = resolveDefaultValue(
-        articulo,
-        ['pre', 'PVP', 'pvp', 'precio'],
-      );
+      final nombre = resolveDefaultValue(articulo, [
+        'name',
+        'ART_NOM',
+        'art_nom',
+        'descripcion',
+      ]);
+      final descripcion = resolveDefaultValue(articulo, [
+        'dsc',
+        'descripcion',
+        'name',
+      ]);
+      final precio = resolveDefaultValue(articulo, [
+        'pre',
+        'PVP',
+        'pvp',
+        'precio',
+      ]);
       final tipoIva = _ivaPorcentaje(
-        resolveDefaultValue(
-          articulo,
-          ['por_iva', 'tipo_iva', 'reg_iva_vta', 'iva', 'IVA'],
-        ),
+        resolveDefaultValue(articulo, [
+          'por_iva',
+          'tipo_iva',
+          'reg_iva_vta',
+          'iva',
+          'IVA',
+        ]),
       );
 
       final resultado = {
@@ -1372,9 +1638,97 @@ class PedidosService {
     }
   }
 
+  /// Obtiene los datos de línea aplicando las tarifas de venta de Velneo.
+  ///
+  /// La prioridad es: tarifa específica cliente/artículo, tarifa del cliente
+  /// para el artículo y, por último, el PVP de ART_M con descuento cero.
+  static Future<Map<String, dynamic>> getArticuloDefaultsParaCliente(
+    String articuloCodigo, {
+    int clienteId = 0,
+  }) async {
+    final codigo = articuloCodigo.trim();
+    if (codigo.isEmpty) return getArticuloDefaults(codigo);
+
+    if (clienteId > 0) {
+      final tarifaCliente = await _buscarTarifa(
+        endpointKey: 'tarifasCliente',
+        filtro: 'clt_art',
+        valor: '$clienteId,$codigo',
+      );
+      if (tarifaCliente != null) {
+        return _aplicarTarifa(
+          await getArticuloDefaults(codigo),
+          tarifaCliente,
+          origen: 'cliente',
+        );
+      }
+
+      try {
+        final clienteDefaults = await getClienteDefaults(clienteId);
+        final tarifaId = (clienteDefaults['tarifa'] ?? '').toString().trim();
+        if (tarifaId.isNotEmpty) {
+          final tarifaArticulo = await _buscarTarifa(
+            endpointKey: 'tarifasArticulo',
+            filtro: 'tar_art',
+            valor: '$tarifaId,$codigo',
+          );
+          if (tarifaArticulo != null) {
+            return _aplicarTarifa(
+              await getArticuloDefaults(codigo),
+              tarifaArticulo,
+              origen: 'tarifa $tarifaId',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ No se pudo resolver la tarifa del cliente $clienteId: $e');
+      }
+    }
+
+    final articulo = await getArticuloDefaults(codigo);
+    return {...articulo, 'dto': '0'};
+  }
+
+  static Future<Map<String, dynamic>?> _buscarTarifa({
+    required String endpointKey,
+    required String filtro,
+    required String valor,
+  }) async {
+    try {
+      final json = await _api.get(
+        AppConfig.endpoint(endpointKey),
+        params: {'filter[$filtro]': valor, 'page[size]': 1},
+      );
+      final registros = payloadLista(json);
+      if (registros.isEmpty) return null;
+      return registros.first;
+    } catch (e) {
+      debugPrint('⚠️ Error consultando $endpointKey ($valor): $e');
+      return null;
+    }
+  }
+
+  static Map<String, dynamic> _aplicarTarifa(
+    Map<String, dynamic> defaults,
+    Map<String, dynamic> tarifa, {
+    required String origen,
+  }) {
+    final precio = resolveDefaultValue(tarifa, ['PRE', 'pre', 'precio']);
+    final dto = resolveDefaultValue(tarifa, ['POR_DTO', 'por_dto', 'dto']);
+    debugPrint('💶 Tarifa $origen aplicada → precio=$precio, dto=$dto');
+    return {
+      ...defaults,
+      if (precio.isNotEmpty) 'precio': precio,
+      'dto': dto.isNotEmpty ? dto : '0',
+    };
+  }
+
   /// Busca artículos del catálogo (`ART_M`) por nombre, descripción o código.
   /// Devuelve una lista acotada de [limit] opciones; si algo falla, lista vacía.
-  static Future<List<OpcionMaestra>> searchArticulos(String texto, {int limit = 25}) async {
+  static Future<List<OpcionMaestra>> searchArticulos(
+    String texto, {
+    int limit = 25,
+  }) async {
     final query = texto.trim();
     if (query.isEmpty) return const [];
 
@@ -1392,13 +1746,22 @@ class PedidosService {
         },
       );
 
-      final records = payloadLista(json).where((record) {
-        final nombre = (record.s('name').isNotEmpty ? record.s('name') : record.s('descripcion'))
-            .toLowerCase();
-        final codigo = (record.s('art').isNotEmpty ? record.s('art') : record.s('id'))
-            .toLowerCase();
-        return nombre.contains(query.toLowerCase()) || codigo.contains(query.toLowerCase());
-      }).take(limit).map(_opcionFromRecord).toList();
+      final records = payloadLista(json)
+          .where((record) {
+            final nombre =
+                (record.s('name').isNotEmpty
+                        ? record.s('name')
+                        : record.s('descripcion'))
+                    .toLowerCase();
+            final codigo =
+                (record.s('art').isNotEmpty ? record.s('art') : record.s('id'))
+                    .toLowerCase();
+            return nombre.contains(query.toLowerCase()) ||
+                codigo.contains(query.toLowerCase());
+          })
+          .take(limit)
+          .map(_opcionFromRecord)
+          .toList();
 
       return records;
     } catch (_) {

@@ -42,7 +42,9 @@ import 'screens/agenda_calendar_screen.dart';
 import 'screens/presupuestos_list_screen.dart';
 import 'screens/presupuesto_detail_screen.dart';
 import 'screens/presupuesto_form_screen.dart';
+import 'screens/settings_screen.dart';
 import 'state/auth_state.dart'; // Estado global de la sesión (¿estamos conectados?).
+import 'state/theme_settings.dart';
 import 'theme/app_theme.dart'; // Colores y estilos de toda la app.
 
 /// main() es la FUNCIÓN DE ARRANQUE: es lo PRIMERO que ejecuta Flutter.
@@ -59,12 +61,15 @@ Future<void> main() async {
   // inicializado" y la sincronización diferida lanza también TimeoutException.
   // Es idempotente: si ya está abierta, no hace nada.
   await localCacheDbInstance.init();
+  final themeSettings = ThemeSettings();
+  await themeSettings.load();
 
   // runApp(...) = "enciende la app y muestra esto en la pantalla".
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthState()),
+        ChangeNotifierProvider.value(value: themeSettings),
         Provider(create: (_) => OrderRepository()),
         Provider(create: (_) => CrmRepository()),
         Provider(create: (_) => EntitySearchRepository()),
@@ -85,10 +90,13 @@ class PedidosVentaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // MaterialApp = el "caparazón" de la app. Configura título, tema y rutas.
+    final themeSettings = context.watch<ThemeSettings>();
     return MaterialApp(
       title: 'Pedidos de Venta', // Título (visible en la barra del navegador o Task Switcher).
       debugShowCheckedModeBanner: false, // Oculta la cinta roja "DEBUG" en la esquina.
       theme: AppTheme.light(), // Tema claro con los colores definidos en theme/app_theme.dart.
+      darkTheme: AppTheme.dark(),
+      themeMode: themeSettings.themeMode,
 
       // initialRoute: ¿qué pantalla se muestra al abrir la app? La "/".
       initialRoute: '/',
@@ -118,6 +126,7 @@ class PedidosVentaApp extends StatelessWidget {
         '/presupuesto/form': (context) => PresupuestoFormScreen(
               presupuestoId: ModalRoute.of(context)!.settings.arguments,
             ),
+        '/configuracion': (context) => const SettingsScreen(),
       },
     );
   }

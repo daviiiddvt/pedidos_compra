@@ -1,4 +1,5 @@
 import 'package:diacritic/diacritic.dart';
+
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 
@@ -14,13 +15,13 @@ class OrderRepository {
   }
 
   void setClientes(List<Cliente> clientes) {
-    _clienteCache = {for (var c in clientes) c.id: c};
+    _clienteCache = {..._clienteCache, for (var c in clientes) c.id: c};
     _enrichOrders();
   }
 
   void _enrichOrders() {
     if (_clienteCache.isEmpty) return;
-        
+
     _allOrders = _allOrders.map((order) {
       final cliente = _clienteCache[order.clienteId];
       if (cliente == null) return order;
@@ -43,7 +44,7 @@ class OrderRepository {
     required User? currentUser,
   }) {
     final normalizedQuery = removeDiacritics(query.toLowerCase());
-        
+
     final role = currentUser?.role.toLowerCase();
     final commercialId = currentUser?.contactId ?? '';
 
@@ -55,9 +56,10 @@ class OrderRepository {
         return false;
       }
 
-          final matchesStatus = statusFilter == null ||
-            statusFilter.isEmpty ||
-            AppColors.estadoCodigo(order.estado) ==
+      final matchesStatus =
+          statusFilter == null ||
+          statusFilter.isEmpty ||
+          AppColors.estadoCodigo(order.estado) ==
               AppColors.estadoCodigo(statusFilter);
       if (!matchesStatus) return false;
 
@@ -66,7 +68,8 @@ class OrderRepository {
         '${order.clienteNombre} ${order.clienteTelefono} ${order.clienteCif} ${order.numeroPedido}'
             .toLowerCase(),
       );
-      return normalizedQuery.isEmpty || searchableText.contains(normalizedQuery);
+      return normalizedQuery.isEmpty ||
+          searchableText.contains(normalizedQuery);
     }).toList();
   }
 }

@@ -21,7 +21,6 @@
 
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart'; // Colores.
 
 /// ModalSelector: la ventana emergente con la lista y el buscador.
 class ModalSelector extends StatefulWidget {
@@ -127,10 +126,10 @@ class _ModalSelectorState extends State<ModalSelector> {
             // Título.
             Text(
               widget.title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: AppColors.text,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 12),
@@ -160,11 +159,13 @@ class _ModalSelectorState extends State<ModalSelector> {
 
             Flexible(
               child: _filtered.isEmpty
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.all(24),
                       child: Text(
                         'Sin resultados',
-                        style: TextStyle(color: AppColors.textSecondary),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     )
                   : ListView.builder(

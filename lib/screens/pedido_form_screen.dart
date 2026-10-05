@@ -55,8 +55,18 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   bool _guardando = false; // ¿Estamos guardando ya? (para no doble enviar).
   String _tab = 'cabecera'; // Pestaña activa.
 
-  // ¿Estamos en modo edición? Sí, si nos pasaron un id.
-  bool get _editando => widget.pedidoId != null && widget.pedidoId is! Pedido;
+  dynamic get _pedidoIdReal =>
+      widget.pedidoId is Pedido ? (widget.pedidoId as Pedido).id : widget.pedidoId;
+
+  bool get _esConversionDesdePresupuesto {
+    if (widget.pedidoId is! Pedido) return false;
+    final pedido = widget.pedidoId as Pedido;
+    return pedido.id != null &&
+        pedido.codigo == 0 &&
+        pedido.numeroPedido.isEmpty;
+  }
+
+  bool get _editando => _pedidoIdReal != null && !_esConversionDesdePresupuesto;
 
   /// El pedido en construcción vive en el cubit (fuente de verdad única).
   Pedido get _pedido => _cubit.state.pedido;
@@ -64,16 +74,21 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   @override
   void initState() {
     super.initState();
-    // Pedido nuevo con fecha de HOY por defecto, o el pedido inicial pasado.
     if (widget.pedidoId is Pedido) {
       final initial = widget.pedidoId as Pedido;
       _cubit = PedidoFormCubit(initial);
       _lineas = [...initial.lineas];
+      _lineasOriginalesIds = initial.lineas
+          .where((linea) => linea.id != null)
+          .map((linea) => linea.id!)
+          .toSet();
+      _cargandoDetalle = false;
+        _cubit.init(initial);
     } else {
       _cubit = PedidoFormCubit(Pedido(fecha: todayIso()));
-    }
-    if (_editando) {
-      _cargarDetalle(); // Si es edición, cargamos los datos del servidor.
+      if (_editando) {
+        _cargarDetalle();
+      }
     }
   }
 
@@ -154,6 +169,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
     final resultado = await mostrarLineaForm(
       context,
       linea: linea, // Enviamos la línea actual para que salga rellena.
+      clienteId: _pedido.clienteId,
       onDelete: () => _eliminarLinea(index), // Si toca "borrar", eliminamos.
     );
     if (resultado != null) {
@@ -166,7 +182,10 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
 
   /// _anadirLinea: abre el modal vacío para añadir UNA línea nueva.
   Future<void> _anadirLinea() async {
-    final resultado = await mostrarLineaForm(context);
+    final resultado = await mostrarLineaForm(
+      context,
+      clienteId: _pedido.clienteId,
+    );
     if (resultado != null) {
       setState(() => _lineas = [..._lineas, resultado]); // La añadimos al final.
     }
@@ -250,7 +269,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
       final pedidoParaGuardar = pedidoConComercial.copyWith(lineas: _lineas);
       if (_editando) {
         await PedidosService.updateComplete(
-          widget.pedidoId,
+          _pedidoIdReal,
           pedidoParaGuardar,
           removedLineIds,
         );
@@ -286,7 +305,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
       // El cubit lo creamos en initState; aquí solo lo exponemos al árbol.
       create: (_) => _cubit,
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(title: Text(_editando ? 'Editar pedido' : 'Nuevo pedido')),
         body: _cargandoDetalle
             ? const Center(child: CircularProgressIndicator()) // Cargando (editar).
@@ -327,7 +346,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
 
                   // ---- Barra inferior: Cancelar | Guardar ----
                   Material(
-                    color: AppColors.surface,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     child: SafeArea(
                       top: false,
                       child: Padding(

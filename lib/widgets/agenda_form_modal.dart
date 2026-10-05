@@ -68,8 +68,6 @@ class AgendaFormModal extends StatefulWidget {
 }
 
 class _AgendaFormModalState extends State<AgendaFormModal> {
-  static const _gap = SizedBox(width: 10, height: 4);
-
   String _campanaNombre = '';
   String _tipoVisitaNombre = '';
   String _clienteNombre = '';
@@ -183,15 +181,14 @@ class _AgendaFormModalState extends State<AgendaFormModal> {
 
   @override
   Widget build(BuildContext context) {
-    final viewInsets = MediaQuery.viewInsetsOf(context);
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      backgroundColor: AppColors.surface,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1080, maxHeight: 820),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + viewInsets.bottom),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
           child: BlocConsumer<AgendaFormCubit, AgendaFormState>(
             listenWhen: (prev, next) =>
                 prev.campanas != next.campanas ||
@@ -218,10 +215,10 @@ class _AgendaFormModalState extends State<AgendaFormModal> {
                 children: [
                   Text(
                     visita.id == null ? 'Nueva visita' : 'Editar visita',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.text,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -369,20 +366,17 @@ class _AgendaFormModalState extends State<AgendaFormModal> {
                           ]),
                           const SizedBox(height: 8),
                           const _SeccionAgenda('Presupuesto'),
-                          Row(
+                          Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: CampoForm(
-                                  label: 'Nº Presupuesto',
-                                  value: visita.presupuestoId ?? '',
-                                  placeholder: 'Número de presupuesto',
-                                  onChanged: (v) => _update('presupuestoId', v),
-                                ),
+                              CampoForm(
+                                label: 'Nº Presupuesto',
+                                value: visita.presupuestoId ?? '',
+                                placeholder: 'Número de presupuesto',
+                                onChanged: (v) => _update('presupuestoId', v),
                               ),
-                              const SizedBox(width: 4),
-                              Padding(
-                                padding: const EdgeInsets.only(top: 22),
+                              Align(
+                                alignment: Alignment.centerRight,
                                 child: IconButton(
                                   tooltip: 'Crear presupuesto',
                                   icon: const Icon(Icons.add),
@@ -425,12 +419,12 @@ class _AgendaFormModalState extends State<AgendaFormModal> {
   Widget _fila(List<Widget> hijos) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < hijos.length; i++) ...[
-            if (i > 0) _gap,
-            Expanded(child: hijos[i]),
+            if (i > 0) const SizedBox(height: 10),
+            hijos[i],
           ],
         ],
       ),
@@ -486,7 +480,10 @@ class _CheckboxAgenda extends StatelessWidget {
             Flexible(
               child: Text(
                 label,
-                style: const TextStyle(fontSize: 14, color: AppColors.text),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ),
           ],
@@ -546,7 +543,10 @@ class _CampoHora extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 6),
         InkWell(
@@ -563,7 +563,9 @@ class _CampoHora extends StatelessWidget {
                       fontSize: 15,
                       color: !enabled
                           ? AppColors.disabled
-                          : (hayValor ? AppColors.text : AppColors.disabled),
+                            : (hayValor
+                              ? Theme.of(context).colorScheme.onSurface
+                              : AppColors.disabled),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -571,7 +573,9 @@ class _CampoHora extends StatelessWidget {
                 Icon(
                   Icons.schedule_outlined,
                   size: 18,
-                  color: enabled ? AppColors.textSecondary : AppColors.disabled,
+                    color: enabled
+                      ? Theme.of(context).colorScheme.onSurfaceVariant
+                      : AppColors.disabled,
                 ),
               ],
             ),
@@ -597,32 +601,74 @@ class _BotoneraAgenda extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        OutlinedButton.icon(
-          onPressed: onEliminar,
-          icon: const Icon(Icons.delete_outline, size: 18),
-          label: const Text('ELIMINAR'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.error,
-            side: const BorderSide(color: AppColors.error),
+    final botones = <Widget>[
+      Tooltip(
+        message: 'Eliminar',
+        child: SizedBox.square(
+          dimension: 48,
+          child: OutlinedButton(
+            onPressed: onEliminar,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.error,
+              side: const BorderSide(color: AppColors.error),
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Icon(Icons.delete_outline, size: 20),
           ),
         ),
-        const Spacer(),
-        OutlinedButton(
-          onPressed: onAceptar,
-          child: const Text('ACEPTAR'),
+      ),
+      Tooltip(
+        message: 'Aceptar',
+        child: SizedBox.square(
+          dimension: 48,
+          child: OutlinedButton(
+            onPressed: onAceptar,
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Icon(Icons.check, size: 20),
+          ),
         ),
-        const SizedBox(width: 8),
-        ElevatedButton(
-          onPressed: onEnviar,
-          child: const Text('ENVIAR'),
+      ),
+      Tooltip(
+        message: 'Enviar',
+        child: SizedBox.square(
+          dimension: 48,
+          child: ElevatedButton(
+            onPressed: onEnviar,
+            style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Icon(Icons.send_outlined, size: 20),
+          ),
         ),
-        const SizedBox(width: 8),
-        OutlinedButton(
-          onPressed: onCancelar,
-          child: const Text('CANCELAR'),
+      ),
+      Tooltip(
+        message: 'Cancelar',
+        child: SizedBox.square(
+          dimension: 48,
+          child: OutlinedButton(
+            onPressed: onCancelar,
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Icon(Icons.close, size: 20),
+          ),
         ),
+      ),
+    ];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        for (var i = 0; i < botones.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          botones[i],
+        ],
       ],
     );
   }

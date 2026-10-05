@@ -41,6 +41,7 @@ class PedidoDetailScreen extends StatefulWidget {
 class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
   Pedido? _pedido; // El pedido cargado (null mientras carga o si falla).
   bool _cargando = true; // ¿Estamos pidiendo el detalle?
+  bool _enviandoEmail = false;
   String _tab = 'cabecera'; // Pestaña activa: empieza en "Cabecera".
 
   @override
@@ -71,12 +72,12 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
     final pedido = _pedido;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         // Título: "Pedido 123" si tiene código, si no simplemente "Pedido".
         title: Text(
           pedido != null && pedido.codigo != 0
-              ? 'Pedido ${pedido.codigo}'
+              ? 'Pedido ${pedido.numeroPedido}'
               : 'Pedido',
         ),
       ),
@@ -129,18 +130,37 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
 
         // ---- Barra inferior con el botón "Editar" ----
         Material(
-          color: AppColors.surface,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           child: SafeArea(
             top: false,
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: SizedBox(
-                width: double.infinity, // Botón a lo ancho.
-                child: ElevatedButton.icon(
-                  onPressed: () => _editar(pedido),
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Editar'),
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _editar(pedido),
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Editar'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _puedeEnviarEmail(pedido) && !_enviandoEmail
+                          ? () => _enviarEmail(pedido)
+                          : null,
+                      icon: _enviandoEmail
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.email_outlined),
+                      label: const Text('Enviar email'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -152,7 +172,7 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
   /// _resumen: el bloque superior (código, estado, cliente, fecha).
   Widget _resumen(Pedido pedido) {
     return Container(
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,10 +209,10 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
                 : (pedido.cliente.isNotEmpty ? pedido.cliente : 'Sin cliente'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis, // Si es muy largo, "..." al final.
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w600,
-              color: AppColors.text,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
 
@@ -200,7 +220,10 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
           if (pedido.fecha.isNotEmpty)
             Text(
               'Fecha: ${formatDate(pedido.fecha)}', // Formato "10/09/2026".
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
         ],
       ),
@@ -211,7 +234,28 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
   /// para que se vean los cambios guardados.
   Future<void> _editar(Pedido pedido) async {
     await Navigator.of(context)
-        .pushNamed('/pedido/form', arguments: pedido.id);
+        .pushNamed('/pedido/form', arguments: pedido);
     if (mounted) _cargar();
+  }
+
+  bool _puedeEnviarEmail(Pedido pedido) =>
+      pedido.id != null && pedido.clienteId > 0 && pedido.lineas.isNotEmpty;
+
+  Future<void> _enviarEmail(Pedido pedido) async {
+    setState(() => _enviandoEmail = true);
+    try {
+      await PedidosService.enviarEmailPedido(pedido.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email enviado correctamente')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo enviar el email: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _enviandoEmail = false);
+    }
   }
 }

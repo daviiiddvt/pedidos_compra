@@ -19,10 +19,13 @@
 //  - setState: "aviso" de que algo cambió → marca para que build() se repita.
 // ============================================================================
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api_service.dart'; // PedidosService (pide datos al servidor).
+import '../core/config.dart';
 import '../models/models.dart'; // El modelo Pedido.
 import '../core/order_repository.dart';
 import '../state/auth_state.dart'; // Para el botón "Salir" (desconectar).
@@ -44,12 +47,18 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
 
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   // --- "Memoria" de la lista ---
   List<Pedido> _pedidos = []; // Los pedidos cargados hasta ahora.
   bool _cargando = true; // ¿Estamos pidiendo datos ahora mismo?
+  bool _cargandoPagina = false;
+  bool _hayMas = true;
+  int _pagina = 1;
+  int _totalPedidos = 0;
   String _filtroEstado = ''; // Filtro activo ('' = sin filtrar = "Todos").
   String _busqueda = '';
+  int _busquedaVersion = 0;
   bool _verPorZona = false; // Alternar modo de visión
 
   /// initState: al nacer la pantalla, nos suscribimos al scroll y cargamos la
@@ -58,40 +67,109 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_cargarAlLlegarAlFinal);
     WidgetsBinding.instance.addPostFrameCallback((_) => _cargarInicial());
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  /// _cargar: pide una página de pedidos al servidor.
-  /// - pagina: qué página pedimos.
-  /// - estado: filtro activo ('' = todos).
-  /// - refresh: si es true, REEMPLAZA la lista; si no, AÑADE al final (scroll).
-  /// - search: término de búsqueda.
   Future<void> _cargarInicial() async {
+    await _cargarPagina(reset: true);
+  }
+
+  void _cargarAlLlegarAlFinal() {
+    if (_busqueda.trim().isNotEmpty) return;
+    if (_scrollController.position.extentAfter < 400) {
+      _cargarPagina();
+    }
+  }
+
+  Future<void> _cargarBusquedaCompleta(int version) async {
+    while (mounted && version == _busquedaVersion && _cargandoPagina) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    if (!mounted || version != _busquedaVersion) return;
+    await _cargarPagina(reset: true);
+    while (mounted && version == _busquedaVersion && _hayMas) {
+      if (_cargandoPagina) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        continue;
+      }
+      await _cargarPagina();
+    }
+  }
+
+  /// Descarga una página y la añade a las ya cargadas. Para administradores
+  /// [comercial] queda vacío, por lo que Velneo devuelve todos los pedidos.
+  Future<void> _cargarPagina({bool reset = false}) async {
+    if (_cargandoPagina || (!reset && !_hayMas)) return;
+
+    final repository = context.read<OrderRepository>();
+    final auth = context.read<AuthState>();
+    final user = auth.currentUser;
+    final comercial = user?.role.toLowerCase() == 'comercial'
+        ? user?.contactId
+        : null;
+    final zonaComercial = auth.canViewTechnicalZone ? user?.contactId : null;
+
+    if (reset) {
+      _pagina = 1;
+      _totalPedidos = 0;
+      _hayMas = true;
+      repository.clearCache();
+    }
+
+    setState(() {
+      _cargandoPagina = true;
+      if (reset) _cargando = true;
+    });
+
     try {
-      final auth = context.read<AuthState>();
-      final user = auth.currentUser;
-      final pedidos = await PedidosService.listAll(
-        comercial: user?.role.toLowerCase() == 'comercial'
-            ? user?.contactId
-            : null,
-        porZona: _verPorZona,
-      );
+      late final ResultadoLista<Pedido> resultado;
+      if (_verPorZona && zonaComercial != null && zonaComercial.isNotEmpty) {
+        final pedidos = await PedidosService.listAll(
+          comercial: zonaComercial,
+          porZona: true,
+        );
+        resultado = ResultadoLista<Pedido>(
+          items: pedidos,
+          total: pedidos.length,
+          page: 1,
+        );
+      } else {
+        resultado = await PedidosService.list(
+          page: _pagina,
+          comercial: comercial,
+        );
+      }
       if (!mounted) return; // Si la pantalla ya se cerró, no seguimos.
-      final repository = context.read<OrderRepository>();
-      repository.setOrders(pedidos);
+      repository.setOrders([
+        if (!reset) ...repository.cachedOrders,
+        ...resultado.items,
+      ]);
+      _pagina++;
+      _totalPedidos = resultado.total;
+      _hayMas = _totalPedidos > 0
+          ? repository.cachedOrders.length < _totalPedidos
+          : resultado.items.length >= AppConfig.pageSize;
       _aplicarFiltros();
-      setState(() => _cargando = false);
+      setState(() {
+        _cargando = false;
+        _cargandoPagina = false;
+      });
 
       // Los datos auxiliares no bloquean la primera pintura de la lista.
       try {
-        final clienteIds = pedidos.map((pedido) => pedido.clienteId).toSet().toList();
+        final clienteIds = resultado.items
+            .map((pedido) => pedido.clienteId)
+            .toSet()
+            .toList();
         final clientes = await PedidosService.getClientesByIds(clienteIds);
         if (!mounted) return;
         repository.setClientes(clientes);
@@ -101,32 +179,34 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _cargando = false);
+      setState(() {
+        _cargando = false;
+        _cargandoPagina = false;
+      });
       // Mostramos el error del servidor en un snackbar.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
   void _aplicarFiltros() {
     final pedidos = context.read<OrderRepository>().filterOrders(
-          query: _busqueda,
-          statusFilter: _filtroEstado,
-          currentUser: context.read<AuthState>().currentUser,
-        );
+      query: _busqueda,
+      statusFilter: _filtroEstado,
+      currentUser: context.read<AuthState>().currentUser,
+    );
     if (mounted) setState(() => _pedidos = pedidos);
   }
 
   /// _refrescar: recarga la primera página (se usa con el gesto "tirar abajo").
   Future<void> _refrescar() async {
-    setState(() => _cargando = true);
     await _cargarInicial();
   }
 
   /// _cambiarFiltro: al tocar un filtro (ej. "Recibido"), vuelve a la página 1.
   void _cambiarFiltro(String estado) {
-    if (estado == _filtroEstado) return; // Tocar el filtro ya activo → no hacer nada.
+    if (estado == _filtroEstado) {
+      return; // Tocar el filtro ya activo → no hacer nada.
+    }
     setState(() {
       _filtroEstado = estado;
     });
@@ -183,9 +263,6 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
       body: Column(
         children: [
           _filtros(), // Fila con los chips (Todos/Pendiente/Recibido/Cancelado).
-
-
-
           // Contador: "X pedidos" (solo si hay algo).
           if (_pedidos.isNotEmpty)
             Padding(
@@ -194,9 +271,9 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   '${_pedidos.length} pedidos',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -205,31 +282,41 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
           // ---- La zona de la lista (Expandida = ocupa el resto del alto) ----
           Expanded(
             child: _cargando && _pedidos.isEmpty
-                ? const Center(child: CircularProgressIndicator()) // Cargando 1ª vez.
+                ? Center(
+                    child: CircularProgressIndicator(),
+                  ) // Cargando 1ª vez.
                 : _pedidos.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'Sin pedidos de venta que mostrar.',
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                      )
-                    : RefreshIndicator(
-                        // Gestazo de "tirar hacia abajo" = recargar.
-                        onRefresh: _refrescar,
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          itemCount: _pedidos.length,
-                          itemBuilder: (context, index) {
-                            // Un pedido normal → su tarjeta FilaPedido.
-                            final pedido = _pedidos[index];
-                            return FilaPedido(
-                              pedido: pedido,
-                              onTap: () => _abrirDetalle(pedido),
-                            );
-                          },
-                        ),
+                ? Center(
+                  child: Text(
+                      'Sin pedidos de venta que mostrar.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
+                    ),
+                  )
+                : RefreshIndicator(
+                    // Gestazo de "tirar hacia abajo" = recargar.
+                    onRefresh: _refrescar,
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: _pedidos.length + (_hayMas ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == _pedidos.length) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        // Un pedido normal → su tarjeta FilaPedido.
+                        final pedido = _pedidos[index];
+                        return FilaPedido(
+                          pedido: pedido,
+                          onTap: () => _abrirDetalle(pedido),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -237,40 +324,42 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
   }
 
   Widget _filtros() {
+    final canViewTechnicalZone = context.read<AuthState>().canViewTechnicalZone;
     return Container(
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Selector de modo de visión
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment<bool>(
-                value: false,
-                label: Text('Mis clientes asignados'),
-                icon: Icon(Icons.person),
-              ),
-              ButtonSegment<bool>(
-                value: true,
-                label: Text('Mi zona técnica'),
-                icon: Icon(Icons.map),
-              ),
-            ],
-            selected: {_verPorZona},
-            onSelectionChanged: (Set<bool> newSelection) {
-              final newValue = newSelection.first;
-              if (newValue == _verPorZona) return;
-              
-              setState(() {
-                _verPorZona = newValue;
-                _pedidos.clear(); // Limpiamos la lista para mostrar el cargador
-              });
-              _refrescar();
-            },
-          ),
+          if (canViewTechnicalZone)
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment<bool>(
+                  value: false,
+                  label: Text('Mis clientes asignados'),
+                  icon: Icon(Icons.person),
+                ),
+                ButtonSegment<bool>(
+                  value: true,
+                  label: Text('Mi zona técnica'),
+                  icon: Icon(Icons.map),
+                ),
+              ],
+              selected: {_verPorZona},
+              onSelectionChanged: (Set<bool> newSelection) {
+                final newValue = newSelection.first;
+                if (newValue == _verPorZona) return;
+
+                setState(() {
+                  _verPorZona = newValue;
+                  _pedidos.clear();
+                });
+                _refrescar();
+              },
+            ),
           const SizedBox(height: 10),
-          
+
           // 1. La fila de chips (dentro de un Wrap)
           Wrap(
             spacing: 8,
@@ -290,9 +379,8 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
               ),
             ],
           ),
-          
-          const SizedBox(height: 10), // Separación entre chips y buscador sized box es un widget que permite definir un tamaño fijo para su hijo, en este caso se utiliza para darle un alto fijo al TextField del buscador.
 
+          const SizedBox(height: 10), // Separación entre chips y buscador sized box es un widget que permite definir un tamaño fijo para su hijo, en este caso se utiliza para darle un alto fijo al TextField del buscador.
           // 2. El buscador (envuelto en un SizedBox para darle tamaño fijo si quieres)
           SizedBox(
             height: 48,
@@ -303,12 +391,22 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12), // Ajusta el padding horizontal según tus necesidades
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                ), // Ajusta el padding horizontal según tus necesidades
               ),
               controller: _searchController,
               onChanged: (value) {
                 _busqueda = value;
-                _aplicarFiltros();
+                _busquedaVersion++;
+                final version = _busquedaVersion;
+                _searchDebounce?.cancel();
+                _searchDebounce = Timer(
+                  const Duration(milliseconds: 350),
+                  () => _busqueda.trim().isEmpty
+                      ? _cargarPagina(reset: true)
+                      : _cargarBusquedaCompleta(version),
+                );
               },
             ),
           ),

@@ -131,11 +131,15 @@ class AppTheme {
       seedColor: AppColors.primary,
       brightness: brightness,
     );
+    final isDark = brightness == Brightness.dark;
+    final background = isDark ? scheme.surface : AppColors.background;
+    final surface = isDark ? scheme.surfaceContainerHighest : AppColors.surface;
+    final border = isDark ? scheme.outline : AppColors.border;
 
     return ThemeData(
       useMaterial3: true, // Usa el lenguaje visual moderno de Material.
       colorScheme: scheme, // La paleta generada.
-      scaffoldBackgroundColor: AppColors.background, // Fondo general de pantallas.
+      scaffoldBackgroundColor: background, // Fondo general de pantallas.
 
       // --- Barra superior (AppBar) ---
       appBarTheme: const AppBarTheme(
@@ -145,16 +149,16 @@ class AppTheme {
       ),
 
       // --- Campos de texto (TextFormField) ---
-      inputDecorationTheme: const InputDecorationTheme(
+      inputDecorationTheme: InputDecorationTheme(
         filled: true, // Fondo relleno.
-        fillColor: AppColors.surface, // Blanco.
+        fillColor: surface,
         border: OutlineInputBorder( // Borde redondeado.
           borderRadius: BorderRadius.all(Radius.circular(10)), // Esquinas redondeadas.
-          borderSide: BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: border),
         ),
         enabledBorder: OutlineInputBorder( // Borde cuando el campo está activo.
           borderRadius: BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: border),
         ),
         focusedBorder: OutlineInputBorder( // Borde cuando lo estamos escribiendo.
           borderRadius: BorderRadius.all(Radius.circular(10)),
@@ -178,9 +182,9 @@ class AppTheme {
       // --- Botón secundario (OutlinedButton, con borde) ---
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.text,
+          foregroundColor: scheme.onSurface,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          side: const BorderSide(color: AppColors.border),
+          side: BorderSide(color: border),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -195,8 +199,8 @@ class AppTheme {
       ),
 
       // --- Tarjetas (Card) ---
-      cardTheme: const CardThemeData(
-        color: AppColors.surface, // Fondo blanco.
+      cardTheme: CardThemeData(
+        color: surface,
         elevation: 2, // Sombra suave.
         margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6), // Separación.
         shape: RoundedRectangleBorder(

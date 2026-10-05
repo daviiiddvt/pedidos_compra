@@ -83,21 +83,100 @@ class _CabeceraFormState extends State<CabeceraForm> {
   @override
   void initState() {
     super.initState();
-    _cargarMaestros(); // Al nacer, bajamos todas las listas.
+    // 1. Resolución INSTANTÁNEA (0 ms) si los maestros ya están en caché de sesión:
+    final cache = MasterCacheService();
+    _series = cache.getSync<List<OpcionMaestra>>('series') ?? [];
+    _formasPago = cache.getSync<List<OpcionMaestra>>('formas_pago') ?? [];
+    _almacenes = cache.getSync<List<OpcionMaestra>>('almacenes') ?? [];
+    _comerciales = cache.getSync<List<OpcionMaestra>>('comerciales') ?? [];
+
+    if (_series.isNotEmpty ||
+        _formasPago.isNotEmpty ||
+        _comerciales.isNotEmpty ||
+        _almacenes.isNotEmpty) {
+      _cargandoMaestros = false;
+      final s = PedidosService.findMatchingOption(_series, widget.pedido.serie);
+      final f = PedidosService.findMatchingOption(
+        _formasPago,
+        widget.pedido.formaPago,
+      );
+      final c = PedidosService.findMatchingOption(
+        _comerciales,
+        widget.pedido.comercial,
+      );
+      OpcionMaestra? a;
+      if (widget.pedido.almacen.isNotEmpty) {
+        a = PedidosService.findMatchingOption(
+          _almacenes,
+          widget.pedido.almacen,
+        );
+      } else if (widget.mostrarAlmacen && _almacenes.isNotEmpty) {
+        a =
+            PedidosService.findMatchingOption(_almacenes, '1') ??
+            PedidosService.findMatchingOption(_almacenes, '001') ??
+            _almacenes.first;
+      }
+
+      if (s != null || f != null || c != null || a != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _actualizar(
+            (pedido) => pedido.copyWith(
+              serieNombre: s?.nombre ?? widget.pedido.serieNombre,
+              formaPagoNombre: f?.nombre ?? widget.pedido.formaPagoNombre,
+              comercialNombre: c?.nombre ?? widget.pedido.comercialNombre,
+              almacen: a != null ? a.codigo : widget.pedido.almacen,
+              almacenNombre: a != null ? a.nombre : widget.pedido.almacenNombre,
+            ),
+          );
+        });
+      }
+    }
+
+    _cargarMaestros(); // Refresco o descarga paralela en segundo plano
     _cargarEmpresaDefaults();
   }
 
   Future<void> _cargarEmpresaDefaults() async {
     try {
       final currentUser = context.read<AuthState>().currentUser;
-      final defaults = await PedidosService.getEmpresaDefaults(
-        contactId: currentUser?.contactId,
+      final esAlta = widget.pedido.id == null || widget.pedido.codigo == 0;
+      if (esAlta &&
+          currentUser?.role.toLowerCase() == 'administrador' &&
+          currentUser!.contactId.isNotEmpty &&
+          widget.pedido.comercial.isEmpty) {
+        final esComercial = await PedidosService.esContactoComercial(
+          currentUser.contactId,
+        );
+        if (!mounted) return;
+        if (esComercial) {
+          final comercial = PedidosService.findMatchingOption(
+            _comerciales,
+            currentUser.contactId,
+          );
+          _actualizar(
+            (pedido) => pedido.copyWith(
+              comercial: currentUser.contactId,
+              comercialNombre: comercial?.nombre ?? currentUser.name,
+            ),
+          );
+        }
+      }
+      final cache = MasterCacheService();
+      final cacheKey = 'empresa_defaults:${currentUser?.contactId ?? ""}';
+      final defaults = await cache.getOrLoad<Map<String, dynamic>>(
+        key: cacheKey,
+        loader: () => PedidosService.getEmpresaDefaults(
+          contactId: currentUser?.contactId,
+        ),
+        ttl: const Duration(minutes: 30),
       );
       if (!mounted) return;
 
       final preValDia = defaults['preValDia'];
       setState(() {
-        _fechaValidezEditable = preValDia == null || preValDia.toString().trim().isEmpty;
+        _fechaValidezEditable =
+            preValDia == null || preValDia.toString().trim().isEmpty;
       });
 
       if (widget.mostrarAlmacen) {
@@ -108,8 +187,8 @@ class _CabeceraFormState extends State<CabeceraForm> {
           final almacenOpcion =
               PedidosService.findMatchingOption(_almacenes, almacenDefault) ??
               OpcionMaestra(codigo: almacenDefault, nombre: almacenDefault);
-          widget.onChanged(
-            widget.pedido.copyWith(
+          _actualizar(
+            (pedido) => pedido.copyWith(
               almacen: almacenOpcion.codigo,
               almacenNombre: almacenOpcion.nombre,
             ),
@@ -142,37 +221,71 @@ class _CabeceraFormState extends State<CabeceraForm> {
       }
     }
 
-    final resultados = await Future.wait([
-      cargar('series', 'series', PedidosService.getSeries),
-      cargar('comerciales', 'comerciales', PedidosService.getComerciales),
-      if (widget.mostrarAlmacen)
-        cargar('almacenes', 'almacenes', PedidosService.getAlmacenes)
-      else
-        Future.value(<OpcionMaestra>[]),
-      cargar('formas de pago', 'formas_pago', PedidosService.getFormasPago),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _series = resultados[0];
-      _comerciales = resultados[1];
-      _almacenes = resultados[2];
-      _formasPago = resultados[3];
-      _cargandoMaestros = false;
+    void actualizarNombres() {
+      if (!mounted) return;
+      final s = PedidosService.findMatchingOption(_series, widget.pedido.serie);
+      final c = PedidosService.findMatchingOption(
+        _comerciales,
+        widget.pedido.comercial,
+      );
+      final a = PedidosService.findMatchingOption(
+        _almacenes,
+        widget.pedido.almacen,
+      );
+      final f = PedidosService.findMatchingOption(
+        _formasPago,
+        widget.pedido.formaPago,
+      );
+
+      if (s != null || c != null || a != null || f != null) {
+        _actualizar(
+          (pedido) => pedido.copyWith(
+            serieNombre: s?.nombre ?? widget.pedido.serieNombre,
+            comercialNombre: c?.nombre ?? widget.pedido.comercialNombre,
+            almacenNombre: a?.nombre ?? widget.pedido.almacenNombre,
+            formaPagoNombre: f?.nombre ?? widget.pedido.formaPagoNombre,
+          ),
+        );
+      }
+    }
+
+    // Series y formas de pago responden al instante sin esperar a la descarga pesada de comerciales:
+    cargar('series', 'series', PedidosService.getSeries).then((res) {
+      if (mounted && res.isNotEmpty) {
+        setState(() => _series = res);
+        actualizarNombres();
+      }
     });
 
-    final s = PedidosService.findMatchingOption(_series, widget.pedido.serie);
-    final c = PedidosService.findMatchingOption(_comerciales, widget.pedido.comercial);
-    final a = PedidosService.findMatchingOption(_almacenes, widget.pedido.almacen);
-    final f = PedidosService.findMatchingOption(_formasPago, widget.pedido.formaPago);
+    cargar('formas de pago', 'formas_pago', PedidosService.getFormasPago).then((
+      res,
+    ) {
+      if (mounted && res.isNotEmpty) {
+        setState(() => _formasPago = res);
+        actualizarNombres();
+      }
+    });
 
-    if (s != null || c != null || a != null || f != null) {
-      widget.onChanged(widget.pedido.copyWith(
-        serieNombre: s?.nombre ?? widget.pedido.serieNombre,
-        comercialNombre: c?.nombre ?? widget.pedido.comercialNombre,
-        almacenNombre: a?.nombre ?? widget.pedido.almacenNombre,
-        formaPagoNombre: f?.nombre ?? widget.pedido.formaPagoNombre,
-      ));
+    if (widget.mostrarAlmacen) {
+      cargar('almacenes', 'almacenes', PedidosService.getAlmacenes).then((res) {
+        if (mounted && res.isNotEmpty) {
+          setState(() => _almacenes = res);
+          actualizarNombres();
+        }
+      });
     }
+
+    cargar('comerciales', 'comerciales', PedidosService.getComerciales).then((
+      res,
+    ) {
+      if (mounted) {
+        setState(() {
+          _comerciales = res;
+          _cargandoMaestros = false;
+        });
+        actualizarNombres();
+      }
+    });
 
     await _cargarEmpresaDefaults();
   }
@@ -180,7 +293,8 @@ class _CabeceraFormState extends State<CabeceraForm> {
   /// _actualizar: aplica un cambio al pedido y avisa a la pantalla madre.
   /// "transform" es una función que recibe el pedido y devuelve la copia cambiada.
   Pedido _actualizar(Pedido Function(Pedido) transform) {
-    final nuevo = transform(widget.pedido);
+    final pedidoActual = context.read<PedidoFormCubit>().state.pedido;
+    final nuevo = transform(pedidoActual);
     widget.onChanged(nuevo); // Avisamos: "el pedido ahora es así".
     return nuevo;
   }
@@ -224,8 +338,6 @@ class _CabeceraFormState extends State<CabeceraForm> {
         // ================= DATOS GENERALES =================
         const _Seccion('Datos generales'),
 
-        
-
         // Cliente (buscador con autocompletado; obligatorio).
         // Se consulta a Velneo bajo demanda (debounce 400 ms, mín. 3 letras)
         // y se apoya en la caché local para devolver resultados al instante.
@@ -240,9 +352,15 @@ class _CabeceraFormState extends State<CabeceraForm> {
           emptyActionText: 'Crear nuevo cliente',
           onEmptyAction: (query) async {
             final cubit = context.read<PedidoFormCubit>();
-            final nuevoCliente = await mostrarCrearClienteModal(context, initialName: query);
+            final nuevoCliente = await mostrarCrearClienteModal(
+              context,
+              initialName: query,
+            );
             if (!mounted || nuevoCliente == null) return;
-            final opcion = OpcionMaestra(codigo: nuevoCliente.id.toString(), nombre: nuevoCliente.nombreComercial);
+            final opcion = OpcionMaestra(
+              codigo: nuevoCliente.id.toString(),
+              nombre: nuevoCliente.nombreComercial,
+            );
             cubit.selectCliente(
               opcion,
               series: _series,
@@ -273,11 +391,14 @@ class _CabeceraFormState extends State<CabeceraForm> {
           },
         ),
         if (context.watch<PedidoFormCubit>().state.cargandoDatosCliente)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text(
               'Aplicando datos del cliente...',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
 
@@ -410,13 +531,13 @@ class _CabeceraFormState extends State<CabeceraForm> {
                 .watch<PedidoFormCubit>()
                 .state
                 .direccionesCliente;
+            final direccionSeleccionada = PedidosService.findMatchingOption(
+              direcciones,
+              p.direccionEnvio,
+            );
             return CampoSelect(
               label: 'Dirección de envío',
-              value: direcciones.any((d) => d.codigo == p.direccionEnvio)
-                  ? direcciones
-                        .firstWhere((d) => d.codigo == p.direccionEnvio)
-                        .nombre
-                  : p.direccionEnvio,
+              value: direccionSeleccionada?.nombre ?? p.direccionEnvio,
               enabled: !_cargandoMaestros,
               onTap: () => _elegir(
                 'Seleccionar dirección de envío',

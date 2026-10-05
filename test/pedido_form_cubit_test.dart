@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:pedidos_venta/core/api_service.dart';
 import 'package:pedidos_venta/core/formatters.dart';
 import 'package:pedidos_venta/models/models.dart';
 import 'package:pedidos_venta/state/pedido_form_cubit.dart';
@@ -51,6 +52,17 @@ void main() {
       expect(pedido.clienteNombre, '');
       expect(pedido.direccionEnvio, '');
       expect(cubit.state.direccionesCliente, isEmpty);
+    });
+
+    test('resuelve la dirección por código numérico equivalente', () {
+      final direccion = PedidosService.findMatchingOption(
+        const [
+          OpcionMaestra(codigo: '001', nombre: 'Calle Mayor 1'),
+        ],
+        '1',
+      );
+
+      expect(direccion?.nombre, 'Calle Mayor 1');
     });
   });
 }

@@ -40,9 +40,9 @@ class TotalesCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _fila('Base total', formatNumber(base)), // "Base total   1.000,00 €"
+            _fila(context, 'Base total', formatNumber(base)), // "Base total   1.000,00 €"
             const SizedBox(height: 8),
-            _fila('Total IVA', formatNumber(iva)), // "Total IVA     210,00 €"
+            _fila(context, 'Total IVA', formatNumber(iva)), // "Total IVA     210,00 €"
             const Divider(height: 24), // Separador.
             // La fila final, destacada:
             Row(
@@ -53,7 +53,7 @@ class TotalesCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.text,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 Text(
@@ -73,17 +73,23 @@ class TotalesCard extends StatelessWidget {
   }
 
   /// _fila: una fila "etiqueta + valor" (reutilizada por base e IVA).
-  Widget _fila(String label, String value) {
+  Widget _fila(BuildContext context, String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween, // Etiqueta a un lado, valor al otro.
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          style: TextStyle(
+            fontSize: 13,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         Text(
           '$value €',
-          style: const TextStyle(fontSize: 14, color: AppColors.text),
+          style: TextStyle(
+            fontSize: 14,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
       ],
     );

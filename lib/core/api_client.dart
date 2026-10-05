@@ -350,6 +350,11 @@ dynamic payloadData(dynamic json) {
 int payloadTotal(dynamic json) {
   final data = normalizeData(json);
   if (data is Map) {
+    final count = data['count'];
+    if (count != null) {
+      final n = int.tryParse('$count');
+      if (n != null) return n;
+    }
     final v = data['total_count'];
     if (v != null) {
       final n = int.tryParse('$v');

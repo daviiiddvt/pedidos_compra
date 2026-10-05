@@ -365,6 +365,7 @@ class PresupuestoVenta {
         clienteNombre: _text(json['clt_nom'] ?? json['clienteNombre']),
         serie: _text(json['ser']),
         comercial: _text(json['cmr']),
+        comercialNombre: _text(json['cmr_nom'] ?? json['comercialNombre']),
         fecha: _date(json['fch']),
         fechaValidez: _date(json['fch_val']),
         formaPago: _text(json['fpg']),

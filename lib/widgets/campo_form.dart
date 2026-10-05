@@ -115,7 +115,10 @@ class _CampoFormState extends State<CampoForm> {
       children: [
         Text(
           widget.label,
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         if (widget.required)
           const Text(
@@ -206,7 +209,10 @@ class CampoSelect extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             if (required)
               const Text(
@@ -236,14 +242,18 @@ class CampoSelect extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       color: (value != null && value!.isNotEmpty)
-                          ? AppColors.text
+                          ? Theme.of(context).colorScheme.onSurface
                           : AppColors.disabled,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 // La "flecha" de desplegable.
-                const Icon(Icons.expand_more, color: AppColors.textSecondary, size: 20),
+                Icon(
+                  Icons.expand_more,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
               ],
             ),
           ),

@@ -16,7 +16,6 @@
 
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart'; // Colores.
 
 /// SegmentTabs: barra de pestañas con aspecto de "botones segmentados".
 class SegmentTabs extends StatelessWidget {
@@ -37,9 +36,9 @@ class SegmentTabs extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surface, // Fondo blanco.
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
       ),
       child: Row(
         children: tabs
@@ -48,7 +47,7 @@ class SegmentTabs extends StatelessWidget {
                 child: Material(
                   // La pestaña ACTIVA tiene fondo azul; las demás transparente.
                   color: tab.key == active
-                      ? AppColors.primary
+                              ? Theme.of(context).colorScheme.primary
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(6),
                   child: InkWell(
@@ -64,8 +63,8 @@ class SegmentTabs extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           // Texto blanco si está activa, gris si no.
                           color: tab.key == active
-                              ? AppColors.white
-                              : AppColors.textSecondary,
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
