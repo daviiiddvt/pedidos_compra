@@ -62,7 +62,12 @@ class CabeceraForm extends StatefulWidget {
     this.mostrarEmail = false,
     this.mostrarFechaValidez = false,
     this.mostrarNumeroPresupuesto = false,
-    this.estadosDisponibles = const ['Pendiente', 'Servido', 'Cancelado'],
+    this.estadosDisponibles = const [
+      'PENDIENTE',
+      'SERVIDO',
+      'CANCELADO',
+      'PARCIALMENTE SERVIDO',
+    ],
   });
 
   @override

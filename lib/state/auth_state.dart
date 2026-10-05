@@ -41,6 +41,7 @@ class AuthState extends ChangeNotifier {
   }) async {
     _connecting = true;
     _error = null;
+    PedidosService.clearTechnicalZoneCache();
     notifyListeners();
 
     try {
@@ -106,6 +107,7 @@ class AuthState extends ChangeNotifier {
     _mastersSyncing = false;
     _currentUser = null; // 4. LIMPIAR EL USUARIO AL DESCONECTAR POR SEGURIDAD
     _canViewTechnicalZone = false;
+    PedidosService.clearTechnicalZoneCache();
     MasterCacheService().invalidateAll();
     MasterSyncService.instance.stop();
     ApiClient.instance.setApiKey('');

@@ -23,6 +23,8 @@
 //        PedidosService.list()  (no hace falta "new").
 // ============================================================================
 
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart' show debugPrint; // Logging.
 
 import 'api_client.dart'; // ApiClient (el mensajero) + ApiException.
@@ -71,6 +73,11 @@ class PedidosService {
   // El mensajero único que hará las llamadas HTTP.
   static final _api = ApiClient.instance;
   static final Map<String, String> _articuloNombreCache = <String, String>{};
+  static final Map<String, Set<int>> _technicalZoneClientCache = {};
+
+  static void clearTechnicalZoneCache() {
+    _technicalZoneClientCache.clear();
+  }
 
   static Map<String, String> buildArticleNameMap(
     List<Map<String, dynamic>> records,
@@ -520,6 +527,30 @@ class PedidosService {
     return ResultadoLista<Pedido>(items: items, total: total, page: page);
   }
 
+  static Future<List<Map<String, dynamic>>> _getAllRecords(
+    String endpoint, {
+    Map<String, dynamic>? params,
+    int pageSize = 1000,
+  }) async {
+    final records = <Map<String, dynamic>>[];
+    var page = 1;
+    while (true) {
+      final json = await _api.get(
+        endpoint,
+        params: {
+          ...?params,
+          'page[size]': pageSize,
+          'page[number]': page,
+        },
+      );
+      final items = payloadLista(json);
+      records.addAll(items);
+      if (items.length < pageSize) break;
+      page++;
+    }
+    return records;
+  }
+
   /// Descarga todas las cabeceras de pedido por páginas.
   ///
   /// Repite peticiones a [list] hasta alcanzar el total informado o recibir
@@ -556,74 +587,38 @@ class PedidosService {
         return [];
       }
 
-      // 2. PRIMERO COGER LOS CLIENTES Y SACAR SU DIR_PRI_ID
-      debugPrint('Descargando todos los clientes...');
-      final allClients = <Cliente>[];
-      var page = 1;
-      while (true) {
-        final cliJson = await _api.get(
-          AppConfig.endpoint('clientes'),
-          params: {'page[size]': 1000, 'page[number]': page},
-        );
-        final items = payloadLista(cliJson);
-        for (var c in items) {
-          allClients.add(Cliente.fromJson(c));
-        }
-        if (items.length < 1000) break;
-        page++;
-      }
-      debugPrint('Total de clientes obtenidos: ${allClients.length}');
-
-      // 3. DESPUES CARGAR LA DIRECCION EN LA TABLA DIR_M
-      debugPrint('Descargando direcciones (DIR_M)...');
-      final dirPobMap = <int, String>{}; // DIR_PRI_ID -> POB_EXT
-      page = 1;
-      while (true) {
-        final dJson = await _api.get(
-          AppConfig.endpoint('direcciones'),
-          params: {'page[size]': 1000, 'page[number]': page},
-        );
-        final items = payloadLista(dJson);
-        for (var d in items) {
+      final cachedClientIds = _technicalZoneClientCache[comercial];
+      final matchingClientIds = cachedClientIds ?? <int>{};
+      if (cachedClientIds == null) {
+        debugPrint('Descargando clientes, direcciones y poblaciones en paralelo...');
+        final masterRecords = await Future.wait([
+          _getAllRecords(AppConfig.endpoint('clientes')),
+          _getAllRecords(AppConfig.endpoint('direcciones')),
+          _getAllRecords('TecERPv7_dat_dat/v1/POB'),
+        ]);
+        final clients = masterRecords[0].map(Cliente.fromJson).toList();
+        final dirPobMap = <int, String>{};
+        for (final d in masterRecords[1]) {
           final dId = d['ID'] ?? d['id'];
           final pobExt =
               d['POB_EXT']?.toString() ?? d['pob_ext']?.toString() ?? '';
-          if (dId != null) dirPobMap[dId] = pobExt;
+          if (dId != null) {
+            dirPobMap[int.tryParse('$dId') ?? 0] = pobExt;
+          }
         }
-        if (items.length < 1000) break;
-        page++;
-      }
-      debugPrint('Total de direcciones cargadas: ${dirPobMap.length}');
-
-      // 4. SACAR LA POBLACION Y SU ZONA TECNICA
-      debugPrint('Descargando poblaciones y zonas técnicas (POB)...');
-      final pobZnMap = <String, String>{}; // POB_ID -> ZN_TCN
-      page = 1;
-      while (true) {
-        final pJson = await _api.get(
-          'TecERPv7_dat_dat/v1/POB',
-          params: {'page[size]': 1000, 'page[number]': page},
-        );
-        final items = payloadLista(pJson);
-        for (var p in items) {
+        final pobZnMap = <String, String>{};
+        for (final p in masterRecords[2]) {
           final pId = p['ID']?.toString() ?? p['id']?.toString() ?? '';
-          final znTcn =
+          pobZnMap[pId] =
               p['ZN_TCN']?.toString() ?? p['zn_tcn']?.toString() ?? '';
-          pobZnMap[pId] = znTcn;
         }
-        if (items.length < 1000) break;
-        page++;
-      }
-      debugPrint('Total de poblaciones cargadas: ${pobZnMap.length}');
-
-      // 5. SI ALGUNA DE ELLAS COINCIDE CON LAS ZONAS TECNICAS DEL COMERCIAL
-      final matchingClientIds = <int>{};
-      for (final c in allClients) {
-        final pobId = dirPobMap[c.dirPriId] ?? '';
-        final znTcn = pobZnMap[pobId] ?? '';
-        if (znIds.contains(znTcn)) {
-          matchingClientIds.add(c.id);
+        for (final client in clients) {
+          final pobId = dirPobMap[client.dirPriId] ?? '';
+          if (znIds.contains(pobZnMap[pobId])) {
+            matchingClientIds.add(client.id);
+          }
         }
+        _technicalZoneClientCache[comercial] = matchingClientIds;
       }
       debugPrint(
         'Clientes con zona técnica coincidente: ${matchingClientIds.length}',
@@ -636,17 +631,23 @@ class PedidosService {
 
       // 6. ENTONCES CARGAS LOS PEDIDOS DE VENTA DE LOS CLIENTES COINCIDENTES
       debugPrint('Cargando pedidos de venta de clientes coincidentes...');
-      // Descargamos globales y filtramos en memoria por rendimiento de la API
-      page = 1;
+      // Descargamos globales en pequeños lotes paralelos y filtramos en memoria.
+      var page = 1;
       while (true) {
-        final result = await list(page: page);
-        for (final p in result.items) {
-          if (matchingClientIds.contains(p.clienteId)) {
-            all.add(p);
+        final results = await Future.wait(
+          List.generate(4, (index) => list(page: page + index)),
+        );
+        var hasFullPage = false;
+        for (final result in results) {
+          for (final pedido in result.items) {
+            if (matchingClientIds.contains(pedido.clienteId)) {
+              all.add(pedido);
+            }
           }
+          hasFullPage = hasFullPage || result.items.length >= AppConfig.pageSize;
         }
-        if (result.items.length < AppConfig.pageSize) break;
-        page++;
+        if (!hasFullPage) break;
+        page += 4;
       }
 
       debugPrint(
@@ -771,7 +772,10 @@ class PedidosService {
     throw ApiException('No se pudo crear el pedido.');
   }
 
-  static Map<String, dynamic> buildPedidoPayload(Pedido pedido) {
+  static Map<String, dynamic> buildPedidoPayload(
+    Pedido pedido, {
+    List<int>? fotoBytes,
+  }) {
     final payload = <String, dynamic>{
       'clt': pedido.clienteId,
       'est': AppColors.estadoCodigo(pedido.estado),
@@ -785,6 +789,7 @@ class PedidosService {
       'obs': pedido.observaciones,
       'emp': '1',
       'emp_div': '1',
+      if (fotoBytes != null) 'fot': base64Encode(fotoBytes),
     };
 
     if (pedido.email.trim().isNotEmpty) {
@@ -845,13 +850,18 @@ class PedidosService {
     dynamic id,
     Pedido pedido,
     Set<int> removedLineIds,
+    {List<int>? fotoBytes,
+    }
   ) async {
     final dirId = await _ensureDireccionId(
       pedido.clienteId,
       pedido.direccionEnvio,
     );
     final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
-    final updated = await update(id, _pedidoPayload(pedidoMapeado));
+    final updated = await update(
+      id,
+      buildPedidoPayload(pedidoMapeado, fotoBytes: fotoBytes),
+    );
     for (final lineId in removedLineIds) {
       await eliminarLinea(lineId);
     }

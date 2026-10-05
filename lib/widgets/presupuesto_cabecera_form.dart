@@ -24,7 +24,7 @@ class PresupuestoCabeceraForm extends StatelessWidget {
       mostrarEmail: true,
       mostrarFechaValidez: pedido.id != null && pedido.id! > 0,
       mostrarNumeroPresupuesto: true,
-      estadosDisponibles: const ['Pendiente', 'Aceptado', 'Rechazado', 'Parcialmente Servido'],
+      estadosDisponibles: const ['PENDIENTE', 'ACEPTADO', 'RECHAZADO', 'PARCIALMENTE SERVIDO'],
     );
   }
 }

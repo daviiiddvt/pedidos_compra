@@ -49,7 +49,11 @@ class LineaFormModal extends StatefulWidget {
     this.onDelete,
     this.mostrarFechaEntrega = true,
     this.mostrarReferencia = true,
-    this.estadosDisponibles = const ['Pendiente', 'Cancelado'],
+    this.estadosDisponibles = const [
+      'PENDIENTE',
+      'CANCELADO',
+      'PARCIALMENTE SERVIDO',
+    ],
   });
 
   @override
@@ -127,7 +131,7 @@ class _LineaFormModalState extends State<LineaFormModal> {
     // (l.estado puede venir como código VELNEO "C"... → lo normalizamos.)
     final esCancelada =
         _editando && (l!.cancelado || AppColors.estadoCodigo(l.estado) == 'C');
-    _estado = esCancelada ? 'Cancelado' : 'Pendiente';
+    _estado = esCancelada ? 'CANCELADO' : 'PENDIENTE';
     _previstoPara = l?.previstoPara ?? '';
   }
 
@@ -229,8 +233,7 @@ class _LineaFormModalState extends State<LineaFormModal> {
       retencionIrpf: parseNumber(_retencionIrpf.text),
       retencionAlquiler: parseNumber(_retencionAlquiler.text),
       estado: _estado,
-      cancelado:
-          _estado == 'Cancelado', // Si estado = Cancelado → sí cancelada.
+        cancelado: AppColors.estadoCodigo(_estado) == 'C',
       previstoPara: _previstoPara,
     );
     Navigator.of(context).pop(linea); // Cerramos y entregamos la línea.

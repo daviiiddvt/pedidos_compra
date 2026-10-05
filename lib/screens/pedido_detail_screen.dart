@@ -93,6 +93,7 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
   Widget _buildContenido(Pedido pedido) {
     final lineas = pedido.lineas;
     final totales = calcularTotales(lineas); // Sumamos todas las líneas.
+    final puedeEditar = AppColors.estadoCodigo(pedido.estado) != 'S';
 
     return Column(
       children: [
@@ -139,9 +140,9 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => _editar(pedido),
+                      onPressed: puedeEditar ? () => _editar(pedido) : null,
                       icon: const Icon(Icons.edit),
-                      label: const Text('Editar'),
+                      label: Text(puedeEditar ? 'Editar' : 'SERVIDO'),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -237,6 +238,7 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
         .pushNamed('/pedido/form', arguments: pedido);
     if (mounted) _cargar();
   }
+
 
   bool _puedeEnviarEmail(Pedido pedido) =>
       pedido.id != null && pedido.clienteId > 0 && pedido.lineas.isNotEmpty;

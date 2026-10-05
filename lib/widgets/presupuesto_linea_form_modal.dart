@@ -17,6 +17,6 @@ Future<LineaPedido?> mostrarPresupuestoLineaForm(
     onDelete: onDelete,
     mostrarFechaEntrega: false,
     mostrarReferencia: false,
-    estadosDisponibles: const ['Pendiente', 'Aceptado', 'Rechazado', 'Parcialmente Servido'],
+    estadosDisponibles: const ['PENDIENTE', 'ACEPTADO', 'RECHAZADO', 'PARCIALMENTE SERVIDO'],
   );
 }

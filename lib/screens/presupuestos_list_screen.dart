@@ -239,7 +239,7 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
-              children: ['', 'Pendiente', 'Aceptado', 'Rechazado', 'Parcialmente Servido'].map((status) {
+              children: ['', 'PENDIENTE', 'ACEPTADO', 'RECHAZADO', 'PARCIALMENTE SERVIDO'].map((status) {
                 return Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: ChoiceChip(

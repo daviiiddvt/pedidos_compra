@@ -43,7 +43,7 @@ class PedidosListScreen extends StatefulWidget {
 /// _PedidosListScreenState: TODA la "memoria" de esta pantalla va aquí.
 class _PedidosListScreenState extends State<PedidosListScreen> {
   // Los estados que ofrecen los filtros (ChoiceChip).
-  static const _estados = ['Pendiente', 'Servido', 'Cancelado'];
+  static const _estados = ['PENDIENTE', 'SERVIDO', 'CANCELADO'];
 
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();

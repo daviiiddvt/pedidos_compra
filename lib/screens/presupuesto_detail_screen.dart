@@ -52,6 +52,8 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
   Widget build(BuildContext context) {
     final presupuesto = _presupuesto;
     final pedidoVisual = presupuesto?.toPedidoVisual();
+    final puedeEditar = presupuesto != null &&
+      AppColors.estadoCodigo(presupuesto.estado) != 'A';
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -117,15 +119,15 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                             children: [
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  onPressed: () async {
+                                  onPressed: puedeEditar ? () async {
                                     await Navigator.of(context).pushNamed(
                                       '/presupuesto/form',
                                       arguments: presupuesto,
                                     );
                                     if (mounted) _cargar();
-                                  },
+                                  } : null,
                                   icon: const Icon(Icons.edit),
-                                  label: const Text('Editar'),
+                                  label: Text(puedeEditar ? 'Editar' : 'ACEPTADO'),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -133,7 +135,7 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                                 child: ElevatedButton.icon(
                                   onPressed: () async {
                                     if (presupuesto.vtaPedG > 0 ||
-                                        presupuesto.estado == 'A') {
+                                      AppColors.estadoCodigo(presupuesto.estado) == 'A') {
                                       showDialog(
                                         context: context,
                                         builder: (ctx) => AlertDialog(

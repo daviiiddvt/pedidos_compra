@@ -65,9 +65,10 @@ class AppColors {
       case 'R':
       case 'RECHAZADO':
         return 'R';
-      case 'X':
+      case 'Q':
+      case 'X': // Compatibilidad con respuestas antiguas.
       case 'PARCIALMENTE_SERVIDO':
-        return 'X';
+        return 'Q';
       default:
         return estado ?? ''; // Desconocido → se envía tal cual (no rompe).
     }
@@ -88,7 +89,7 @@ class AppColors {
         return estadoAceptado;
       case 'R':
         return estadoRechazado;
-      case 'X':
+      case 'Q':
         return estadoParcial;
       default:
         return primary; // Estado desconocido → azul.
@@ -100,19 +101,19 @@ class AppColors {
   static String estadoLabel(String? estado) {
     switch (estadoCodigo(estado)) {
       case 'P':
-        return 'Pendiente';
+        return 'PENDIENTE';
       case 'S':
-        return 'Servido';
+        return 'SERVIDO';
       case 'C':
-        return 'Cancelado';
+        return 'CANCELADO';
       case 'A':
-        return 'Aceptado';
+        return 'ACEPTADO';
       case 'R':
-        return 'Rechazado';
-      case 'X':
-        return 'Parcialmente Servido';
+        return 'RECHAZADO';
+      case 'Q':
+        return 'PARCIALMENTE SERVIDO';
       default:
-        return estado ?? '—'; // Desconocido → mostramos el texto tal cual (o guion).
+        return (estado ?? '—').toUpperCase();
     }
   }
 }

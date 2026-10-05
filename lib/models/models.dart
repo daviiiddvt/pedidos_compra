@@ -30,6 +30,11 @@ String _textValue(dynamic value) {
   return value == null ? '' : '$value';
 }
 
+String _normalizeOrderStatus(dynamic value) {
+  final status = _textValue(value);
+  return status.trim().toUpperCase() == 'X' ? 'Q' : status;
+}
+
 int _intValue(dynamic value) {
   if (value is num) return value.toInt();
   return int.tryParse(_textValue(value)) ?? 0;
@@ -177,6 +182,8 @@ Map<String, dynamic> _normalizeLineaJson(
       normalized[entry.key] = _intValue(value);
     } else if (entry.key == 'cancelado') {
       normalized[entry.key] = _boolValue(value);
+    } else if (entry.key == 'estado') {
+      normalized[entry.key] = _normalizeOrderStatus(value);
     } else {
       normalized[entry.key] = _textValue(value);
     }
@@ -221,6 +228,11 @@ Map<String, dynamic> _normalizePedidoJson(Map<String, dynamic> json) {
         normalized[entry.key] = _textValue(value);
       }
     }
+  }
+  final estado = _firstValue(json, ['est', 'estado']);
+  if (estado != null && _textValue(estado).trim().toUpperCase() == 'X') {
+    normalized['est'] = 'Q';
+    normalized['estado'] = 'Q';
   }
   return normalized;
 }

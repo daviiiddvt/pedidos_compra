@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/formatters.dart';
 import '../models/models.dart';
 import '../core/presupuesto_service.dart';
+import '../theme/app_theme.dart';
 import '../state/auth_state.dart';
 import '../state/pedido_form_cubit.dart';
 import '../widgets/presupuesto_cabecera_form.dart';
@@ -113,6 +114,10 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
   }
 
   Future<void> _guardar() async {
+    if (_editando && AppColors.estadoCodigo(_presupuesto.estado) == 'A') {
+      _mostrarMensaje('Los presupuestos ACEPTADOS no se pueden editar.');
+      return;
+    }
     if (_presupuesto.clienteId <= 0) {
       _mostrarMensaje('Selecciona un cliente.');
       return;

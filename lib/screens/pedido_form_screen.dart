@@ -22,6 +22,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
 
 import '../core/api_service.dart'; // PedidosService (guardar + cargar detalle).
 import '../core/formatters.dart'; // todayIso (fecha de hoy por defecto).
@@ -35,6 +37,7 @@ import '../widgets/linea_form_modal.dart'; // El "modal" para añadir/editar lí
 import '../widgets/lineas_table.dart'; // Tabla de líneas (editable).
 import '../widgets/segment_tabs.dart'; // Pestañas.
 import '../widgets/totales_card.dart'; // Tarjeta de totales.
+import '../widgets/pedido_foto_tab.dart';
 import '../core/presupuesto_service.dart';
 
 /// PedidoFormScreen: pantalla de ALTA/EDICIÓN de pedidos.
@@ -53,6 +56,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   Set<int> _lineasOriginalesIds = {};
   bool _cargandoDetalle = false; // ¿Cargando el detalle (modo editar)?
   bool _guardando = false; // ¿Estamos guardando ya? (para no doble enviar).
+  Uint8List? _fotoBytes;
   String _tab = 'cabecera'; // Pestaña activa.
 
   dynamic get _pedidoIdReal =>
@@ -191,6 +195,17 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
     }
   }
 
+  Future<void> _seleccionarFoto(ImageSource source) async {
+    final selected = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1920,
+    );
+    if (selected == null || !mounted) return;
+    final bytes = await selected.readAsBytes();
+    if (mounted) setState(() => _fotoBytes = bytes);
+  }
+
   /// _eliminarLinea: pregunta con una ventana de confirmación y, si confirma,
   /// quita la línea del índice dado.
   void _eliminarLinea(int index) {
@@ -248,6 +263,10 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
 
   /// _guardar: valida y envía al servidor (POST si es nuevo, PUT si edita).
   Future<void> _guardar() async {
+    if (_editando && AppColors.estadoCodigo(_pedido.estado) == 'S') {
+      _snack('Los pedidos SERVIDOS no se pueden editar.');
+      return;
+    }
     if (!_validar()) return; // No cumple reglas → nos quedamos aquí.
     setState(() => _guardando = true); // Bloqueamos el botón "Guardar".
 
@@ -272,6 +291,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
           _pedidoIdReal,
           pedidoParaGuardar,
           removedLineIds,
+          fotoBytes: _fotoBytes,
         );
       } else {
         final nuevoPedido = await PedidosService.createComplete(pedidoParaGuardar);
@@ -317,6 +337,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
                       (key: 'cabecera', label: 'Cabecera'),
                       (key: 'lineas', label: 'Líneas (${_lineas.length})'),
                       (key: 'totales', label: 'Totales'),
+                      if (_editando) (key: 'foto', label: 'Foto'),
                     ],
                     active: _tab,
                     onChanged: (key) => setState(() => _tab = key),
@@ -332,6 +353,12 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
                         ),
                       // Totales: resumen de las líneas en memoria.
                       'totales' => _totales(),
+                      'foto' => PedidoFotoTab(
+                          imageBytes: _fotoBytes,
+                          uploading: false,
+                          onCamera: () => _seleccionarFoto(ImageSource.camera),
+                          onGallery: () => _seleccionarFoto(ImageSource.gallery),
+                        ),
                       // Cabecera: el formulario, que avisa en cada cambio (lo
                       // repintamos con BlocBuilder para reflejar al instante los
                       // valores por defecto del cliente elegido).

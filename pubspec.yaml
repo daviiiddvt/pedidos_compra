@@ -44,6 +44,7 @@ dependencies:
   #   Se usa en lib/main.dart y en las pantallas (context.watch / read).
   provider: ^6.1.2
   shared_preferences: ^2.5.3
+  image_picker: ^1.2.0
   # "intl": utilidades de fechas/números internacionales (añadida para compatibilidad).
   intl: ^0.20.2
   flutter_bloc: ^9.1.1
