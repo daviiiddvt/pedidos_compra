@@ -28,7 +28,7 @@ import 'local_cache_db_base.dart'; // Contrato LocalCacheDb.
 /// Implementación SQLite de la caché local.
 class LocalCacheDbSqlite implements LocalCacheDb {
   static const _table = 'maestro_cache';
-  static const _version = 1;
+  static const _version = 2;
 
   /// Ruta de la base de datos; null = ruta estándar de la plataforma.
   /// Se puede inyectar en tests para usar un archivo temporal.
@@ -52,6 +52,7 @@ class LocalCacheDbSqlite implements LocalCacheDb {
       options: OpenDatabaseOptions(
         version: _version,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       ),
     );
     _initialized = true;
@@ -77,6 +78,7 @@ class LocalCacheDbSqlite implements LocalCacheDb {
         type      TEXT NOT NULL,
         codigo    TEXT NOT NULL,
         nombre    TEXT NOT NULL,
+        referencia TEXT NOT NULL DEFAULT '',
         last_used INTEGER NOT NULL,
         synced_at INTEGER NOT NULL,
         PRIMARY KEY (type, codigo)
@@ -88,6 +90,16 @@ class LocalCacheDbSqlite implements LocalCacheDb {
     await db.execute(
       'CREATE INDEX idx_maestro_codigo ON $_table(type, codigo)',
     );
+    await db.execute(
+      'CREATE INDEX idx_maestro_referencia ON $_table(type, referencia)',
+    );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE $_table ADD COLUMN referencia TEXT NOT NULL DEFAULT ""');
+      await db.execute('CREATE INDEX idx_maestro_referencia ON $_table(type, referencia)');
+    }
   }
 
   @override
@@ -97,14 +109,23 @@ class LocalCacheDbSqlite implements LocalCacheDb {
     int limit = 20,
   }) async {
     final db = _requireDb();
-    final like = '%${_escapeLike(query)}%';
-    // LIKE de SQLite no distingue mayúsculas para ASCII; el paso de red
-    // posterior (Velneo) además tolera acentos.
+    final tokens = query.toLowerCase().split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    if (tokens.isEmpty) return const [];
+
+    final whereClauses = <String>['type = ?'];
+    final whereArgs = <dynamic>[type];
+
+    for (final token in tokens) {
+      final like = '%${_escapeLike(token)}%';
+      whereClauses.add('(nombre LIKE ? OR codigo LIKE ? OR referencia LIKE ?)');
+      whereArgs.addAll([like, like, like]);
+    }
+
     final rows = await db.query(
       _table,
-      where: 'type = ? AND (nombre LIKE ? OR codigo LIKE ?)',
-      whereArgs: [type, like, like],
-      columns: ['codigo', 'nombre'],
+      where: whereClauses.join(' AND '),
+      whereArgs: whereArgs,
+      columns: ['codigo', 'nombre', 'referencia'],
       orderBy: 'last_used DESC',
       limit: limit,
     );
@@ -118,7 +139,7 @@ class LocalCacheDbSqlite implements LocalCacheDb {
       _table,
       where: 'type = ?',
       whereArgs: [type],
-      columns: ['codigo', 'nombre'],
+      columns: ['codigo', 'nombre', 'referencia'],
       orderBy: 'last_used DESC',
       limit: limit,
     );
@@ -137,6 +158,7 @@ class LocalCacheDbSqlite implements LocalCacheDb {
           'type': type,
           'codigo': item.codigo,
           'nombre': item.nombre,
+          'referencia': item.referencia,
           'last_used': now,
           'synced_at': now,
         },
@@ -182,6 +204,7 @@ class LocalCacheDbSqlite implements LocalCacheDb {
     return OpcionMaestra(
       codigo: '${row['codigo'] ?? ''}',
       nombre: '${row['nombre'] ?? ''}',
+      referencia: '${row['referencia'] ?? ''}',
     );
   }
 

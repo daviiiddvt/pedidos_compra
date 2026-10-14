@@ -51,11 +51,11 @@ double parseNumber(String text) {
 }
 
 /// formatNumber: convierte un número a texto CON formato español.
-/// - Entrada:  1234.5  →  Salida: "1.234,50"
+/// - Entrada:  1234.5  →  Salida: "1.234,500"
 /// - Entrada:  -50     →  Salida: "-50"
 /// Esto es: puntos para los miles y coma como separador decimal.
-String formatNumber(num value, {int decimals = 2}) {
-  // "1234.5" con 2 decimales → "1234.50".
+String formatNumber(num value, {int decimals = 3}) {
+  // "1234.5" con 3 decimales → "1234.500".
   final fixed = value.toStringAsFixed(decimals);
 
   // Dividimos en parte entera y parte decimal.

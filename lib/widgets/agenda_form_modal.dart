@@ -380,7 +380,7 @@ class _AgendaFormModalState extends State<AgendaFormModal> {
                                 child: IconButton(
                                   tooltip: 'Crear presupuesto',
                                   icon: const Icon(Icons.add),
-                                  color: AppColors.primary,
+                                  color: Theme.of(context).colorScheme.primary,
                                   onPressed: () {
                                     // TODO: Navegar a crear presupuesto
                                   },
@@ -442,10 +442,10 @@ class _SeccionAgenda extends StatelessWidget {
       padding: const EdgeInsets.only(top: 4, bottom: 10),
       child: Text(
         texto.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: AppColors.primary,
+          color: Theme.of(context).colorScheme.primary,
           letterSpacing: 0.5,
         ),
       ),

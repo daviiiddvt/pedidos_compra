@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'order_repository.dart';
+import 'repositorio_pedidos.dart';
 import '../state/auth_state.dart';
 
 class AppLifecycleManager extends StatefulWidget {
@@ -28,7 +28,7 @@ class _AppLifecycleManagerState extends State<AppLifecycleManager> with WidgetsB
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.detached) {
       // Forzar limpieza de seguridad
-      final repository = Provider.of<OrderRepository>(context, listen: false);
+      final repository = Provider.of<RepositorioPedidos>(context, listen: false);
       final authState = Provider.of<AuthState>(context, listen: false);
       
       repository.clearCache();

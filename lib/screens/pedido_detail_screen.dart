@@ -16,8 +16,12 @@
 //  - mounted: false si la pantalla ya se cerró; evita errores al usar setState.
 // ============================================================================
 
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../core/licencia/licencia_service.dart';
 import '../core/api_service.dart'; // PedidosService (pedir el detalle).
 import '../models/models.dart'; // Modelos y cálculo de totales.
 import '../theme/app_theme.dart'; // Colores.
@@ -27,6 +31,8 @@ import '../widgets/cabecera_view.dart'; // Vista de la cabecera del pedido.
 import '../widgets/lineas_table.dart'; // Tabla con las líneas.
 import '../widgets/totales_card.dart'; // Tarjeta de totales.
 import '../widgets/estado_badge.dart'; // "Etiqueta" de color con el estado.
+import '../widgets/pedido_foto_tab.dart';
+
 
 /// PedidoDetailScreen: pantalla de DETALLE (no se edita aquí, solo se ve).
 class PedidoDetailScreen extends StatefulWidget {
@@ -42,12 +48,22 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
   Pedido? _pedido; // El pedido cargado (null mientras carga o si falla).
   bool _cargando = true; // ¿Estamos pidiendo el detalle?
   bool _enviandoEmail = false;
-  String _tab = 'cabecera'; // Pestaña activa: empieza en "Cabecera".
+  bool _confirmando = false;
+  late final PageController _pageController;
+  int _tabIndex = 0;
+  static const _tabs = ['cabecera', 'lineas', 'totales', 'foto'];
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     _cargar(); // Nada más nacer, pedimos el detalle.
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   /// _cargar: pide la información completa del pedido al servidor.
@@ -93,30 +109,45 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
   Widget _buildContenido(Pedido pedido) {
     final lineas = pedido.lineas;
     final totales = calcularTotales(lineas); // Sumamos todas las líneas.
-    final puedeEditar = AppColors.estadoCodigo(pedido.estado) != 'S';
+    final licService = context.watch<LicenciaService>();
+    final puedeEditar = AppColors.estadoCodigo(pedido.estado) != 'S' && !licService.esSoloLec;
 
     return Column(
       children: [
         _resumen(pedido), // Resumen superior (código, proveedor, fecha).
 
-        // Pestañas: Cabecera | Líneas (5) | Totales.
+        // Pestañas: Cabecera | Líneas (5) | Totales | Foto
         SegmentTabs(
           tabs: [
             (key: 'cabecera', label: 'Cabecera'),
             (key: 'lineas', label: 'Líneas (${lineas.length})'),
             (key: 'totales', label: 'Totales'),
+            (key: 'foto', label: 'Foto'),
           ],
-          active: _tab,
-          onChanged: (key) => setState(() => _tab = key),
+          active: _tabs[_tabIndex],
+          onChanged: (key) {
+            final idx = _tabs.indexOf(key);
+            if (idx != -1 && _pageController.hasClients) {
+              _pageController.animateToPage(
+                idx,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+              );
+            }
+          },
         ),
 
-        // Contenido de la pestaña activa.
+        // Contenido con deslizamiento horizontal entre pestañas.
         Expanded(
-          child: switch (_tab) {
-            // Pestaña "Líneas" → la tabla de artículos.
-            'lineas' => LineasTable(lineas: lineas),
-            // Pestaña "Totales" → tarjeta con base/IVA/total (con scroll).
-            'totales' => SingleChildScrollView(
+          child: PageView(
+            controller: _pageController,
+            onPageChanged: (index) {
+              setState(() => _tabIndex = index);
+            },
+            children: [
+              CabeceraView(pedido: pedido),
+              LineasTable(lineas: lineas),
+              SingleChildScrollView(
                 padding: const EdgeInsets.all(12),
                 child: TotalesCard(
                   base: totales.base,
@@ -124,12 +155,18 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
                   total: totales.total,
                 ),
               ),
-            // Cualquier otra (la "cabecera") → vista de datos generales.
-            _ => CabeceraView(pedido: pedido),
-          },
+              PedidoFotoTab(
+                imageBytes: pedido.fotoBase64.isNotEmpty ? base64Decode(pedido.fotoBase64) : null,
+                uploading: false,
+                onCamera: () {},
+                onGallery: () {},
+                readOnly: true,
+              ),
+            ],
+          ),
         ),
 
-        // ---- Barra inferior con el botón "Editar" ----
+        // ---- Barra inferior ----
         Material(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           child: SafeArea(
@@ -138,14 +175,33 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
+                  if (!pedido.conKyr) ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.yellow,
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: _confirmando ? null : () => _confirmar(pedido),
+                        child: _confirmando
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                              )
+                            : const Text('Confirmar', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: puedeEditar ? () => _editar(pedido) : null,
-                      icon: const Icon(Icons.edit),
-                      label: Text(puedeEditar ? 'Editar' : 'SERVIDO'),
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: Text(puedeEditar ? 'Editar' : 'SERVIDO', style: const TextStyle(fontSize: 12)),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: _puedeEnviarEmail(pedido) && !_enviandoEmail
@@ -157,8 +213,8 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.email_outlined),
-                      label: const Text('Enviar email'),
+                          : const Icon(Icons.email_outlined, size: 18),
+                      label: const Text('Email', style: TextStyle(fontSize: 12)),
                     ),
                   ),
                 ],
@@ -178,26 +234,27 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Cada cual a su lado.
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Etiqueta azul con el código.
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   'Nº de pedido: ${pedido.numeroPedido.isNotEmpty ? pedido.numeroPedido : (pedido.codigo > 0 ? pedido.codigo.toString() : '')}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                   ), 
                 ),
               ),
-              // Etiqueta de color según el estado (naranja/verde/gris).
+              const SizedBox(height: 8),
+              // Etiqueta de color según el estado
               EstadoBadge(estado: pedido.estado),
             ],
           ),
@@ -217,15 +274,38 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
             ),
           ),
 
-          // Fecha (solo si hay).
-          if (pedido.fecha.isNotEmpty)
-            Text(
-              'Fecha: ${formatDate(pedido.fecha)}', // Formato "10/09/2026".
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+          // Fecha y CONFIRMADO (si lo está)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (pedido.fecha.isNotEmpty)
+                Text(
+                  'Fecha: ${formatDate(pedido.fecha)}', // Formato "10/09/2026".
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
+              if (pedido.conKyr)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'CONFIRMADO',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -258,6 +338,29 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
       );
     } finally {
       if (mounted) setState(() => _enviandoEmail = false);
+    }
+  }
+
+  Future<void> _confirmar(Pedido pedido) async {
+    setState(() => _confirmando = true);
+    try {
+      await PedidosService.confirmarPedido(pedido.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pedido confirmado correctamente')),
+      );
+      // Navegar a la lista y refrescar (elimina las vistas hasta /home)
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/pedidos',
+        (route) => route.settings.name == '/home' || route.isFirst,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo confirmar: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _confirmando = false);
     }
   }
 }

@@ -21,7 +21,8 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart'; // LineaPedido.
-import '../theme/app_theme.dart'; // Colores.
+ // Colores.
+import '../screens/linea_detail_screen.dart'; // Pantalla de solo lectura
 import 'fila_linea.dart'; // La tarjeta de cada línea.
 
 /// LineasTable: lista de líneas de pedido (con o sin edición).
@@ -66,8 +67,19 @@ class LineasTable extends StatelessWidget {
                     final linea = lineas[index];
                     return FilaLinea(
                       linea: linea,
-                      // Si estamos en modo edición, al tocar → onEdit.
-                      onTap: onEdit != null ? () => onEdit!(linea, index) : null,
+                      // Si estamos en modo edición, onEdit, sino abrimos solo lectura.
+                      onTap: () {
+                        if (onEdit != null) {
+                          onEdit!(linea, index);
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LineaDetailScreen(linea: linea),
+                            ),
+                          );
+                        }
+                      },
                     );
                   },
                 ),
@@ -82,8 +94,8 @@ class LineasTable extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('Añadir línea'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
+                foregroundColor: Theme.of(context).colorScheme.primary,
+                side: BorderSide(color: Theme.of(context).colorScheme.primary),
                 minimumSize: const Size.fromHeight(46), // Botón a lo ancho.
               ),
             ),

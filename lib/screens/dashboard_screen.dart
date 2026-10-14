@@ -31,12 +31,27 @@ class DashboardScreen extends StatelessWidget {
         onTap: () => Navigator.of(context).pushNamed('/pedidos'),
       ),
       _DashboardCard(
-        icon: Icons.calendar_month_outlined,
-        title: 'CRM',
-        subtitle: 'Agenda de visitas del comercial.',
-        color: AppColors.primary,
-        onTap: () => Navigator.of(context).pushNamed('/cmr'),
+        icon: Icons.inventory_2_outlined,
+        title: 'Artículos',
+        subtitle: 'Consultar catálogo de artículos.',
+        color: Colors.orange.shade700,
+        onTap: () => Navigator.of(context).pushNamed('/articulos'),
       ),
+      _DashboardCard(
+        icon: Icons.people_alt_outlined,
+        title: 'Clientes',
+        subtitle: 'Consultar cartera de clientes.',
+        color: Colors.blue.shade700,
+        onTap: () => Navigator.of(context).pushNamed('/clientes'),
+      ),
+      if (auth.canViewTechnicalZone)
+        _DashboardCard(
+          icon: Icons.calendar_month_outlined,
+          title: 'CRM',
+          subtitle: 'Agenda de visitas del comercial.',
+          color: AppColors.primary,
+          onTap: () => Navigator.of(context).pushNamed('/cmr'),
+        ),
     ];
 
     return Scaffold(
@@ -100,7 +115,7 @@ class DashboardScreen extends StatelessWidget {
                         child: Text(
                           'Sincronizando datos... ',
                           style: TextStyle(
-                            color: AppColors.primary,
+                            color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

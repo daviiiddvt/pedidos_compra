@@ -18,7 +18,7 @@ import 'package:flutter/material.dart';
 import '../core/api_service.dart';
 import '../core/master_cache_service.dart';
 import '../models/models.dart'; // Pedido + calcularTotales.
-import '../theme/app_theme.dart'; // Colores.
+ // Colores.
 import '../core/formatters.dart'; // formatDate y formatNumber.
 import 'estado_badge.dart'; // Píldora del estado.
 
@@ -118,20 +118,19 @@ class _CabeceraViewState extends State<CabeceraView> {
       padding: const EdgeInsets.all(16),
       children: [
         // ---- Fila superior: código (si lo hay) + estado ----
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (pedido.codigo != 0)
               Text(
                 'Código: ${pedido.codigo}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-              )
-            else
-              const SizedBox.shrink(), // Si no hay código, no ponemos nada.
+              ),
+            if (pedido.codigo != 0) const SizedBox(height: 8),
             EstadoBadge(estado: pedido.estado),
           ],
         ),
@@ -197,10 +196,10 @@ class _CabeceraViewState extends State<CabeceraView> {
             ),
             Text(
               '${formatNumber(total)} €',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.primary,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ],
@@ -259,10 +258,10 @@ class _Seccion extends StatelessWidget {
       padding: const EdgeInsets.only(top: 16, bottom: 12),
       child: Text(
         texto.toUpperCase(), // Lo ponemos todo en mayúsculas.
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: AppColors.primary,
+          color: Theme.of(context).colorScheme.primary,
           letterSpacing: 0.5, // Un pelín de espacio entre letras.
         ),
       ),

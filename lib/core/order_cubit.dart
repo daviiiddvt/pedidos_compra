@@ -1,5 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../core/order_repository.dart';
+import '../core/repositorio_pedidos.dart';
 import '../models/models.dart';
 
 class OrderState {
@@ -11,7 +11,7 @@ class OrderState {
 }
 
 class OrderCubit extends Cubit<OrderState> {
-  final OrderRepository _repository;
+  final RepositorioPedidos _repository;
   
   OrderCubit(this._repository) : super(OrderState());
 
@@ -26,7 +26,7 @@ class OrderCubit extends Cubit<OrderState> {
   }
 
   void filter(String query, String? statusFilter, User? currentUser) {
-    final filtered = _repository.filterOrders(
+    final filtered = _repository.filtrarPedidos(
       query: query, 
       statusFilter: statusFilter, 
       currentUser: currentUser

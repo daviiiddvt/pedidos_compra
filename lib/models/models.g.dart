@@ -10,10 +10,15 @@ _OpcionMaestra _$OpcionMaestraFromJson(Map<String, dynamic> json) =>
     _OpcionMaestra(
       codigo: json['codigo'] as String,
       nombre: json['nombre'] as String,
+      referencia: json['referencia'] as String? ?? '',
     );
 
 Map<String, dynamic> _$OpcionMaestraToJson(_OpcionMaestra instance) =>
-    <String, dynamic>{'codigo': instance.codigo, 'nombre': instance.nombre};
+    <String, dynamic>{
+      'codigo': instance.codigo,
+      'nombre': instance.nombre,
+      'referencia': instance.referencia,
+    };
 
 _LineaPedido _$LineaPedidoFromJson(Map<String, dynamic> json) => _LineaPedido(
   id: (json['id'] as num?)?.toInt(),
@@ -29,6 +34,9 @@ _LineaPedido _$LineaPedidoFromJson(Map<String, dynamic> json) => _LineaPedido(
   pendiente: (json['pendiente'] as num?)?.toDouble() ?? 1.0,
   precio: (json['precio'] as num?)?.toDouble() ?? 0.0,
   dto: (json['dto'] as num?)?.toDouble() ?? 0.0,
+  dto1: (json['dto1'] as num?)?.toDouble() ?? 0.0,
+  dto2: (json['dto2'] as num?)?.toDouble() ?? 0.0,
+  dto3: (json['dto3'] as num?)?.toDouble() ?? 0.0,
   importe: (json['importe'] as num?)?.toDouble() ?? 0.0,
   tipoIva: (json['tipoIva'] as num?)?.toDouble() ?? 21.0,
   regIvaVta: json['regIvaVta'] as String? ?? 'G',
@@ -54,6 +62,9 @@ Map<String, dynamic> _$LineaPedidoToJson(_LineaPedido instance) =>
       'cantidadServida': instance.cantidadServida,
       'precio': instance.precio,
       'dto': instance.dto,
+      'dto1': instance.dto1,
+      'dto2': instance.dto2,
+      'dto3': instance.dto3,
       'importe': instance.importe,
       'tipoIva': instance.tipoIva,
       'regIvaVta': instance.regIvaVta,
@@ -82,7 +93,9 @@ Map<String, dynamic> _$UserToJson(_User instance) => <String, dynamic>{
 _Cliente _$ClienteFromJson(Map<String, dynamic> json) => _Cliente(
   id: (json['id'] as num).toInt(),
   nombreComercial: json['nombreComercial'] as String? ?? '',
+  nombreFiscal: json['nombreFiscal'] as String? ?? '',
   cif: json['cif'] as String? ?? '',
+  email: json['email'] as String? ?? '',
   telefono: json['telefono'] as String? ?? '',
   pob: (json['pob'] as num?)?.toInt() ?? 0,
   dirPriId: (json['dirPriId'] as num?)?.toInt() ?? 0,
@@ -91,7 +104,9 @@ _Cliente _$ClienteFromJson(Map<String, dynamic> json) => _Cliente(
 Map<String, dynamic> _$ClienteToJson(_Cliente instance) => <String, dynamic>{
   'id': instance.id,
   'nombreComercial': instance.nombreComercial,
+  'nombreFiscal': instance.nombreFiscal,
   'cif': instance.cif,
+  'email': instance.email,
   'telefono': instance.telefono,
   'pob': instance.pob,
   'dirPriId': instance.dirPriId,
@@ -130,6 +145,8 @@ _Pedido _$PedidoFromJson(Map<String, dynamic> json) => _Pedido(
   direccionEnvio: json['dir_env'] as String? ?? '',
   email: json['email'] as String? ?? '',
   observaciones: json['obs'] as String? ?? '',
+  fotoBase64: json['fot'] as String? ?? '',
+  conKyr: json['con_kyr'] == null ? false : _boolValue(json['con_kyr']),
 );
 
 Map<String, dynamic> _$PedidoToJson(_Pedido instance) => <String, dynamic>{
@@ -161,4 +178,6 @@ Map<String, dynamic> _$PedidoToJson(_Pedido instance) => <String, dynamic>{
   'dir_env': instance.direccionEnvio,
   'email': instance.email,
   'obs': instance.observaciones,
+  'fot': instance.fotoBase64,
+  'con_kyr': instance.conKyr,
 };

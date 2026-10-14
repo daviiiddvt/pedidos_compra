@@ -23,23 +23,26 @@ class LocalCacheDbMemory implements LocalCacheDb {
     String query, {
     int limit = 20,
   }) async {
-    final q = query.toLowerCase();
+    final tokens = query.toLowerCase().split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    if (tokens.isEmpty) return const [];
+    
     final hits = _byType[type]
             ?.values
-            .where((e) =>
-                e.nombre.toLowerCase().contains(q) ||
-                e.codigo.toLowerCase().contains(q))
+            .where((e) {
+              final searchable = '${e.nombre.toLowerCase()} ${e.codigo.toLowerCase()} ${e.referencia.toLowerCase()}';
+              return tokens.every((token) => searchable.contains(token));
+            })
             .toList() ??
         const <CachedOption>[];
     hits.sort((a, b) => b.lastUsed.compareTo(a.lastUsed));
-    return hits.take(limit).map((e) => OpcionMaestra(codigo: e.codigo, nombre: e.nombre)).toList();
+    return hits.take(limit).map((e) => OpcionMaestra(codigo: e.codigo, nombre: e.nombre, referencia: e.referencia)).toList();
   }
 
   @override
   Future<List<OpcionMaestra>> listRecent(String type, {int limit = 20}) async {
     final entries = _byType[type]?.values.toList() ?? const <CachedOption>[];
     entries.sort((a, b) => b.lastUsed.compareTo(a.lastUsed));
-    return entries.take(limit).map((e) => OpcionMaestra(codigo: e.codigo, nombre: e.nombre)).toList();
+    return entries.take(limit).map((e) => OpcionMaestra(codigo: e.codigo, nombre: e.nombre, referencia: e.referencia)).toList();
   }
 
   @override
@@ -52,6 +55,7 @@ class LocalCacheDbMemory implements LocalCacheDb {
         type: type,
         codigo: item.codigo,
         nombre: item.nombre,
+        referencia: item.referencia,
         lastUsed: now,
       );
       count++;

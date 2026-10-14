@@ -67,7 +67,7 @@ class FilaLinea extends StatelessWidget {
                   const SizedBox(width: 8),
                   // Si la línea está cancelada, mostramos "Cancelado" sí o sí.
                   EstadoBadge(
-                    estado: linea.cancelado ? 'Cancelado' : linea.estado,
+                    estado: linea.cancelado ? 'Cancelado' : AppColors.estadoLabel(linea.estado),
                     small: true,
                   ),
                 ],
@@ -89,14 +89,19 @@ class FilaLinea extends StatelessWidget {
                 ),
               const SizedBox(height: 8),
 
-              // ---- Las 5 celdas de datos (horizontal) ----
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // ---- Las celdas de datos (horizontal) ----
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   _Celda('Cantidad', formatNumber(linea.cantidad)),
                   _Celda('Pendiente', formatNumber(linea.pendiente)),
                   _Celda('Precio', '${formatNumber(linea.precio)} €'),
-                  _Celda('Dto.', '${formatNumber(linea.dto)} %'),
+                  _Celda('% Dto.', '${formatNumber(linea.dto)} %'),
+                  _Celda('% dto 1', '${formatNumber(linea.dto1)} %'),
+                  _Celda('% dto 2', '${formatNumber(linea.dto2)} %'),
+                  _Celda('% dto 3', '${formatNumber(linea.dto3)} %'),
                   _Celda('IVA', '${formatNumber(linea.tipoIva)} %'),
                 ],
               ),
@@ -118,7 +123,7 @@ class FilaLinea extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ],

@@ -11,6 +11,19 @@ double _double(dynamic value) =>
 
 String _date(dynamic value) => _text(value);
 
+dynamic _val(Map<String, dynamic> json, List<String> keys) {
+  for (final k in keys) {
+    if (json[k] != null) return json[k];
+  }
+  for (final k in keys) {
+    final lower = k.toLowerCase();
+    for (final e in json.entries) {
+      if (e.key.toLowerCase() == lower && e.value != null) return e.value;
+    }
+  }
+  return null;
+}
+
 class LineaPedidoVenta {
   final int? id;
   final int? codigo;
@@ -25,6 +38,9 @@ class LineaPedidoVenta {
   final double pendiente;
   final double precio;
   final double dto;
+  final double dto1;
+  final double dto2;
+  final double dto3;
   final double importe;
   final double tipoIva;
   final String regIvaVta;
@@ -49,6 +65,9 @@ class LineaPedidoVenta {
     this.pendiente = 1,
     this.precio = 0,
     this.dto = 0,
+    this.dto1 = 0,
+    this.dto2 = 0,
+    this.dto3 = 0,
     this.importe = 0,
     this.tipoIva = 21,
     this.regIvaVta = 'G',
@@ -76,7 +95,10 @@ class LineaPedidoVenta {
         cantidadServida: _double(json['can_srv'] ?? json['can_ser']),
         pendiente: _double(json['can_pte'] ?? json['can_pdt']),
         precio: _double(json['pre'] ?? json['precio']),
-        dto: _double(json['por_dto'] ?? json['dto']),
+        dto: _double(_val(json, ['por_dto', 'POR_DTO', 'dto'])),
+        dto1: _double(_val(json, ['DTO1', 'dto1', 'dto_1', 'por_dto_1', 'por_dto1'])),
+        dto2: _double(_val(json, ['DTO2', 'dto2', 'dto_2', 'por_dto_2', 'por_dto2'])),
+        dto3: _double(_val(json, ['DTO3', 'dto3', 'dto_3', 'por_dto_3', 'por_dto3'])),
         importe: _double(json['imp'] ?? json['importe']),
         tipoIva: _double(
           json['por_iva'] ?? json['tipo_iva'] ?? json['reg_iva_vta'],
@@ -101,6 +123,9 @@ class LineaPedidoVenta {
     double? pendiente,
     double? precio,
     double? dto,
+    double? dto1,
+    double? dto2,
+    double? dto3,
     double? importe,
     double? tipoIva,
     String? regIvaVta,
@@ -124,6 +149,9 @@ class LineaPedidoVenta {
     pendiente: pendiente ?? this.pendiente,
     precio: precio ?? this.precio,
     dto: dto ?? this.dto,
+    dto1: dto1 ?? this.dto1,
+    dto2: dto2 ?? this.dto2,
+    dto3: dto3 ?? this.dto3,
     importe: importe ?? this.importe,
     tipoIva: tipoIva ?? this.tipoIva,
     regIvaVta: regIvaVta ?? this.regIvaVta,
@@ -137,8 +165,17 @@ class LineaPedidoVenta {
 
   double get importeTotal => getLineTotal();
 
-  double getLineTotal() =>
-      importe != 0 ? importe : cantidad * precio * (1 - dto / 100);
+  double getLineTotal() {
+    if (importe != 0) return importe;
+    return calcularImporteLinea(
+      cantidad: cantidad,
+      precio: precio,
+      dto: dto,
+      dto1: dto1,
+      dto2: dto2,
+      dto3: dto3,
+    );
+  }
 }
 
 class LineaPresupuestoVenta {
@@ -149,6 +186,9 @@ class LineaPresupuestoVenta {
   final double cantidad;
   final double precio;
   final double dto;
+  final double dto1;
+  final double dto2;
+  final double dto3;
   final double importe;
   final double tipoIva;
   final String regIvaVta;
@@ -162,6 +202,9 @@ class LineaPresupuestoVenta {
     this.cantidad = 1,
     this.precio = 0,
     this.dto = 0,
+    this.dto1 = 0,
+    this.dto2 = 0,
+    this.dto3 = 0,
     this.importe = 0,
     this.tipoIva = 21,
     this.regIvaVta = 'G',
@@ -176,7 +219,10 @@ class LineaPresupuestoVenta {
         descripcion: _text(json['dsc'] ?? json['descripcion'] ?? json['dsc_edt']),
         cantidad: _double(json['can'] ?? json['cantidad']),
         precio: _double(json['pre'] ?? json['precio']),
-        dto: _double(json['por_dto'] ?? json['dto']),
+        dto: _double(_val(json, ['por_dto', 'POR_DTO', 'dto'])),
+        dto1: _double(_val(json, ['DTO1', 'dto1', 'dto_1', 'por_dto_1', 'por_dto1'])),
+        dto2: _double(_val(json, ['DTO2', 'dto2', 'dto_2', 'por_dto_2', 'por_dto2'])),
+        dto3: _double(_val(json, ['DTO3', 'dto3', 'dto_3', 'por_dto_3', 'por_dto3'])),
         importe: _double(json['imp'] ?? json['importe']),
         tipoIva: _double(
           json['por_iva'] ?? json['tipo_iva'] ?? json['reg_iva_vta'],
@@ -193,6 +239,9 @@ class LineaPresupuestoVenta {
     double? cantidad,
     double? precio,
     double? dto,
+    double? dto1,
+    double? dto2,
+    double? dto3,
     double? importe,
     double? tipoIva,
     String? regIvaVta,
@@ -205,6 +254,9 @@ class LineaPresupuestoVenta {
     cantidad: cantidad ?? this.cantidad,
     precio: precio ?? this.precio,
     dto: dto ?? this.dto,
+    dto1: dto1 ?? this.dto1,
+    dto2: dto2 ?? this.dto2,
+    dto3: dto3 ?? this.dto3,
     importe: importe ?? this.importe,
     tipoIva: tipoIva ?? this.tipoIva,
     regIvaVta: regIvaVta ?? this.regIvaVta,
@@ -213,8 +265,17 @@ class LineaPresupuestoVenta {
 
   double get importeTotal => getLineTotal();
 
-  double getLineTotal() =>
-      importe != 0 ? importe : cantidad * precio * (1 - dto / 100);
+  double getLineTotal() {
+    if (importe != 0) return importe;
+    return calcularImporteLinea(
+      cantidad: cantidad,
+      precio: precio,
+      dto: dto,
+      dto1: dto1,
+      dto2: dto2,
+      dto3: dto3,
+    );
+  }
 }
 
 class PedidoVenta {
@@ -371,7 +432,7 @@ class PresupuestoVenta {
         formaPago: _text(json['fpg']),
         direccionEnvio: _text(json['dir_env']),
         email: _text(json['EMAIL_DE_ENVIO_CLT'] ?? json['email_de_envio_clt'] ?? json['email'] ?? json['eml']),
-        observaciones: _text(json['obs']),
+        observaciones: _text(json['obs'] ?? json['OBS'] ?? json['observaciones']),
         vtaPedG: _int(json['VTA_PED_G'] ?? json['vta_ped_g'] ?? json['vtaPedG']),
       );
 
@@ -394,6 +455,9 @@ class PresupuestoVenta {
             cantidad: linea.cantidad,
             precio: linea.precio,
             dto: linea.dto,
+            dto1: linea.dto1,
+            dto2: linea.dto2,
+            dto3: linea.dto3,
             importe: linea.importe,
             tipoIva: linea.tipoIva,
             regIvaVta: linea.regIvaVta,
@@ -435,6 +499,9 @@ class PresupuestoVenta {
             cantidad: linea.cantidad,
             precio: linea.precio,
             dto: linea.dto,
+            dto1: linea.dto1,
+            dto2: linea.dto2,
+            dto3: linea.dto3,
             importe: linea.importe,
             tipoIva: linea.tipoIva,
             regIvaVta: linea.regIvaVta,

@@ -24,15 +24,21 @@
 // ============================================================================
 
 import 'package:flutter/material.dart'; // Librería estándar de Flutter (interfaz).
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart'; // Librería que comparte datos globales.
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 
 // Importamos nuestras propias pantallas y clases (los archivos de la carpeta lib).
 import 'core/app_log.dart'; // Logs a fichero (imprescindible en Windows).
-import 'core/order_repository.dart';
+import 'core/repositorio_pedidos.dart';
 import 'core/app_lifecycle_manager.dart'; // Nuevo manager de ciclo de vida.
 import 'core/crm_repository.dart';
 import 'core/search/entity_search_repository.dart'; // Repositorio local-first.
 import 'core/search/local_cache_db.dart'; // Caché local (SQLite en escritorio/móvil).
+import 'core/licencia/licencia.dart';
+import 'core/licencia/licencia_service.dart';
+import 'screens/licencia_config_screen.dart';
 import 'screens/login_screen.dart'; // Pantalla de conexión al servidor.
 import 'screens/dashboard_screen.dart';
 import 'screens/pedidos_list_screen.dart'; // Pantalla con la lista de pedidos.
@@ -42,6 +48,10 @@ import 'screens/agenda_calendar_screen.dart';
 import 'screens/presupuestos_list_screen.dart';
 import 'screens/presupuesto_detail_screen.dart';
 import 'screens/presupuesto_form_screen.dart';
+import 'screens/articulos_list_screen.dart';
+import 'screens/articulo_detail_screen.dart';
+import 'screens/clientes_list_screen.dart';
+import 'screens/cliente_detail_screen.dart';
 import 'screens/settings_screen.dart';
 import 'state/auth_state.dart'; // Estado global de la sesión (¿estamos conectados?).
 import 'state/theme_settings.dart';
@@ -63,14 +73,21 @@ Future<void> main() async {
   await localCacheDbInstance.init();
   final themeSettings = ThemeSettings();
   await themeSettings.load();
+  
+  final authState = AuthState();
+  await authState.init();
+
+  final licenciaService = LicenciaService();
+  await licenciaService.init();
 
   // runApp(...) = "enciende la app y muestra esto en la pantalla".
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthState()),
+        ChangeNotifierProvider.value(value: authState),
         ChangeNotifierProvider.value(value: themeSettings),
-        Provider(create: (_) => OrderRepository()),
+        ChangeNotifierProvider.value(value: licenciaService),
+        Provider(create: (_) => RepositorioPedidos()),
         Provider(create: (_) => CrmRepository()),
         Provider(create: (_) => EntitySearchRepository()),
       ],
@@ -126,25 +143,87 @@ class PedidosVentaApp extends StatelessWidget {
         '/presupuesto/form': (context) => PresupuestoFormScreen(
               presupuestoId: ModalRoute.of(context)!.settings.arguments,
             ),
+        '/articulos': (context) => const ArticulosListScreen(),
+        '/articulo': (context) => const ArticuloDetailScreen(),
+        '/clientes': (context) => const ClientesListScreen(),
+        '/cliente': (context) => const ClienteDetailScreen(),
         '/configuracion': (context) => const SettingsScreen(),
+        '/licencia': (context) {
+          final licService = context.read<LicenciaService>();
+          return LicenciaConfigScreen(
+            initialLicencia: licService.licencia ?? Licencia(),
+            licenseService: licService,
+            showBack: true,
+          );
+        },
       },
     );
   }
 }
 
-/// _RootScreen es la "pantalla portero": decide si enseñas el LOGIN
-/// o la LISTA DE PEDIDOS mirando el estado global de la sesión.
+/// _RootScreen es la "pantalla portero": decide si enseñas la LICENCIA,
+/// el LOGIN o la LISTA DE PEDIDOS / DASHBOARD.
 ///
 /// El guion bajo "_" al principio del nombre significa que es PRIVADA:
 /// solo se usa dentro de este archivo. Es una convención de Dart.
-class _RootScreen extends StatelessWidget {
+class _RootScreen extends StatefulWidget {
+  @override
+  State<_RootScreen> createState() => _RootScreenState();
+}
+
+class _RootScreenState extends State<_RootScreen> {
+  bool _checkingLostData = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLostData();
+  }
+
+  Future<void> _checkLostData() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        final response = await ImagePicker().retrieveLostData();
+        if (!response.isEmpty && response.file != null) {
+          final prefs = await SharedPreferences.getInstance();
+          final pedidoId = prefs.getString('picking_photo_pedido_id');
+          if (pedidoId != null) {
+            await prefs.setString('recovered_photo_path', response.file!.path);
+            await prefs.remove('picking_photo_pedido_id');
+            if (mounted) {
+              Navigator.of(context).pushReplacementNamed('/pedido/form', arguments: pedidoId.isEmpty ? null : pedidoId);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error recovering lost data: $e');
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _checkingLostData = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // context.watch<AuthState>() = "mira el estado global de la sesión".
-    // Al usar watch (no read), esta pantalla se REDIBUJA sola cuando cambia.
+    if (_checkingLostData && defaultTargetPlatform == TargetPlatform.android) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final licService = context.watch<LicenciaService>();
+    if (!licService.isValida) {
+      return LicenciaConfigScreen(
+        initialLicencia: licService.licencia ?? Licencia(),
+        licenseService: licService,
+        showBack: false,
+      );
+    }
+
     final auth = context.watch<AuthState>();
 
-    // Si estamos conectados → dashboard principal. Si no → pantalla de login.
     return auth.connected ? const DashboardScreen() : const LoginScreen();
   }
 }

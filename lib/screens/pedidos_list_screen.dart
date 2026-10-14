@@ -5,7 +5,7 @@
 //  ¿Qué es?
 //  --------
 //  Es el "escritorio" de la app: una lista de pedidos de venta con:
-//     - Filtros por estado (Todos / Pendiente / Recibido / Cancelado).
+//     - Filtros por estado (Todos / Pendiente / Parcialmente Servido / Servido / Cancelado).
 //     - Desplazamiento INFINITO: al llegar abajo, carga más pedidos solo.
 //     - Tirar hacia abajo para recargar (RefreshIndicator).
 //     - Botón flotante (+) para crear un pedido nuevo.
@@ -27,7 +27,8 @@ import 'package:provider/provider.dart';
 import '../core/api_service.dart'; // PedidosService (pide datos al servidor).
 import '../core/config.dart';
 import '../models/models.dart'; // El modelo Pedido.
-import '../core/order_repository.dart';
+import '../core/repositorio_pedidos.dart';
+import '../core/licencia/licencia_service.dart';
 import '../state/auth_state.dart'; // Para el botón "Salir" (desconectar).
 import '../theme/app_theme.dart'; // Colores.
 import '../widgets/fila_pedido.dart'; // La "tarjeta" de un pedido en la lista.
@@ -43,7 +44,12 @@ class PedidosListScreen extends StatefulWidget {
 /// _PedidosListScreenState: TODA la "memoria" de esta pantalla va aquí.
 class _PedidosListScreenState extends State<PedidosListScreen> {
   // Los estados que ofrecen los filtros (ChoiceChip).
-  static const _estados = ['PENDIENTE', 'SERVIDO', 'CANCELADO'];
+  static const _estados = [
+    'PENDIENTE',
+    'PARCIALMENTE SERVIDO',
+    'SERVIDO',
+    'CANCELADO',
+  ];
 
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
@@ -58,6 +64,12 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
   int _totalPedidos = 0;
   String _filtroEstado = ''; // Filtro activo ('' = sin filtrar = "Todos").
   String _busqueda = '';
+
+  bool get _estaCargandoOBuscando =>
+      _cargando ||
+      _cargandoPagina ||
+      (_searchDebounce?.isActive ?? false) ||
+      (_busqueda.trim().isNotEmpty && _hayMas);
   int _busquedaVersion = 0;
   bool _verPorZona = false; // Alternar modo de visión
 
@@ -110,7 +122,7 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
   Future<void> _cargarPagina({bool reset = false}) async {
     if (_cargandoPagina || (!reset && !_hayMas)) return;
 
-    final repository = context.read<OrderRepository>();
+    final repository = context.read<RepositorioPedidos>();
     final auth = context.read<AuthState>();
     final user = auth.currentUser;
     final comercial = user?.role.toLowerCase() == 'comercial'
@@ -150,13 +162,13 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
       }
       if (!mounted) return; // Si la pantalla ya se cerró, no seguimos.
       repository.setOrders([
-        if (!reset) ...repository.cachedOrders,
+        if (!reset) ...repository.pedidosCacheados,
         ...resultado.items,
       ]);
       _pagina++;
       _totalPedidos = resultado.total;
       _hayMas = _totalPedidos > 0
-          ? repository.cachedOrders.length < _totalPedidos
+          ? repository.pedidosCacheados.length < _totalPedidos
           : resultado.items.length >= AppConfig.pageSize;
       _aplicarFiltros();
       setState(() {
@@ -189,7 +201,7 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
   }
 
   void _aplicarFiltros() {
-    final pedidos = context.read<OrderRepository>().filterOrders(
+    final pedidos = context.read<RepositorioPedidos>().filtrarPedidos(
       query: _busqueda,
       statusFilter: _filtroEstado,
       currentUser: context.read<AuthState>().currentUser,
@@ -228,41 +240,28 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>(); // Para el botón de salir.
+    final licService = context.watch<LicenciaService>();
 
     return Scaffold(
       // ---- Barra superior ----
       appBar: AppBar(
         title: const Text('Pedidos de venta'),
-        actions: [
-          IconButton(
-            tooltip: 'Presupuestos',
-            icon: const Icon(Icons.request_quote_outlined),
-            onPressed: () => Navigator.of(context).pushNamed('/presupuestos'),
-          ),
-          // Botón "Salir": cierra la sesión → la app vuelve al login sola.
-          IconButton(
-            tooltip: 'Salir',
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              context.read<OrderRepository>().clearCache();
-              auth.desconectar();
-            },
-          ),
-        ],
       ),
 
       // ---- Botón flotante (+) para crear un pedido nuevo ----
-      floatingActionButton: FloatingActionButton(
-        onPressed: _nuevoPedido,
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: licService.esSoloLec
+          ? null
+          : FloatingActionButton(
+              onPressed: _nuevoPedido,
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.white,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add),
+            ),
 
       body: Column(
         children: [
-          _filtros(), // Fila con los chips (Todos/Pendiente/Recibido/Cancelado).
+          _filtros(auth.canViewTechnicalZone), // Fila con los chips (Todos/Pendiente/Recibido/Cancelado).
           // Contador: "X pedidos" (solo si hay algo).
           if (_pedidos.isNotEmpty)
             Padding(
@@ -281,14 +280,16 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
 
           // ---- La zona de la lista (Expandida = ocupa el resto del alto) ----
           Expanded(
-            child: _cargando && _pedidos.isEmpty
-                ? Center(
+            child: (_estaCargandoOBuscando && _pedidos.isEmpty)
+                ? const Center(
                     child: CircularProgressIndicator(),
-                  ) // Cargando 1ª vez.
+                  )
                 : _pedidos.isEmpty
                 ? Center(
                   child: Text(
-                      'Sin pedidos de venta que mostrar.',
+                      _busqueda.trim().isNotEmpty
+                          ? 'Sin pedidos de venta que coincidan con "$_busqueda".'
+                          : 'Sin pedidos de venta que mostrar.',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -323,8 +324,7 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
     );
   }
 
-  Widget _filtros() {
-    final canViewTechnicalZone = context.read<AuthState>().canViewTechnicalZone;
+  Widget _filtros(bool canViewTechnicalZone) {
     return Container(
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -332,7 +332,7 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Selector de modo de visión
-          if (canViewTechnicalZone)
+          if (canViewTechnicalZone) ...[
             SegmentedButton<bool>(
               segments: const [
                 ButtonSegment<bool>(
@@ -358,26 +358,30 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
                 _refrescar();
               },
             ),
-          const SizedBox(height: 10),
+            const SizedBox(height: 10),
+          ],
 
-          // 1. La fila de chips (dentro de un Wrap)
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ChoiceChip(
-                label: const Text('Todos'),
-                selected: _filtroEstado.isEmpty,
-                onSelected: (_) => _cambiarFiltro(''),
-              ),
-              ..._estados.map(
-                (estado) => ChoiceChip(
-                  label: Text(estado),
-                  selected: _filtroEstado == estado,
-                  onSelected: (_) => _cambiarFiltro(estado),
+          // 1. La fila de chips (dentro de un Row con SingleChildScrollView)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFiltroChip(
+                  label: 'Todos',
+                  estado: '',
+                  selected: _filtroEstado.isEmpty,
+                  onSelected: () => _cambiarFiltro(''),
                 ),
-              ),
-            ],
+                ..._estados.map(
+                  (estado) => _buildFiltroChip(
+                    label: estado,
+                    estado: estado,
+                    selected: _filtroEstado == estado,
+                    onSelected: () => _cambiarFiltro(estado),
+                  ),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 10), // Separación entre chips y buscador sized box es un widget que permite definir un tamaño fijo para su hijo, en este caso se utiliza para darle un alto fijo al TextField del buscador.
@@ -386,7 +390,16 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
             height: 48,
             child: TextField(
               decoration: InputDecoration(
-                suffixIcon: const Icon(Icons.search),
+                suffixIcon: (_cargandoPagina || (_searchDebounce?.isActive ?? false))
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : const Icon(Icons.search),
                 hintText: 'Buscar pedido...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -398,6 +411,7 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
               controller: _searchController,
               onChanged: (value) {
                 _busqueda = value;
+                _aplicarFiltros();
                 _busquedaVersion++;
                 final version = _busquedaVersion;
                 _searchDebounce?.cancel();
@@ -407,10 +421,45 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
                       ? _cargarPagina(reset: true)
                       : _cargarBusquedaCompleta(version),
                 );
+                setState(() {});
               },
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFiltroChip({
+    required String label,
+    required String estado,
+    required bool selected,
+    required VoidCallback onSelected,
+  }) {
+    final color = estado.isEmpty
+        ? Theme.of(context).colorScheme.primary
+        : AppColors.estadoColor(estado);
+    final selectedTextColor = estado.isEmpty
+        ? Theme.of(context).colorScheme.onPrimary
+        : Colors.white;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onSelected(),
+        showCheckmark: false,
+        selectedColor: color,
+        backgroundColor: color.withValues(alpha: 0.12),
+        side: BorderSide(
+          color: selected ? color : color.withValues(alpha: 0.45),
+        ),
+        labelStyle: TextStyle(
+          color: selected ? selectedTextColor : color,
+          fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+          fontSize: 13,
+        ),
       ),
     );
   }

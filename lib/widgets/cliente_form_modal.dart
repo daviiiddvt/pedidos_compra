@@ -66,61 +66,63 @@ class _ClienteFormModalState extends State<_ClienteFormModal> {
         constraints: const BoxConstraints(maxWidth: 400),
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text('Nuevo Cliente', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 16),
-                TextFormField(
-                  initialValue: _nombre,
-                  decoration: const InputDecoration(labelText: 'Nombre comercial / Razón social *'),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Obligatorio' : null,
-                  onSaved: (v) => _nombre = v ?? '',
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: _cif,
-                  decoration: const InputDecoration(labelText: 'CIF / NIF'),
-                  onSaved: (v) => _cif = v ?? '',
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: _telefono,
-                  decoration: const InputDecoration(labelText: 'Teléfono'),
-                  onSaved: (v) => _telefono = v ?? '',
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: _email,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  onSaved: (v) => _email = v ?? '',
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: _guardando ? null : () => Navigator.of(context).pop(),
-                      child: Text(
-                        'Cancelar',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('Nuevo Cliente', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    initialValue: _nombre,
+                    decoration: const InputDecoration(labelText: 'Nombre comercial / Razón social *'),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Obligatorio' : null,
+                    onSaved: (v) => _nombre = v ?? '',
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: _cif,
+                    decoration: const InputDecoration(labelText: 'CIF / NIF'),
+                    onSaved: (v) => _cif = v ?? '',
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: _telefono,
+                    decoration: const InputDecoration(labelText: 'Teléfono'),
+                    onSaved: (v) => _telefono = v ?? '',
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: _email,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                    onSaved: (v) => _email = v ?? '',
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _guardando ? null : () => Navigator.of(context).pop(),
+                        child: Text(
+                          'Cancelar',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: _guardando ? null : _guardar,
-                      child: _guardando
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Crear Cliente'),
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: _guardando ? null : _guardar,
+                        child: _guardando
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('Crear Cliente'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

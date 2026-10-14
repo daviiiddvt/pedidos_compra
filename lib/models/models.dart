@@ -20,6 +20,14 @@ dynamic _firstValue(Map<String, dynamic> json, List<String> keys) {
   for (final key in keys) {
     if (json.containsKey(key) && json[key] != null) return json[key];
   }
+  for (final key in keys) {
+    final lowerKey = key.toLowerCase();
+    for (final entry in json.entries) {
+      if (entry.key.toLowerCase() == lowerKey && entry.value != null) {
+        return entry.value;
+      }
+    }
+  }
   return null;
 }
 
@@ -61,16 +69,16 @@ class RegimenIva {
 }
 
 const List<RegimenIva> kRegimenesIva = [
-  RegimenIva(codigo: 'G', nombre: 'General', porcentaje: 21.0),
-  RegimenIva(codigo: 'R', nombre: 'Reducido', porcentaje: 10.0),
-  RegimenIva(codigo: 'S', nombre: 'Súper reducido', porcentaje: 2.0),
-  RegimenIva(codigo: 'E', nombre: 'Especial', porcentaje: 0.0),
-  RegimenIva(codigo: 'X', nombre: 'Exento', porcentaje: 0.0),
+  RegimenIva(codigo: 'G', nombre: 'GENERAL', porcentaje: 21.0),
+  RegimenIva(codigo: 'R', nombre: 'REDUCIDO', porcentaje: 10.0),
+  RegimenIva(codigo: 'S', nombre: 'SÚPER REDUCIDO', porcentaje: 2.0),
+  RegimenIva(codigo: 'E', nombre: 'ESPECIAL', porcentaje: 0.0),
+  RegimenIva(codigo: 'X', nombre: 'EXENTO', porcentaje: 0.0),
   RegimenIva(codigo: '1', nombre: 'IVA 0%', porcentaje: 0.0),
   RegimenIva(codigo: '2', nombre: 'IVA 5%', porcentaje: 5.0),
-  RegimenIva(codigo: '3', nombre: 'Otros 1', porcentaje: 0.0),
-  RegimenIva(codigo: '4', nombre: 'Otros 2', porcentaje: 0.0),
-  RegimenIva(codigo: '5', nombre: 'Otros 3', porcentaje: 0.0),
+  RegimenIva(codigo: '3', nombre: 'OTROS 1', porcentaje: 0.0),
+  RegimenIva(codigo: '4', nombre: 'OTROS 2', porcentaje: 0.0),
+  RegimenIva(codigo: '5', nombre: 'OTROS 3', porcentaje: 0.0),
 ];
 
 RegimenIva regimenIvaPorCodigo(String? codigo) {
@@ -150,7 +158,10 @@ Map<String, dynamic> _normalizeLineaJson(
     'cantidadServida': ['can_srv', 'can_ser', 'cantidadServida', 'servida'],
     'pendiente': ['can_pte', 'can_pdt', 'pendiente', 'cantidadPendiente'],
     'precio': ['pre', 'precio'],
-    'dto': ['por_dto', 'dto'],
+    'dto': ['por_dto', 'POR_DTO', 'dto'],
+    'dto1': ['DTO1', 'dto1', 'dto_1', 'por_dto_1', 'por_dto1'],
+    'dto2': ['DTO2', 'dto2', 'dto_2', 'por_dto_2', 'por_dto2'],
+    'dto3': ['DTO3', 'dto3', 'dto_3', 'por_dto_3', 'por_dto3'],
     'importe': ['imp', 'importe'],
     'regIvaVta': ['reg_iva_vta', 'regIvaVta', 'reg_iva'],
     'tipoIva': ['por_iva', 'tipo_iva', 'reg_iva_vta', 'tipoIva'],
@@ -170,6 +181,9 @@ Map<String, dynamic> _normalizeLineaJson(
       'pendiente',
       'precio',
       'dto',
+      'dto1',
+      'dto2',
+      'dto3',
       'importe',
       'retencionIrpf',
       'retencionAlquiler',
@@ -200,7 +214,7 @@ Map<String, dynamic> _normalizePedidoJson(Map<String, dynamic> json) {
     'cliente': ['clt', 'cliente'],
     'clt': ['clt', 'clienteId'],
     'tot_ped': ['tot_ped', 'tot_pre', 'total'],
-    'clienteNombre': ['clt_nom', 'clt_name', 'nom_com', 'clienteNombre'],
+    'clienteNombre': ['clt_nom', 'clt_name', 'nom_fis', 'clienteNombre'],
     'ser': ['ser', 'serie'],
     'ser_nom': ['ser_nom', 'serieNombre'],
     'vtaPedG': ['vta_ped_g', 'vta_ped', 'VTA_PED_G'],
@@ -211,11 +225,12 @@ Map<String, dynamic> _normalizePedidoJson(Map<String, dynamic> json) {
     'fpg_nom': ['fpg_nom', 'formaPagoNombre'],
     'dir_env': ['dir_env', 'dir_env_man', 'direccionEnvio'],
     'email': ['email', 'mail', 'eml', 'EML', 'EMAIL_DE_ENVIO_CLT'],
-    'obs': ['obs', 'observaciones'],
+    'obs': ['obs', 'OBS', 'observaciones'],
     'cmr_nom': ['cmr_nom', 'comercialNombre'],
     'alm': ['alm', 'almacen'],
     'alm_nom': ['alm_nom', 'almacenNombre'],
     'codigo': ['codigo', 'cod', 'id_reg'],
+    'fot': ['fot', 'FOT', 'foto', 'fotoBase64'],
   };
   for (final entry in aliases.entries) {
     final value = _firstValue(json, entry.value);
@@ -242,15 +257,48 @@ abstract class OpcionMaestra with _$OpcionMaestra {
   const factory OpcionMaestra({
     required String codigo,
     required String nombre,
+    @Default('') String referencia,
   }) = _OpcionMaestra;
 
   factory OpcionMaestra.fromJson(Map<String, dynamic> json) =>
       _$OpcionMaestraFromJson({
         'codigo': _textValue(_firstValue(json, ['codigo', 'id', 'code'])),
         'nombre': _textValue(
-          _firstValue(json, ['nombre', 'name', 'nom_com', 'descripcion']),
+          _firstValue(json, ['nombre', 'name', 'nom_fis', 'descripcion']),
+        ),
+        'referencia': _textValue(
+          _firstValue(json, ['referencia', 'ref', 'ref_man', 'REF']),
         ),
       });
+}
+
+/// Calcula el importe neto de una línea aplicando descuentos concatenados (en cascada):
+/// 1. dto (% Dto. principal, POR_DTO)
+/// 2. dto1 (% dto 1, DTO1)
+/// 3. dto2 (% dto 2, DTO2)
+/// 4. dto3 (% dto 3, DTO3)
+double calcularImporteLinea({
+  required double cantidad,
+  required double precio,
+  double dto = 0.0,
+  double dto1 = 0.0,
+  double dto2 = 0.0,
+  double dto3 = 0.0,
+}) {
+  var subtotal = cantidad * precio;
+  if (dto != 0.0) {
+    subtotal -= subtotal * (dto / 100);
+  }
+  if (dto1 != 0.0) {
+    subtotal -= subtotal * (dto1 / 100);
+  }
+  if (dto2 != 0.0) {
+    subtotal -= subtotal * (dto2 / 100);
+  }
+  if (dto3 != 0.0) {
+    subtotal -= subtotal * (dto3 / 100);
+  }
+  return subtotal;
 }
 
 @freezed
@@ -271,6 +319,9 @@ abstract class LineaPedido with _$LineaPedido {
     @JsonKey(includeToJson: false) @Default(1.0) double pendiente,
     @Default(0.0) double precio,
     @Default(0.0) double dto,
+    @Default(0.0) double dto1,
+    @Default(0.0) double dto2,
+    @Default(0.0) double dto3,
     @Default(0.0) double importe,
     @Default(21.0) double tipoIva,
     @Default('G') String regIvaVta,
@@ -292,8 +343,14 @@ abstract class LineaPedido with _$LineaPedido {
 
   double getLineTotal() {
     if (importe != 0.0) return importe;
-    final base = cantidad * precio;
-    return base - base * (dto / 100);
+    return calcularImporteLinea(
+      cantidad: cantidad,
+      precio: precio,
+      dto: dto,
+      dto1: dto1,
+      dto2: dto2,
+      dto3: dto3,
+    );
   }
 
   double get pendienteCalculada => cantidad - cantidadServida;
@@ -316,7 +373,9 @@ abstract class Cliente with _$Cliente {
   const factory Cliente({
     required int id,
     @Default('') String nombreComercial,
+    @Default('') String nombreFiscal,
     @Default('') String cif,
+    @Default('') String email,
     @Default('') String telefono,
     @Default(0) int pob,
     @Default(0) int dirPriId,
@@ -325,9 +384,13 @@ abstract class Cliente with _$Cliente {
   factory Cliente.fromJson(Map<String, dynamic> json) => _$ClienteFromJson({
     'id': _intValue(_firstValue(json, ['id', 'codigo'])),
     'nombreComercial': _textValue(
-      _firstValue(json, ['nom_com', 'name', 'nombreComercial']),
+      _firstValue(json, ['nom_fis', 'name', 'nombreComercial']),
+    ),
+    'nombreFiscal': _textValue(
+      _firstValue(json, ['nom_fis', 'NOM_FIS', 'nombreFiscal']),
     ),
     'cif': _textValue(_firstValue(json, ['cif', 'nif'])),
+    'email': _textValue(_firstValue(json, ['eml', 'EML', 'email'])),
     'telefono': _textValue(_firstValue(json, ['tlf', 'telefono', 'tel'])),
     'pob': _intValue(_firstValue(json, ['pob', 'POB'])),
     'dirPriId': _intValue(_firstValue(json, ['dir_pri_id', 'DIR_PRI_ID'])),
@@ -373,6 +436,8 @@ abstract class Pedido with _$Pedido {
     @JsonKey(name: 'dir_env') @Default('') String direccionEnvio,
     @JsonKey(name: 'email') @Default('') String email,
     @JsonKey(name: 'obs') @Default('') String observaciones,
+    @JsonKey(name: 'fot') @Default('') String fotoBase64,
+    @JsonKey(name: 'con_kyr', fromJson: _boolValue) @Default(false) bool conKyr,
   }) = _Pedido;
 
   factory Pedido.fromJson(Map<String, dynamic> json) =>

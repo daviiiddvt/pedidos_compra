@@ -210,10 +210,25 @@ class _AutocompleteFieldState extends State<AutocompleteField> {
                           }
                         : null,
                   )
-                : Icon(
-                    Icons.search,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                : BlocBuilder<RemoteSearchCubit, RemoteSearchState>(
+                    bloc: _cubit,
+                    builder: (context, state) {
+                      if (state is RemoteSearchLoading) {
+                        return const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      }
+                      return Icon(
+                        Icons.search,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      );
+                    },
                   ),
           ),
         ),
@@ -381,9 +396,12 @@ class _SuggestionTileState extends State<_SuggestionTile> {
           widget.option.nombre,
           style: const TextStyle(fontSize: 14),
         ),
-        subtitle: widget.option.codigo.isNotEmpty
+        subtitle: widget.option.codigo.isNotEmpty || widget.option.referencia.isNotEmpty
             ? Text(
-                'Código: ${widget.option.codigo}',
+                [
+                  if (widget.option.codigo.isNotEmpty) 'Código: ${widget.option.codigo}',
+                  if (widget.option.referencia.isNotEmpty) 'Ref: ${widget.option.referencia}',
+                ].join(' • '),
                 style: const TextStyle(fontSize: 11),
               )
             : null,
@@ -407,7 +425,7 @@ class _SuggestionsCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
+          side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35)),
         ),
         child: child,
       ),

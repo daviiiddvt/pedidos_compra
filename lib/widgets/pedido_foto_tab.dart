@@ -9,12 +9,16 @@ class PedidoFotoTab extends StatelessWidget {
     required this.uploading,
     required this.onCamera,
     required this.onGallery,
+    this.readOnly = false,
+    this.onDelete,
   });
 
   final Uint8List? imageBytes;
   final bool uploading;
   final VoidCallback onCamera;
   final VoidCallback onGallery;
+  final VoidCallback? onDelete;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +55,7 @@ class PedidoFotoTab extends StatelessWidget {
           const SizedBox(height: 16),
           if (uploading)
             const Center(child: CircularProgressIndicator())
-          else
+          else if (!readOnly)
             Wrap(
               alignment: WrapAlignment.center,
               spacing: 12,
@@ -67,16 +71,27 @@ class PedidoFotoTab extends StatelessWidget {
                   icon: const Icon(Icons.photo_library_outlined),
                   label: const Text('FOTOTECA'),
                 ),
+                if (imageBytes != null && onDelete != null)
+                  ElevatedButton.icon(
+                    onPressed: onDelete,
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: colorScheme.error,
+                      backgroundColor: colorScheme.errorContainer,
+                    ),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('ELIMINAR'),
+                  ),
               ],
             ),
           const SizedBox(height: 12),
-          Text(
-            imageBytes == null
-                ? 'No hay una foto adjunta.'
-                : 'La foto se enviará al pulsar Guardar.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: colorScheme.onSurfaceVariant),
-          ),
+          if (!readOnly)
+            Text(
+              imageBytes == null
+                  ? 'No hay una foto adjunta.'
+                  : 'La foto se enviará al pulsar Guardar.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
         ],
       ),
     );

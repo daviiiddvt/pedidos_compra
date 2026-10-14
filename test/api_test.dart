@@ -8,7 +8,7 @@ void main() {
     final api = ApiClient.instance;
     api.setApiKey(AppConfig.apiKey);
     
-    final json = await api.get('TecERPv7_dat_dat/v1/VTA_PED_G', params: {'page[size]': '1'});
+    final json = await api.get('VTA_PED_G', params: {'page[size]': '1'});
     // ignore: avoid_print
     print('PEDIDO: \n${jsonEncode(json)}');
   });

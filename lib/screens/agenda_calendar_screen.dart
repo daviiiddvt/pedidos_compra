@@ -251,7 +251,7 @@ class _AgendaCalendarScreenState extends State<AgendaCalendarScreen> {
                     ),
                     calendarStyle: CalendarStyle(
                       todayDecoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.35),
+                        color: Theme.of(context).colorScheme.primaryContainer,
                         shape: BoxShape.circle,
                       ),
                       selectedDecoration: BoxDecoration(
@@ -269,10 +269,10 @@ class _AgendaCalendarScreenState extends State<AgendaCalendarScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   child: Text(
                     'Visitas del ${formatDate(_isoDia(_selectedDay))}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -280,14 +280,14 @@ class _AgendaCalendarScreenState extends State<AgendaCalendarScreen> {
                 Expanded(
                   child: visitasDelDia.isEmpty
                       ? Center(
-                          child: Text(
-                            state.cargando
-                                ? 'Cargando visitas...'
-                                : 'No hay visitas este día.',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
+                          child: state.cargando
+                              ? const CircularProgressIndicator()
+                              : Text(
+                                  'No hay visitas este día.',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
                         )
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(12, 0, 12, 88),
@@ -312,10 +312,8 @@ class _AgendaCalendarScreenState extends State<AgendaCalendarScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 leading: CircleAvatar(
-                                  backgroundColor: AppColors.primary.withValues(
-                                    alpha: 0.12,
-                                  ),
-                                  foregroundColor: AppColors.primary,
+                                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                  foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
                                   child: const Icon(Icons.event_outlined),
                                 ),
                                 title: Text(

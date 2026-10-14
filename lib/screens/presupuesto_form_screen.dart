@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/formatters.dart';
 import '../models/models.dart';
 import '../core/presupuesto_service.dart';
+import '../core/licencia/licencia_service.dart';
 import '../theme/app_theme.dart';
 import '../state/auth_state.dart';
 import '../state/pedido_form_cubit.dart';
@@ -28,7 +29,9 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
   Set<int> _lineasOriginalesIds = {};
   bool _cargando = false;
   bool _guardando = false;
-  String _tab = 'cabecera';
+  late final PageController _pageController;
+  int _tabIndex = 0;
+  static const _tabs = ['cabecera', 'lineas', 'totales'];
 
   dynamic get _presupuestoIdReal =>
       widget.presupuestoId is PresupuestoVenta
@@ -44,6 +47,7 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     if (widget.presupuestoId is PresupuestoVenta) {
       final p = widget.presupuestoId as PresupuestoVenta;
       final visual = p.toPedidoVisual();
@@ -67,6 +71,7 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
 
   @override
   void dispose() {
+    _pageController.dispose();
     _cubit.close();
     super.dispose();
   }
@@ -94,22 +99,75 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
   }
 
   Future<void> _editarLinea(LineaPedido line, int index) async {
+    final cltId = _presupuesto.clienteId > 0 ? _presupuesto.clienteId : (int.tryParse(_presupuesto.cliente) ?? 0);
     final result = await mostrarPresupuestoLineaForm(
       context,
       linea: line,
-      clienteId: _presupuesto.clienteId,
+      clienteId: cltId,
       onDelete: () => setState(() => _lineas = [..._lineas]..removeAt(index)),
     );
     if (result != null && mounted) setState(() => _lineas[index] = result);
   }
 
   Future<void> _anadirLinea() async {
+    final cltId = _presupuesto.clienteId > 0 ? _presupuesto.clienteId : (int.tryParse(_presupuesto.cliente) ?? 0);
     final result = await mostrarPresupuestoLineaForm(
       context,
-      clienteId: _presupuesto.clienteId,
+      clienteId: cltId,
     );
     if (result != null && mounted) {
       setState(() => _lineas = [..._lineas, result]);
+    }
+  }
+
+  Future<void> _confirmarEliminar() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar presupuesto'),
+        content: const Text('¿Estás seguro de que quieres eliminar este presupuesto de venta? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      setState(() => _guardando = true);
+      // Velneo may prevent deleting a budget if it still has lines.
+      for (final linea in _lineas) {
+        if (linea.id != null) {
+          try {
+            await PresupuestosService.eliminarLinea(linea.id!);
+          } catch (_) {} 
+        }
+      }
+      
+      await PresupuestosService.remove(_presupuestoIdReal);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Presupuesto eliminado correctamente')),
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/presupuestos',
+        (route) => route.settings.name == '/home' || route.isFirst,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al eliminar: $e')),
+      );
+      setState(() => _guardando = false);
     }
   }
 
@@ -156,6 +214,9 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
                     cantidad: linea.cantidad,
                     precio: linea.precio,
                     dto: linea.dto,
+                    dto1: linea.dto1,
+                    dto2: linea.dto2,
+                    dto3: linea.dto3,
                     importe: linea.importe,
                     tipoIva: linea.tipoIva,
                     regIvaVta: linea.regIvaVta,
@@ -179,6 +240,9 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
                     cantidad: linea.cantidad,
                     precio: linea.precio,
                     dto: linea.dto,
+                    dto1: linea.dto1,
+                    dto2: linea.dto2,
+                    dto3: linea.dto3,
                     importe: linea.importe,
                     tipoIva: linea.tipoIva,
                     regIvaVta: linea.regIvaVta,
@@ -227,32 +291,47 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
                       (key: 'lineas', label: 'Líneas (${_lineas.length})'),
                       (key: 'totales', label: 'Totales'),
                     ],
-                    active: _tab,
-                    onChanged: (tab) => setState(() => _tab = tab),
+                    active: _tabs[_tabIndex],
+                    onChanged: (key) {
+                      final idx = _tabs.indexOf(key);
+                      if (idx != -1 && _pageController.hasClients) {
+                        _pageController.animateToPage(
+                          idx,
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeInOut,
+                        );
+                      }
+                    },
                   ),
                   Expanded(
-                    child: switch (_tab) {
-                      'lineas' => LineasTable(
-                        lineas: _lineas,
-                        onEdit: _editarLinea,
-                        onAdd: _anadirLinea,
-                      ),
-                      'totales' => SingleChildScrollView(
-                        padding: const EdgeInsets.all(12),
-                        child: TotalesCard(
-                          base: calcularTotales(_lineas).base,
-                          iva: calcularTotales(_lineas).iva,
-                          total: calcularTotales(_lineas).total,
-                          labelTotal: 'Total Presupuesto',
+                    child: PageView(
+                      controller: _pageController,
+                      onPageChanged: (index) {
+                        setState(() => _tabIndex = index);
+                      },
+                      children: [
+                        BlocBuilder<PedidoFormCubit, PedidoFormState>(
+                          builder: (context, state) => PresupuestoCabeceraForm(
+                            pedido: state.pedido,
+                            onChanged: (value) => _cubit.update(value),
+                          ),
                         ),
-                      ),
-                      _ => BlocBuilder<PedidoFormCubit, PedidoFormState>(
-                        builder: (context, state) => PresupuestoCabeceraForm(
-                          pedido: state.pedido,
-                          onChanged: (value) => _cubit.update(value),
+                        LineasTable(
+                          lineas: _lineas,
+                          onEdit: _editarLinea,
+                          onAdd: _anadirLinea,
                         ),
-                      ),
-                    },
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.all(12),
+                          child: TotalesCard(
+                            base: calcularTotales(_lineas).base,
+                            iva: calcularTotales(_lineas).iva,
+                            total: calcularTotales(_lineas).total,
+                            labelTotal: 'Total Presupuesto',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   SafeArea(
                     top: false,
@@ -260,6 +339,25 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
+                          if (_editando) ...[
+                            Tooltip(
+                              message: 'Eliminar presupuesto',
+                              child: SizedBox.square(
+                                dimension: 48,
+                                child: OutlinedButton(
+                                  onPressed: _confirmarEliminar,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.error,
+                                    side: const BorderSide(color: AppColors.error),
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  child: const Icon(Icons.delete_outline, size: 20),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                          ],
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () => Navigator.of(context).pop(),
@@ -269,7 +367,7 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: _guardando ? null : _guardar,
+                              onPressed: _guardando || context.watch<LicenciaService>().esSoloLec ? null : _guardar,
                               child: _guardando
                                   ? const CircularProgressIndicator()
                                   : const Text('Guardar'),

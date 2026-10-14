@@ -20,10 +20,12 @@
 //  - AlertDialog: la "ventanita" de confirmación (ej. "¿Eliminar línea?").
 // ============================================================================
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/api_service.dart'; // PedidosService (guardar + cargar detalle).
 import '../core/formatters.dart'; // todayIso (fecha de hoy por defecto).
@@ -39,6 +41,7 @@ import '../widgets/segment_tabs.dart'; // Pestañas.
 import '../widgets/totales_card.dart'; // Tarjeta de totales.
 import '../widgets/pedido_foto_tab.dart';
 import '../core/presupuesto_service.dart';
+import '../core/licencia/licencia_service.dart';
 
 /// PedidoFormScreen: pantalla de ALTA/EDICIÓN de pedidos.
 class PedidoFormScreen extends StatefulWidget {
@@ -57,7 +60,15 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   bool _cargandoDetalle = false; // ¿Cargando el detalle (modo editar)?
   bool _guardando = false; // ¿Estamos guardando ya? (para no doble enviar).
   Uint8List? _fotoBytes;
-  String _tab = 'cabecera'; // Pestaña activa.
+  late final PageController _pageController;
+  int _tabIndex = 0;
+
+  List<String> get _tabs => [
+    'cabecera',
+    'lineas',
+    'totales',
+    if (_editando) 'foto',
+  ];
 
   dynamic get _pedidoIdReal =>
       widget.pedidoId is Pedido ? (widget.pedidoId as Pedido).id : widget.pedidoId;
@@ -78,6 +89,8 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
+    _checkRecoveredPhoto();
     if (widget.pedidoId is Pedido) {
       final initial = widget.pedidoId as Pedido;
       _cubit = PedidoFormCubit(initial);
@@ -86,6 +99,9 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
           .where((linea) => linea.id != null)
           .map((linea) => linea.id!)
           .toSet();
+      if (initial.fotoBase64.isNotEmpty) {
+        _fotoBytes = base64Decode(initial.fotoBase64);
+      }
       _cargandoDetalle = false;
         _cubit.init(initial);
     } else {
@@ -98,6 +114,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
 
   @override
   void dispose() {
+    _pageController.dispose();
     _cubit.close();
     super.dispose();
   }
@@ -116,6 +133,11 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
           .where((linea) => linea.id != null)
           .map((linea) => linea.id!)
           .toSet();
+        if (detalle.fotoBase64.isNotEmpty) {
+          _fotoBytes = base64Decode(detalle.fotoBase64);
+        } else {
+          _fotoBytes = null;
+        }
         _cargandoDetalle = false;
       });
     } catch (e) {
@@ -139,28 +161,9 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
         // (No modificamos las originales directamente por inmutabilidad.)
         _lineas = _lineas
             .map(
-              (l) => LineaPedido(
-                id: l.id,
-                codigo: l.codigo,
-                articulo: l.articulo,
-                articuloNombre: l.articuloNombre,
-                descripcion: l.descripcion,
-                referencia: l.referencia,
-                referenciaProveedor: l.referenciaProveedor,
-                nReferencia: l.nReferencia,
-                cantidad: l.cantidad,
-                pendiente: l.pendiente,
-                precio: l.precio,
-                dto: l.dto,
-                importe: l.importe,
-                tipoIva: l.tipoIva,
-                regIvaVta: l.regIvaVta,
-                retencionIrpf: l.retencionIrpf,
-                retencionAlquiler: l.retencionAlquiler,
-                clienteVenta: l.clienteVenta,
-                estado: 'Cancelado', // ← cambiamos solo el estado
-                cancelado: true, //     ← y la marca de cancelado
-                previstoPara: l.previstoPara,
+              (l) => l.copyWith(
+                estado: 'Cancelado',
+                cancelado: true,
               ),
             )
             .toList();
@@ -170,10 +173,11 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
 
   /// _editarLinea: abre el modal para editar UNA línea existente.
   Future<void> _editarLinea(LineaPedido linea, int index) async {
+    final cltId = _pedido.clienteId > 0 ? _pedido.clienteId : (int.tryParse(_pedido.cliente) ?? 0);
     final resultado = await mostrarLineaForm(
       context,
       linea: linea, // Enviamos la línea actual para que salga rellena.
-      clienteId: _pedido.clienteId,
+      clienteId: cltId,
       onDelete: () => _eliminarLinea(index), // Si toca "borrar", eliminamos.
     );
     if (resultado != null) {
@@ -186,24 +190,96 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
 
   /// _anadirLinea: abre el modal vacío para añadir UNA línea nueva.
   Future<void> _anadirLinea() async {
+    final cltId = _pedido.clienteId > 0 ? _pedido.clienteId : (int.tryParse(_pedido.cliente) ?? 0);
     final resultado = await mostrarLineaForm(
       context,
-      clienteId: _pedido.clienteId,
+      clienteId: cltId,
     );
     if (resultado != null) {
       setState(() => _lineas = [..._lineas, resultado]); // La añadimos al final.
     }
   }
 
+  bool _fotoNueva = false;
+
+  Future<void> _checkRecoveredPhoto() async {
+    final prefs = await SharedPreferences.getInstance();
+    final path = prefs.getString('recovered_photo_path');
+    if (path != null) {
+      await prefs.remove('recovered_photo_path');
+      try {
+        final xfile = XFile(path);
+        final bytes = await xfile.readAsBytes();
+        if (mounted) {
+          final fotoIdx = _tabs.indexOf('foto');
+          setState(() {
+            _fotoBytes = bytes;
+            _fotoNueva = true;
+            _fotoEliminada = false;
+            if (fotoIdx != -1) _tabIndex = fotoIdx;
+          });
+          if (fotoIdx != -1 && _pageController.hasClients) {
+            _pageController.jumpToPage(fotoIdx);
+          }
+        }
+      } catch (e) {
+        debugPrint('Error leyendo foto recuperada: $e');
+      }
+    }
+  }
+
   Future<void> _seleccionarFoto(ImageSource source) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('picking_photo_pedido_id', _pedidoIdReal?.toString() ?? '');
+    
     final selected = await ImagePicker().pickImage(
       source: source,
-      imageQuality: 85,
-      maxWidth: 1920,
+      imageQuality: 50,
+      maxWidth: 800,
+      maxHeight: 800,
     );
+    
+    await prefs.remove('picking_photo_pedido_id');
+    
     if (selected == null || !mounted) return;
     final bytes = await selected.readAsBytes();
-    if (mounted) setState(() => _fotoBytes = bytes);
+    if (mounted) {
+      setState(() {
+        _fotoBytes = bytes;
+        _fotoEliminada = false;
+        _fotoNueva = true;
+      });
+    }
+  }
+
+  bool _fotoEliminada = false;
+
+  Future<void> _eliminarFoto() async {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar foto'),
+        content: const Text('¿Seguro que quieres eliminar esta foto?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(), // Cerrar sin borrar.
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop(); // Cerramos la ventana...
+              setState(() {
+                _fotoBytes = null;
+                _fotoEliminada = true;
+                _cubit.update(_pedido.copyWith(fotoBase64: ''));
+              });
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.error), // Rojito.
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// _eliminarLinea: pregunta con una ventana de confirmación y, si confirma,
@@ -261,6 +337,58 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
   }
 
+  Future<void> _confirmarEliminar() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar pedido'),
+        content: const Text('¿Estás seguro de que quieres eliminar este pedido de venta? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      setState(() => _guardando = true);
+      // Velneo may prevent deleting an order if it still has lines.
+      // So we explicitly delete all lines first.
+      for (final linea in _lineas) {
+        if (linea.id != null) {
+          try {
+            await PedidosService.eliminarLinea(linea.id!);
+          } catch (_) {} // Ignore errors for individual lines (e.g. already deleted)
+        }
+      }
+      
+      await PedidosService.remove(_pedidoIdReal);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pedido eliminado correctamente')),
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/pedidos',
+        (route) => route.settings.name == '/home' || route.isFirst,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al eliminar: $e')),
+      );
+      setState(() => _guardando = false);
+    }
+  }
+
   /// _guardar: valida y envía al servidor (POST si es nuevo, PUT si edita).
   Future<void> _guardar() async {
     if (_editando && AppColors.estadoCodigo(_pedido.estado) == 'S') {
@@ -291,10 +419,14 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
           _pedidoIdReal,
           pedidoParaGuardar,
           removedLineIds,
-          fotoBytes: _fotoBytes,
+          fotoBytes: _fotoNueva ? _fotoBytes : null,
+          deleteFoto: _fotoEliminada,
         );
       } else {
-        final nuevoPedido = await PedidosService.createComplete(pedidoParaGuardar);
+        final nuevoPedido = await PedidosService.createComplete(
+          pedidoParaGuardar,
+          fotoBytes: _fotoNueva ? _fotoBytes : null,
+        );
           if (widget.pedidoId is Pedido && (widget.pedidoId as Pedido).id != null) {
             await PresupuestosService.linkPedido(
               (widget.pedidoId as Pedido).id,
@@ -339,36 +471,52 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
                       (key: 'totales', label: 'Totales'),
                       if (_editando) (key: 'foto', label: 'Foto'),
                     ],
-                    active: _tab,
-                    onChanged: (key) => setState(() => _tab = key),
+                    active: _tabIndex < _tabs.length ? _tabs[_tabIndex] : 'cabecera',
+                    onChanged: (key) {
+                      final idx = _tabs.indexOf(key);
+                      if (idx != -1 && _pageController.hasClients) {
+                        _pageController.animateToPage(
+                          idx,
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeInOut,
+                        );
+                      }
+                    },
                   ),
-                  // Contenido según la pestaña activa.
+                  // Contenido según la pestaña activa con deslizamiento.
                   Expanded(
-                    child: switch (_tab) {
-                      // Líneas: versión editable (permite editar y añadir).
-                      'lineas' => LineasTable(
-                          lineas: _lineas,
-                          onEdit: _editarLinea,
-                          onAdd: _anadirLinea,
-                        ),
-                      // Totales: resumen de las líneas en memoria.
-                      'totales' => _totales(),
-                      'foto' => PedidoFotoTab(
-                          imageBytes: _fotoBytes,
-                          uploading: false,
-                          onCamera: () => _seleccionarFoto(ImageSource.camera),
-                          onGallery: () => _seleccionarFoto(ImageSource.gallery),
-                        ),
-                      // Cabecera: el formulario, que avisa en cada cambio (lo
-                      // repintamos con BlocBuilder para reflejar al instante los
-                      // valores por defecto del cliente elegido).
-                      _ => BlocBuilder<PedidoFormCubit, PedidoFormState>(
+                    child: PageView(
+                      controller: _pageController,
+                      onPageChanged: (index) {
+                        setState(() => _tabIndex = index);
+                      },
+                      children: [
+                        // Cabecera: el formulario, que avisa en cada cambio.
+                        BlocBuilder<PedidoFormCubit, PedidoFormState>(
                           builder: (context, state) => CabeceraForm(
                             pedido: state.pedido,
                             onChanged: _onCambioCabecera,
                           ),
                         ),
-                    },
+                        // Líneas: versión editable (permite editar y añadir).
+                        LineasTable(
+                          lineas: _lineas,
+                          onEdit: _editarLinea,
+                          onAdd: _anadirLinea,
+                        ),
+                        // Totales: resumen de las líneas en memoria.
+                        _totales(),
+                        // Foto (si está en modo edición).
+                        if (_editando)
+                          PedidoFotoTab(
+                            imageBytes: _fotoBytes,
+                            uploading: false,
+                            onCamera: () => _seleccionarFoto(ImageSource.camera),
+                            onGallery: () => _seleccionarFoto(ImageSource.gallery),
+                            onDelete: _eliminarFoto,
+                          ),
+                      ],
+                    ),
                   ),
 
                   // ---- Barra inferior: Cancelar | Guardar ----
@@ -380,6 +528,25 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
                         padding: const EdgeInsets.all(12),
                         child: Row(
                           children: [
+                            if (_editando) ...[
+                              Tooltip(
+                                message: 'Eliminar pedido',
+                                child: SizedBox.square(
+                                  dimension: 48,
+                                  child: OutlinedButton(
+                                    onPressed: _confirmarEliminar,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.error,
+                                      side: const BorderSide(color: AppColors.error),
+                                      padding: EdgeInsets.zero,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    child: const Icon(Icons.delete_outline, size: 20),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                            ],
                             Expanded(
                               child: OutlinedButton(
                                 onPressed: () => Navigator.of(context).pop(), // Salir sin guardar.
@@ -389,7 +556,7 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: _guardando ? null : _guardar, // Deshabilitado mientras guarda.
+                                onPressed: _guardando || context.watch<LicenciaService>().esSoloLec ? null : _guardar, // Deshabilitado mientras guarda o si es solo lectura.
                                 child: _guardando
                                     ? const SizedBox(
                                         width: 18,

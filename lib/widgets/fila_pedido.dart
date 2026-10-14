@@ -18,7 +18,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart'; // Pedido + calcularTotales.
-import '../theme/app_theme.dart'; // Colores.
+ // Colores.
 import '../core/formatters.dart'; // formatDate y formatNumber.
 import 'estado_badge.dart'; // La píldora del estado.
 
@@ -61,27 +61,46 @@ class FilaPedido extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ---- Fila superior: código (izquierda) + estado (derecha) ----
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  // Etiqueta azul con el código (o el id, o "—").
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '${pedido.codigo != 0 ? pedido.codigo : (pedido.id ?? '—')}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Etiqueta azul con el código (o el id, o "—").
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${pedido.codigo != 0 ? pedido.codigo : (pedido.id ?? '—')}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (pedido.conKyr && !mostrarNumeroPresupuesto) ...[
+                        const SizedBox(width: 8),
+                        const Text(
+                          'CONFIRMADO',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   EstadoBadge(estado: pedido.estado), // Píldora del estado.
                 ],
@@ -144,10 +163,10 @@ class FilaPedido extends StatelessWidget {
                   ),
                   Text(
                     '${formatNumber(total)} €', // "1.234,56 €"
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ],

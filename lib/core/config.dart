@@ -22,17 +22,72 @@
 // ============================================================================
 
 class AppConfig {
+  static const String defaultHost = 'https://tecerp.nunsys.com:4331';
+  static const String datName = 'TecERPv7_dat_dat';
+  static const String defaultVersion = 'v1';
+
+  static String serverHost = defaultHost;
+  static String serverInstance = '';
+  static String serverVersion = defaultVersion;
+
   // --------------------------------------------------------------------------
   // Dirección base del servidor. NO llevará la parte del endpoint, solo el
-  // dominio + raíz del API. Esto se puede cambiar desde la pantalla de login
-  // (no es "final" porque el usuario puede conectarse a otro servidor).
+  // dominio + raíz del API: {host}/{instancia}/TecERPv7_dat_dat/{versión}
   // --------------------------------------------------------------------------
   static String baseUrl =
-      'https://tecerp.nunsys.com:4331/TECMICRO_PRUEBAS_AD_AVANZADO/';
+      'https://tecerp.nunsys.com:XXXX/NOMBRE_API/';
 
   // Clave API para autenticarse contra VELNEO. Se rellena en el login y se
   // añade automáticamente como parámetro "api_key" en TODAS las peticiones.
-  static String apiKey = '80IF1kwMQZTknj3BirIz';
+  static String apiKey = '';
+
+  /// Construye la URL base parametrizada:
+  /// {host}/{instance}/TecERPv7_dat_dat/{version}
+  static String buildBaseUrl({
+    String? host,
+    String? instance,
+    String? version,
+  }) {
+    final h = (host ?? serverHost).trim().replaceAll(RegExp(r'/+$'), '');
+    final inst = (instance ?? serverInstance).trim().replaceAll('/', '');
+    final v = (version ?? serverVersion).trim().replaceAll('/', '');
+    final safeV = v.isEmpty ? defaultVersion : v;
+
+    if (inst.isEmpty) return h;
+    return '$h/$inst/$datName/$safeV';
+  }
+
+  /// Descompone una URL existente en sus partes si coincide con la estructura de Velneo.
+  static void parseAndSetBaseUrl(String url) {
+    final clean = url.trim().replaceAll(RegExp(r'/+$'), '');
+    if (clean.isNotEmpty) {
+      baseUrl = clean;
+    }
+    try {
+      final uri = Uri.parse(clean);
+      if (uri.hasScheme && uri.host.isNotEmpty) {
+        final portPart = uri.hasPort ? ':${uri.port}' : '';
+        serverHost = '${uri.scheme}://${uri.host}$portPart';
+        final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+        if (segments.length >= 3 && segments[1].toLowerCase() == datName.toLowerCase()) {
+          serverInstance = segments[0];
+          serverVersion = segments[2];
+        } else if (segments.isNotEmpty && segments[0] != 'NOMBRE_API' && segments[0] != 'XXXX') {
+          serverInstance = segments[0];
+        }
+      }
+    } catch (_) {
+      final reg = RegExp(r'^(https?://[^/]+)/([^/]+)/([^/]+)/([^/]+)$', caseSensitive: false);
+      final match = reg.firstMatch(clean);
+      if (match != null) {
+        serverHost = match.group(1)!;
+        serverInstance = match.group(2)!;
+        if (match.group(3)!.toLowerCase() == datName.toLowerCase()) {
+          serverVersion = match.group(4)!;
+        }
+      }
+    }
+  }
 
   // --------------------------------------------------------------------------
   // Endpoints reales de VELNEO.
@@ -41,36 +96,42 @@ class AppConfig {
   // --------------------------------------------------------------------------
   static const endpoints = {
     'pedidos':
-        'TecERPv7_dat_dat/v1/VTA_PED_G', // Cabeceras de pedidos de VENTA.
-    'usuarios': 'TecERPv7_dat_dat/v1/USR_M', // Usuarios de acceso.
+        'VTA_PED_G', // Cabeceras de pedidos de VENTA.
+    'usuarios': 'USR_M', // Usuarios de acceso.
     'gruposUsuarios':
-        'TecERPv7_dat_dat/v1/USR_GRP_USR_M', // Asignaciones de grupos.
-    'lineas': 'TecERPv7_dat_dat/v1/VTA_PED_LIN_G', // Líneas de pedido de venta.
+        'USR_GRP_USR_M', // Asignaciones de grupos.
+    'lineas': 'VTA_PED_LIN_G', // Líneas de pedido de venta.
     'procesoActualizarLinea':
-        'ACT_VTA_PED_LIN_G_APP.pro', // Proceso Velneo para actualizar líneas.
+        '../../ACT_VTA_PED_LIN_G_APP.pro', // Proceso Velneo para actualizar líneas.
     'procesoEnviarEmailPedido':
-        'ENV_EML_VTA_PED.pro', // Envía el pedido al cliente por email.
+        '../../ENV_EML_VTA_PED.pro', // Envía el pedido al cliente por email.
     'presupuestos':
-        'TecERPv7_dat_dat/v1/VTA_PRE_G', // Cabeceras de presupuestos de VENTA.
-    'lineasPresupuesto': 'TecERPv7_dat_dat/v1/VTA_PRE_LIN_G',
+        'VTA_PRE_G', // Cabeceras de presupuestos de VENTA.
+    'lineasPresupuesto': 'VTA_PRE_LIN_G',
     'procesoActualizarLineaPresupuesto':
-        'ACT_VTA_PRE_LIN_G_APP.pro', // Líneas de presupuesto.
-    'clientes': 'TecERPv7_dat_dat/v1/ENT_M', // Entidades (clientes de venta).
-    'comerciales': 'TecERPv7_dat_dat/v1/ENT_M', // Entidades (comerciales).
-    'direcciones': 'TecERPv7_dat_dat/v1/DIR_M', // Direcciones de clientes.
-    'empresa': 'TecERPv7_dat_dat/v1/EMP_M', // Datos de empresa/defaults.
-    'articulos': 'TecERPv7_dat_dat/v1/ART_M', // Catálogo de artículos.
-    'tarifasCliente': 'TecERPv7_dat_dat/v1/vta_tar_cli_g',
-    'tarifasArticulo': 'TecERPv7_dat_dat/v1/vta_tar_art_g',
-    'almacenes': 'TecERPv7_dat_dat/v1/ALM_M', // Lista de almacenes.
-    'series': 'TecERPv7_dat_dat/v1/SER_M', // Numeración de documentos.
-    'formasPago': 'TecERPv7_dat_dat/v1/FPG_M', // Formas de pago aceptadas.
-    'agenda': 'TecERPv7_dat_dat/v1/CRM_AGE', // Visitas de agenda CRM.
-    'campanas': 'TecERPv7_dat_dat/v1/CRM_CAM_COM', // Campañas comerciales CRM.
-    'tiposVisita': 'TecERPv7_dat_dat/v1/TIP_VIS', // Tipos de visita CRM.
-    'zonasTecnicas': 'TecERPv7_dat_dat/v1/ZN_TCN', // Zonas técnicas
+        '../../ACT_VTA_PRE_LIN_G_APP.pro', // Líneas de presupuesto.
+    'clientes': 'ENT_M', // Entidades (clientes de venta).
+    'comerciales': 'ENT_M', // Entidades (comerciales).
+    'movimientos': 'MOV_G', // Movimientos.
+    'direcciones': 'DIR_M', // Direcciones de clientes.
+    'empresa': 'EMP_M', // Datos de empresa/defaults.
+    'articulos': 'ART_M', // Catálogo de artículos.
+    'familias': 'FAM_M', // Familias de artículos.
+    'descuentosPorFamilia': 'DTO_POR_FAM', // Descuentos de cliente por familia.
+    'proveedores': 'ENT_M', // Entidades (proveedores).
+    'tarifasCliente': 'vta_tar_cli_g',
+    'tarifasArticulo': 'vta_tar_art_g',
+    'tarifas': 'VTA_TAR_G', // Maestro de tarifas
+    'almacenes': 'ALM_M', // Lista de almacenes.
+    'series': 'SER_M', // Numeración de documentos.
+    'formasPago': 'FPG_M', // Formas de pago aceptadas.
+    'agenda': 'CRM_AGE', // Visitas de agenda CRM.
+    'campanas': 'CRM_CAM_COM', // Campañas comerciales CRM.
+    'tiposVisita': 'TIP_VIS', // Tipos de visita CRM.
+    'zonasTecnicas': 'ZN_TCN', // Zonas técnicas
     'zonasComerciales':
-        'TecERPv7_dat_dat/v1/ZN_TCN_CMR', // Tabla intermedia zonas-comercial
+        'ZN_TCN_CMR', // Tabla intermedia zonas-comercial
+    'poblaciones': 'POB', // Poblaciones
   };
 
   // Número de resultados que se piden por página (parámetro page[size]).

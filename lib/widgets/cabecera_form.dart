@@ -591,10 +591,10 @@ class _Seccion extends StatelessWidget {
       padding: const EdgeInsets.only(top: 12, bottom: 10),
       child: Text(
         texto.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: AppColors.primary,
+          color: Theme.of(context).colorScheme.primary,
           letterSpacing: 0.5,
         ),
       ),

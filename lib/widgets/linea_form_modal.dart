@@ -74,6 +74,9 @@ class _LineaFormModalState extends State<LineaFormModal> {
   late final TextEditingController _cantidad;
   late final TextEditingController _precio;
   late final TextEditingController _dto;
+  late final TextEditingController _dto1;
+  late final TextEditingController _dto2;
+  late final TextEditingController _dto3;
   late final TextEditingController _retencionIrpf;
   late final TextEditingController _retencionAlquiler;
 
@@ -82,6 +85,7 @@ class _LineaFormModalState extends State<LineaFormModal> {
   late String _estado; // 'Pendiente' o 'Cancelado'.
   String? _articuloId; // El CÓDIGO del artículo elegido (lo que se guarda).
   String _previstoPara = ''; // Fecha prevista de entrega (ISO).
+
 
   // ¿Es modo edición? Sí, si nos pasaron una línea.
   bool get _editando => widget.linea != null;
@@ -103,20 +107,29 @@ class _LineaFormModalState extends State<LineaFormModal> {
     _nReferencia = TextEditingController(text: l?.nReferencia ?? '');
     _cantidad = TextEditingController(
       text: l != null
-          ? formatNumber(l.cantidad, decimals: 2)
+          ? formatNumber(l.cantidad, decimals: 3)
           : '1', // 1 por defecto.
     );
     _precio = TextEditingController(
-      text: l != null ? formatNumber(l.precio, decimals: 2) : '0',
+      text: l != null ? formatNumber(l.precio, decimals: 3) : '0',
     );
     _dto = TextEditingController(
-      text: l != null ? formatNumber(l.dto, decimals: 2) : '0',
+      text: l != null ? formatNumber(l.dto, decimals: 3) : '0',
+    );
+    _dto1 = TextEditingController(
+      text: l != null ? formatNumber(l.dto1, decimals: 3) : '0',
+    );
+    _dto2 = TextEditingController(
+      text: l != null ? formatNumber(l.dto2, decimals: 3) : '0',
+    );
+    _dto3 = TextEditingController(
+      text: l != null ? formatNumber(l.dto3, decimals: 3) : '0',
     );
     _retencionIrpf = TextEditingController(
-      text: l != null ? formatNumber(l.retencionIrpf, decimals: 2) : '0',
+      text: l != null ? formatNumber(l.retencionIrpf, decimals: 3) : '0',
     );
     _retencionAlquiler = TextEditingController(
-      text: l != null ? formatNumber(l.retencionAlquiler, decimals: 2) : '0',
+      text: l != null ? formatNumber(l.retencionAlquiler, decimals: 3) : '0',
     );
 
     // Selectores con valor por defecto:
@@ -133,6 +146,7 @@ class _LineaFormModalState extends State<LineaFormModal> {
         _editando && (l!.cancelado || AppColors.estadoCodigo(l.estado) == 'C');
     _estado = esCancelada ? 'CANCELADO' : 'PENDIENTE';
     _previstoPara = l?.previstoPara ?? '';
+
   }
 
   @override
@@ -144,19 +158,30 @@ class _LineaFormModalState extends State<LineaFormModal> {
     _cantidad.dispose();
     _precio.dispose();
     _dto.dispose();
+    _dto1.dispose();
+    _dto2.dispose();
+    _dto3.dispose();
     _retencionIrpf.dispose();
     _retencionAlquiler.dispose();
     super.dispose();
   }
 
-  /// _importeCalculado: el importe en vivo = cantidad × precio − descuento.
-  /// Se recalcula solo cada vez que se pinta (leyendo los controllers).
+  /// _importeCalculado: el importe en vivo con descuentos concatenados (en cascada).
   double get _importeCalculado {
     final cantidad = parseNumber(_cantidad.text);
     final precio = parseNumber(_precio.text);
     final dto = parseNumber(_dto.text);
-    final base = cantidad * precio;
-    return base - base * (dto / 100); // Le restamos el % de descuento.
+    final dto1 = parseNumber(_dto1.text);
+    final dto2 = parseNumber(_dto2.text);
+    final dto3 = parseNumber(_dto3.text);
+    return calcularImporteLinea(
+      cantidad: cantidad,
+      precio: precio,
+      dto: dto,
+      dto1: dto1,
+      dto2: dto2,
+      dto3: dto3,
+    );
   }
 
   /// Busca artículos en Velneo mediante el repositorio local-first.
@@ -188,11 +213,26 @@ class _LineaFormModalState extends State<LineaFormModal> {
       final precio =
           double.tryParse((defaults['precio'] ?? '').toString()) ?? 0;
       if (defaults['precio'] != null && defaults['precio'].toString().isNotEmpty) {
-        _precio.text = formatNumber(precio, decimals: 2);
+        _precio.text = formatNumber(precio, decimals: 3);
       }
       final dto =
-          double.tryParse((defaults['dto'] ?? '0').toString()) ?? 0;
-      _dto.text = formatNumber(dto, decimals: 2);
+          double.tryParse((defaults['dto'] ?? defaults['por_dto'] ?? defaults['POR_DTO'] ?? '0').toString()) ?? 0;
+      _dto.text = formatNumber(dto, decimals: 3);
+
+      // Si la API devolvió resultados en DTO_POR_FAM, se vuelcan sobre _dto1, _dto2, _dto3.
+      // Si la API no devolvió resultados, mantienen los valores que tenían hasta seleccionar otro artículo.
+      if (defaults['dto1'] != null) {
+        final dto1 = double.tryParse(defaults['dto1'].toString()) ?? 0;
+        _dto1.text = formatNumber(dto1, decimals: 3);
+      }
+      if (defaults['dto2'] != null) {
+        final dto2 = double.tryParse(defaults['dto2'].toString()) ?? 0;
+        _dto2.text = formatNumber(dto2, decimals: 3);
+      }
+      if (defaults['dto3'] != null) {
+        final dto3 = double.tryParse(defaults['dto3'].toString()) ?? 0;
+        _dto3.text = formatNumber(dto3, decimals: 3);
+      }
       final regIvaRaw = defaults['reg_iva_vta'] ?? defaults['reg_iva'];
       if (regIvaRaw != null && regIvaRaw.toString().isNotEmpty) {
         _regimenIva = regimenIvaPorCodigo(regIvaRaw.toString());
@@ -227,6 +267,9 @@ class _LineaFormModalState extends State<LineaFormModal> {
       cantidadServida: cantidadServida,
       precio: parseNumber(_precio.text),
       dto: parseNumber(_dto.text),
+      dto1: parseNumber(_dto1.text),
+      dto2: parseNumber(_dto2.text),
+      dto3: parseNumber(_dto3.text),
       importe: _importeCalculado, // El importe calculado en vivo.
       tipoIva: _regimenIva.porcentaje,
       regIvaVta: _regimenIva.codigo,
@@ -237,6 +280,235 @@ class _LineaFormModalState extends State<LineaFormModal> {
       previstoPara: _previstoPara,
     );
     Navigator.of(context).pop(linea); // Cerramos y entregamos la línea.
+  }
+
+  Widget _buildDetalleTab() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          AutocompleteField(
+            label: 'Artículo',
+            required: true,
+            minChars: 3,
+            debounce: const Duration(milliseconds: 400),
+            maxResults: 20,
+            initialValue: _articulo.text,
+            hint: 'Buscar por nombre o código...',
+            search: _buscarArticulos,
+            onSelected: (opcion) {
+              setState(() {
+                _articulo.text = opcion.nombre;
+                _articuloId = opcion.codigo;
+              });
+              _cargarDatosArticulo(opcion.codigo);
+            },
+            onCleared: () {
+              setState(() {
+                _articulo.clear();
+                _articuloId = null;
+              });
+            },
+          ),
+          CampoForm(
+            label: 'Descripción',
+            value: _descripcion.text,
+            onChanged: (v) => _descripcion.text = v,
+            placeholder: 'Descripción del artículo',
+            required: true,
+            multiline: true,
+          ),
+          if (widget.mostrarReferencia)
+            CampoForm(
+              label: 'N/Referencia',
+              value: _nReferencia.text,
+              onChanged: (v) => _nReferencia.text = v,
+            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: CampoForm(
+                  label: 'Cantidad',
+                  controller: _cantidad,
+                  onChanged: (v) => setState(() {}),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  required: true,
+                  validator: (v) => parseNumber(v ?? '') <= 0 ? 'Debe ser mayor que 0' : null,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: CampoForm(
+                  label: 'Precio',
+                  controller: _precio,
+                  onChanged: (v) => setState(() {}),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+            ],
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: CampoForm(
+                  label: '% Dto.',
+                  controller: _dto,
+                  onChanged: (v) => setState(() {}),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: CampoForm(
+                  label: '% dto 1',
+                  controller: _dto1,
+                  onChanged: (v) => setState(() {}),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: CampoForm(
+                  label: '% dto 2',
+                  controller: _dto2,
+                  onChanged: (v) => setState(() {}),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: CampoForm(
+                  label: '% dto 3',
+                  controller: _dto3,
+                  onChanged: (v) => setState(() {}),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+            ],
+          ),
+          CampoSelect(
+            label: 'Régimen de IVA',
+            value: _regimenIva.nombre,
+            onTap: () async {
+              final sel = await mostrarSelector(
+                context,
+                title: 'Seleccionar régimen de IVA',
+                options: kRegimenesIva,
+                textOf: (op) => (op as RegimenIva).nombre,
+                searchable: false,
+              );
+              if (sel != null && sel is RegimenIva) setState(() => _regimenIva = sel);
+            },
+          ),
+          CampoSelect(
+            label: 'Estado',
+            value: _estado,
+            onTap: () async {
+              final sel = await mostrarSelector(
+                context,
+                title: 'Seleccionar estado',
+                options: widget.estadosDisponibles,
+                searchable: false,
+              );
+              if (sel != null) setState(() => _estado = sel);
+            },
+          ),
+          if (widget.mostrarFechaEntrega)
+            CampoFecha(
+              label: 'Entrega prevista',
+              value: _previstoPara,
+              onChanged: (v) => setState(() => _previstoPara = v),
+            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: CampoForm(
+                  label: 'Retención IRPF',
+                  controller: _retencionIrpf,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: CampoForm(
+                  label: 'Retención alquiler',
+                  controller: _retencionAlquiler,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Importe',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  '${formatNumber(_importeCalculado)} €',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBotones() {
+    return Row(
+      children: [
+        if (widget.onDelete != null) ...[
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop(); // Cerramos el modal...
+                widget.onDelete!(); // ...y avisamos para eliminar.
+              },
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: const Text('Eliminar'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error, // Rojo.
+                side: const BorderSide(color: AppColors.error),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+        ],
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(), // Cerrar sin guardar → null.
+            child: const Text('Cancelar'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: _guardar, // Validar y devolver la línea.
+            child: const Text('Aceptar'),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -250,263 +522,22 @@ class _LineaFormModalState extends State<LineaFormModal> {
         bottom: MediaQuery.of(context).viewInsets.bottom + 16,
       ),
       child: Form(
-        key: _formKey, // El formulario que agrupa las validaciones.
+        key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-
-            // ---- Zona con SCROLL de los campos ----
-            Flexible(
-              child: SingleChildScrollView(
-                // Permite hacer scroll si no caben.
-                child: Column(
-                  children: [
-                    // Artículo: buscador con autocompletado remoto (debounce).
-                    // Nada más escribir 3 caracteres consulta a Velneo y
-                    // ofrece hasta 20 resultados; no se baja el catálogo.
-                    AutocompleteField(
-                      label: 'Artículo',
-                      required: true,
-                      minChars: 3,
-                      debounce: const Duration(milliseconds: 400),
-                      maxResults: 20,
-                      initialValue: _articulo.text,
-                      hint: 'Buscar por nombre o código...',
-                      search: _buscarArticulos,
-                      onSelected: (opcion) {
-                        debugPrint('🔥🔥🔥 SE CLICÓ UN ARTICULO: $opcion');
-                        // Mapeo SEGURO del artículo elegido → estado del modal.
-                        // El ID real de la línea es el CÓDIGO del artículo
-                        // (ART_M). El nombre es lo que se muestra y guarda en
-                        // articuloNombre. Ambos se guardan explícitamente.
-                        setState(() {
-                          _articulo.text = opcion.nombre; // Nombre visible.
-                          _articuloId =
-                              opcion.codigo; // Código → 'art' en Velneo.
-                        });
-                        _cargarDatosArticulo(opcion.codigo);
-                      },
-                      onCleared: () {
-                        setState(() {
-                          _articulo.clear();
-                          _articuloId = null;
-                        });
-                      },
-                    ),
-
-                    // Descripción (obligatoria, multilínea).
-                    CampoForm(
-                      label: 'Descripción',
-                      value: _descripcion.text,
-                      onChanged: (v) => _descripcion.text = v,
-                      placeholder: 'Descripción del artículo',
-                      required: true,
-                      multiline: true,
-                    ),
-
-                    if (widget.mostrarReferencia)
-                      CampoForm(
-                        label: 'N/Referencia',
-                        value: _nReferencia.text,
-                        onChanged: (v) => _nReferencia.text = v,
-                      ),
-
-                    // Cantidad.
-                    CampoForm(
-                      label: 'Cantidad',
-                      controller: _cantidad,
-                      onChanged: (v) {
-                        setState(() {});
-                      },
-                      keyboardType: TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      required: true,
-                      validator: (v) => parseNumber(v ?? '') <= 0
-                          ? 'Debe ser mayor que 0'
-                          : null,
-                    ),
-
-                    // Precio y % descuento (lado a lado).
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: CampoForm(
-                            label: 'Precio',
-                            controller: _precio,
-                            onChanged: (v) =>
-                                setState(() {}), // Recalcula importe.
-                            keyboardType: TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: CampoForm(
-                            label: '% descuento',
-                            controller: _dto,
-                            onChanged: (v) =>
-                                setState(() {}), // Recalcula importe.
-                            keyboardType: TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // Régimen de IVA
-                    CampoSelect(
-                      label: 'Régimen de IVA',
-                      value: _regimenIva.nombre,
-                      onTap: () async {
-                        final sel = await mostrarSelector(
-                          context,
-                          title: 'Seleccionar régimen de IVA',
-                          options: kRegimenesIva,
-                          textOf: (op) => (op as RegimenIva).nombre,
-                          searchable: false,
-                        );
-                        if (sel != null && sel is RegimenIva) {
-                          setState(() => _regimenIva = sel);
-                        }
-                      },
-                    ),
-
-                    // Estado de la línea (Pendiente / Cancelado).
-                    CampoSelect(
-                      label: 'Estado',
-                      value: _estado,
-                      onTap: () async {
-                        final sel = await mostrarSelector(
-                          context,
-                          title: 'Seleccionar estado',
-                          options: widget.estadosDisponibles,
-                          searchable: false,
-                        );
-                        if (sel != null) setState(() => _estado = sel);
-                      },
-                    ),
-
-                    if (widget.mostrarFechaEntrega)
-                      CampoFecha(
-                        label: 'Entrega prevista',
-                        value: _previstoPara,
-                        onChanged: (v) => setState(() => _previstoPara = v),
-                      ),
-
-                    // Retenciones (lado a lado).
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: CampoForm(
-                            label: 'Retención IRPF',
-                            controller: _retencionIrpf,
-                            keyboardType: TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: CampoForm(
-                            label: 'Retención alquiler',
-                            controller: _retencionAlquiler,
-                            keyboardType: TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // ---- El importe calculado en vivo (azul, destacado) ----
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryLight,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Importe',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          Text(
-                            '${formatNumber(_importeCalculado)} €',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
+            Flexible(child: _buildDetalleTab()),
             const SizedBox(height: 12),
-
-            // ---- Botones: Eliminar (si es edición) | Cancelar | Aceptar ----
-            Row(
-              children: [
-                if (widget.onDelete != null) ...[
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop(); // Cerramos el modal...
-                        widget.onDelete!(); // ...y avisamos para eliminar.
-                      },
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                      label: const Text('Eliminar'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.error, // Rojo.
-                        side: const BorderSide(color: AppColors.error),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                ],
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context)
-                        .pop(), // Cerrar sin guardar → null.
-                    child: const Text('Cancelar'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _guardar, // Validar y devolver la línea.
-                    child: const Text('Aceptar'),
-                  ),
-                ),
-              ],
-            ),
+            _buildBotones(),
           ],
         ),
       ),
     );
   }
 }
+
 
 // ============================================================================
 //  mostrarLineaForm: la función "abrela" — muestra el modal y devuelve la línea.

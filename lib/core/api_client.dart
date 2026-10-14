@@ -213,7 +213,7 @@ class ApiClient {
     // el login se quitan las barras finales) y el endpoint NO empieza por "/".
     final base = AppConfig.baseUrl.replaceAll(RegExp(r'/+$'), ''); // sin "/" final
     final ruta = path.startsWith('/') ? path : '/$path'; // con "/" delante
-    var uri = Uri.parse('$base$ruta');
+    var uri = Uri.parse('$base$ruta').normalizePath();
     if (merged.isNotEmpty) {
       // Mezclamos los parámetros (por si la URL ya traía alguno).
       uri = uri.replace(queryParameters: {...uri.queryParameters, ...merged});
@@ -288,6 +288,10 @@ int _toIntOrZero(dynamic value) {
 bool _toBoolOrFalse(dynamic value) {
   if (value is bool) return value;
   if (value is num) return value != 0;
+  if (value is String) {
+    final v = value.trim().toLowerCase();
+    return v == '1' || v == 'true' || v == 's' || v == 't' || v == 'si' || v == 'sí';
+  }
   return false;
 }
 
@@ -298,7 +302,9 @@ String _toStr(dynamic value) => value == null ? '' : '$value';
 /// si el valor llega como {"value": "12.5"}, devuelve "12.5".
 dynamic _fieldValue(dynamic reg, String key) {
   if (reg is! Map) return null;
-  final value = reg[key];
+  final value = reg[key] ??
+      reg[key.toLowerCase()] ??
+      reg[key.toUpperCase()];
   if (value is Map && value.containsKey('value')) return value['value'];
   return value;
 }

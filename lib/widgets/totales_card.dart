@@ -14,7 +14,7 @@
 
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart'; // Colores.
+ // Colores.
 import '../core/formatters.dart'; // formatNumber (dá formato "1.234,50").
 
 /// TotalesCard: tarjeta con base, IVA y total.
@@ -58,10 +58,10 @@ class TotalesCard extends StatelessWidget {
                 ),
                 Text(
                   '${formatNumber(total)} €', // "Total   1.210,00 €"
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ],

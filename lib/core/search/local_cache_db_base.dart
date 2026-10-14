@@ -23,12 +23,14 @@ class CachedOption {
   final String type; // 'cliente' | 'articulo' | 'serie' | ...
   final String codigo; // Código guardado (lo que se envía a Velneo).
   final String nombre; // Nombre legible.
+  final String referencia;
   final DateTime lastUsed; // Cuándo se consultó por última vez (para ordenar).
 
   const CachedOption({
     required this.type,
     required this.codigo,
     required this.nombre,
+    this.referencia = '',
     required this.lastUsed,
   });
 }

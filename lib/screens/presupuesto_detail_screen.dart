@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../core/licencia/licencia_service.dart';
 import '../models/models.dart';
 import '../core/presupuesto_service.dart';
 import '../core/formatters.dart';
@@ -23,12 +25,21 @@ class PresupuestoDetailScreen extends StatefulWidget {
 class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
   PresupuestoVenta? _presupuesto;
   bool _cargando = true;
-  String _tab = 'cabecera';
+  late final PageController _pageController;
+  int _tabIndex = 0;
+  static const _tabs = ['cabecera', 'lineas', 'totales'];
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     _cargar();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _cargar() async {
@@ -52,8 +63,10 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
   Widget build(BuildContext context) {
     final presupuesto = _presupuesto;
     final pedidoVisual = presupuesto?.toPedidoVisual();
+    final licService = context.watch<LicenciaService>();
     final puedeEditar = presupuesto != null &&
-      AppColors.estadoCodigo(presupuesto.estado) != 'A';
+      AppColors.estadoCodigo(presupuesto.estado) != 'A' &&
+      !licService.esSoloLec;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -84,13 +97,35 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                         ),
                         (key: 'totales', label: 'Totales'),
                       ],
-                      active: _tab,
-                      onChanged: (tab) => setState(() => _tab = tab),
+                      active: _tabs[_tabIndex],
+                      onChanged: (key) {
+                        final idx = _tabs.indexOf(key);
+                        if (idx != -1 && _pageController.hasClients) {
+                          _pageController.animateToPage(
+                            idx,
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      },
                     ),
                     Expanded(
-                      child: switch (_tab) {
-                        'lineas' => LineasTable(lineas: pedidoVisual.lineas),
-                        'totales' => SingleChildScrollView(
+                      child: PageView(
+                        controller: _pageController,
+                        onPageChanged: (index) {
+                          setState(() => _tabIndex = index);
+                        },
+                        children: [
+                          CabeceraView(
+                            pedido: pedidoVisual,
+                            mostrarAlmacen: false,
+                            mostrarFechaEntrega: false,
+                            mostrarEmail: true,
+                            mostrarFechaValidez: true,
+                            mostrarNumeroPresupuesto: true,
+                          ),
+                          LineasTable(lineas: pedidoVisual.lineas),
+                          SingleChildScrollView(
                             padding: const EdgeInsets.all(12),
                             child: TotalesCard(
                               base: calcularTotales(pedidoVisual.lineas).base,
@@ -99,15 +134,8 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                               labelTotal: 'Total Presupuesto',
                             ),
                           ),
-                        _ => CabeceraView(
-                            pedido: pedidoVisual,
-                            mostrarAlmacen: false,
-                            mostrarFechaEntrega: false,
-                            mostrarEmail: true,
-                            mostrarFechaValidez: true,
-                            mostrarNumeroPresupuesto: true,
-                          ),
-                      },
+                        ],
+                      ),
                     ),
                     Material(
                       color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -133,7 +161,7 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  onPressed: () async {
+                                  onPressed: licService.esSoloLec ? null : () async {
                                     if (presupuesto.vtaPedG > 0 ||
                                       AppColors.estadoCodigo(presupuesto.estado) == 'A') {
                                       showDialog(
@@ -215,25 +243,26 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Etiqueta azul con el código/número de presupuesto
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   'Nº de presupuesto: $numeroPresupuesto',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
               // Etiqueta de color según el estado
               EstadoBadge(estado: presupuesto.estado),
             ],

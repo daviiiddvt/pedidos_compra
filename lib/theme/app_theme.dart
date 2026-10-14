@@ -18,14 +18,14 @@ import 'package:flutter/material.dart'; // Trae el sistema de colores y temas.
 /// AppColors: la "paleta" de la app, agrupada por nombre.
 /// Un Color(0xFF1976D2) es un color en formato hexadecimal: #1976D2.
 class AppColors {
-  static const primary = Color(0xFF1976D2); // Azul principal (botones, barras).
+  static const primary = Color(0xFF1844A1); // Azul principal (botones, barras).
   static const primaryDark = Color(0xFF1565C0); // Azul más oscuro (pulsado).
   static const primaryLight = Color(0xFFE3F2FD); // Azul muy claro (fondos suaves).
   static const accent = Color(0xFF4CAF50); // Verde de acento (éxito, flechas).
   static const background = Color(0xFFF5F7FA); // Fondo gris claro de las pantallas.
   static const surface = Color(0xFFFFFFFF); // Blanco (tarjetas y campos).
-  static const text = Color(0xFF1C1E21); // Casi negro (texto principal).
-  static const textSecondary = Color(0xFF5F6368); // Gris (texto secundario).
+  static const text = Color(0xFFFFFFFF); // Casi negro (texto principal).
+  static const textSecondary = Color(0xFFFFFFFF); // Gris (texto secundario).
   static const border = Color(0xFFE0E0E0); // Gris claro (bordes de campos).
   static const error = Color(0xFFD32F2F); // Rojo (errores).
   static const warning = Color(0xFFF57C00); // Naranja (avisos).
@@ -149,6 +149,13 @@ class AppTheme {
         elevation: 0, // Sin sombra.
       ),
 
+      // --- Pestañas (TabBar) ---
+      tabBarTheme: const TabBarThemeData(
+        labelColor: AppColors.white,
+        unselectedLabelColor: AppColors.white,
+        indicatorColor: AppColors.white,
+      ),
+
       // --- Campos de texto (TextFormField) ---
       inputDecorationTheme: InputDecorationTheme(
         filled: true, // Fondo relleno.
@@ -163,7 +170,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder( // Borde cuando lo estamos escribiendo.
           borderRadius: BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14), // Respiración interna.
       ),
@@ -195,7 +202,7 @@ class AppTheme {
       // --- Botón de texto (TextButton) ---
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: scheme.primary,
         ),
       ),
 

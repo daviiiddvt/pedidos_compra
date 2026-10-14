@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../core/api_service.dart';
 import '../core/config.dart';
 import '../core/presupuesto_service.dart';
+import '../core/licencia/licencia_service.dart';
 import '../state/auth_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/fila_pedido.dart';
@@ -19,6 +20,13 @@ class PresupuestosListScreen extends StatefulWidget {
 }
 
 class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
+  static const _estados = [
+    'PENDIENTE',
+    'ACEPTADO',
+    'RECHAZADO',
+    'PARCIALMENTE SERVIDO',
+  ];
+
   final _buscadorController = TextEditingController();
   final _scrollController = ScrollController();
   Timer? _searchDebounce;
@@ -31,6 +39,18 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
   int _totalPresupuestos = 0;
   int _busquedaVersion = 0;
   String _filtroEstado = '';
+
+  bool get _estaCargandoOBuscando =>
+      _cargando ||
+      _cargandoPagina ||
+      (_searchDebounce?.isActive ?? false) ||
+      (_buscadorController.text.trim().isNotEmpty && _hayMas);
+
+  void _cambiarFiltro(String estado) {
+    if (estado == _filtroEstado) return;
+    setState(() => _filtroEstado = estado);
+    _aplicarFiltros();
+  }
 
   @override
   void initState() {
@@ -184,46 +204,22 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Presupuestos de venta'),
-        actions: [
-          IconButton(
-            tooltip: 'Salir',
-            icon: const Icon(Icons.logout),
-            onPressed: () => context.read<AuthState>().desconectar(),
-          ),
-        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _abrirFormulario(),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: context.watch<LicenciaService>().esSoloLec
+          ? null
+          : FloatingActionButton(
+              onPressed: () => _abrirFormulario(),
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.white,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add),
+            ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: TextField(
-              controller: _buscadorController,
-              onChanged: (_) {
-                _busquedaVersion++;
-                final version = _busquedaVersion;
-                _searchDebounce?.cancel();
-                _searchDebounce = Timer(
-                  const Duration(milliseconds: 350),
-                  () => _buscadorController.text.trim().isEmpty
-                      ? _cargarPagina(reset: true)
-                      : _cargarBusquedaCompleta(version),
-                );
-              },
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: 'Buscar cliente o número',
-              ),
-            ),
-          ),
+          _filtros(),
           if (_visibles.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -235,31 +231,19 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
                 ),
               ),
             ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: ['', 'PENDIENTE', 'ACEPTADO', 'RECHAZADO', 'PARCIALMENTE SERVIDO'].map((status) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
-                    label: Text(status.isEmpty ? 'Todos' : status),
-                    selected: _filtroEstado == status,
-                    onSelected: (_) {
-                      setState(() => _filtroEstado = status);
-                      _aplicarFiltros();
-                    },
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
           Expanded(
-            child: _cargando
+            child: (_estaCargandoOBuscando && _visibles.isEmpty)
                 ? const Center(child: CircularProgressIndicator())
                 : _visibles.isEmpty
-                ? const Center(
-                    child: Text('Sin presupuestos de venta que mostrar.'),
+                ? Center(
+                    child: Text(
+                      _buscadorController.text.trim().isNotEmpty
+                          ? 'Sin presupuestos de venta que coincidan con "${_buscadorController.text.trim()}".'
+                          : 'Sin presupuestos de venta que mostrar.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   )
                 : RefreshIndicator(
                     onRefresh: _refrescar,
@@ -287,6 +271,113 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _filtros() {
+    return Container(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 1. La fila de chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFiltroChip(
+                  label: 'Todos',
+                  estado: '',
+                  selected: _filtroEstado.isEmpty,
+                  onSelected: () => _cambiarFiltro(''),
+                ),
+                ..._estados.map(
+                  (estado) => _buildFiltroChip(
+                    label: estado,
+                    estado: estado,
+                    selected: _filtroEstado == estado,
+                    onSelected: () => _cambiarFiltro(estado),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+          // 2. El buscador
+          SizedBox(
+            height: 48,
+            child: TextField(
+              controller: _buscadorController,
+              decoration: InputDecoration(
+                suffixIcon: (_cargandoPagina || (_searchDebounce?.isActive ?? false))
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : const Icon(Icons.search),
+                hintText: 'Buscar cliente o número...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onChanged: (_) {
+                _busquedaVersion++;
+                final version = _busquedaVersion;
+                _aplicarFiltros();
+                _searchDebounce?.cancel();
+                _searchDebounce = Timer(
+                  const Duration(milliseconds: 350),
+                  () => _buscadorController.text.trim().isEmpty
+                      ? _cargarPagina(reset: true)
+                      : _cargarBusquedaCompleta(version),
+                );
+                setState(() {});
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFiltroChip({
+    required String label,
+    required String estado,
+    required bool selected,
+    required VoidCallback onSelected,
+  }) {
+    final color = estado.isEmpty
+        ? Theme.of(context).colorScheme.primary
+        : AppColors.estadoColor(estado);
+    final selectedTextColor = estado.isEmpty
+        ? Theme.of(context).colorScheme.onPrimary
+        : Colors.white;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onSelected(),
+        showCheckmark: false,
+        selectedColor: color,
+        backgroundColor: color.withValues(alpha: 0.12),
+        side: BorderSide(
+          color: selected ? color : color.withValues(alpha: 0.45),
+        ),
+        labelStyle: TextStyle(
+          color: selected ? selectedTextColor : color,
+          fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+          fontSize: 13,
+        ),
       ),
     );
   }

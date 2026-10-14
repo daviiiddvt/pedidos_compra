@@ -3,14 +3,14 @@ import 'package:diacritic/diacritic.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 
-class OrderRepository {
-  List<Pedido> _allOrders = [];
+class RepositorioPedidos {
+  List<Pedido> _todosLosPedidos = [];
   Map<int, Cliente> _clienteCache = {};
 
-  List<Pedido> get cachedOrders => List.unmodifiable(_allOrders);
+  List<Pedido> get pedidosCacheados => List.unmodifiable(_todosLosPedidos);
 
   void setOrders(List<Pedido> orders) {
-    _allOrders = orders;
+    _todosLosPedidos = orders;
     _enrichOrders();
   }
 
@@ -22,7 +22,7 @@ class OrderRepository {
   void _enrichOrders() {
     if (_clienteCache.isEmpty) return;
 
-    _allOrders = _allOrders.map((order) {
+    _todosLosPedidos = _todosLosPedidos.map((order) {
       final cliente = _clienteCache[order.clienteId];
       if (cliente == null) return order;
       return order.copyWith(
@@ -34,11 +34,11 @@ class OrderRepository {
   }
 
   void clearCache() {
-    _allOrders = [];
+    _todosLosPedidos = [];
     _clienteCache = {};
   }
 
-  List<Pedido> filterOrders({
+  List<Pedido> filtrarPedidos({
     required String query,
     String? statusFilter,
     required User? currentUser,
@@ -48,7 +48,7 @@ class OrderRepository {
     final role = currentUser?.role.toLowerCase();
     final commercialId = currentUser?.contactId ?? '';
 
-    return _allOrders.where((order) {
+    return _todosLosPedidos.where((order) {
       if (role != 'administrador' && role != 'admin' && role != 'comercial') {
         return false;
       }
