@@ -47,7 +47,6 @@ class PedidoDetailScreen extends StatefulWidget {
 class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
   Pedido? _pedido; // El pedido cargado (null mientras carga o si falla).
   bool _cargando = true; // ¿Estamos pidiendo el detalle?
-  bool _enviandoEmail = false;
   bool _confirmando = false;
   late final PageController _pageController;
   int _tabIndex = 0;
@@ -146,7 +145,11 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
             },
             children: [
               CabeceraView(pedido: pedido),
-              LineasTable(lineas: lineas),
+              LineasTable(
+                lineas: lineas,
+                clienteId: pedido.clienteId > 0 ? pedido.clienteId.toString() : pedido.cliente,
+                clienteNombre: pedido.clienteNombre,
+              ),
               SingleChildScrollView(
                 padding: const EdgeInsets.all(12),
                 child: TotalesCard(
@@ -199,22 +202,6 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
                       onPressed: puedeEditar ? () => _editar(pedido) : null,
                       icon: const Icon(Icons.edit, size: 18),
                       label: Text(puedeEditar ? 'Editar' : 'SERVIDO', style: const TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _puedeEnviarEmail(pedido) && !_enviandoEmail
-                          ? () => _enviarEmail(pedido)
-                          : null,
-                      icon: _enviandoEmail
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.email_outlined, size: 18),
-                      label: const Text('Email', style: TextStyle(fontSize: 12)),
                     ),
                   ),
                 ],
@@ -320,26 +307,7 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
   }
 
 
-  bool _puedeEnviarEmail(Pedido pedido) =>
-      pedido.id != null && pedido.clienteId > 0 && pedido.lineas.isNotEmpty;
 
-  Future<void> _enviarEmail(Pedido pedido) async {
-    setState(() => _enviandoEmail = true);
-    try {
-      await PedidosService.enviarEmailPedido(pedido.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email enviado correctamente')),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo enviar el email: $error')),
-      );
-    } finally {
-      if (mounted) setState(() => _enviandoEmail = false);
-    }
-  }
 
   Future<void> _confirmar(Pedido pedido) async {
     setState(() => _confirmando = true);

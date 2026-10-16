@@ -3,6 +3,7 @@ class Movimiento {
   final String articuloId;
   final String articuloRef;
   final String articuloNombre;
+  final String clienteId;
   final String fecha;
   final double entrada;
   final double salida;
@@ -13,6 +14,7 @@ class Movimiento {
     required this.articuloId,
     required this.articuloRef,
     required this.articuloNombre,
+    this.clienteId = '',
     required this.fecha,
     required this.entrada,
     required this.salida,
@@ -24,6 +26,7 @@ class Movimiento {
     String? articuloId,
     String? articuloRef,
     String? articuloNombre,
+    String? clienteId,
     String? fecha,
     double? entrada,
     double? salida,
@@ -34,6 +37,7 @@ class Movimiento {
       articuloId: articuloId ?? this.articuloId,
       articuloRef: articuloRef ?? this.articuloRef,
       articuloNombre: articuloNombre ?? this.articuloNombre,
+      clienteId: clienteId ?? this.clienteId,
       fecha: fecha ?? this.fecha,
       entrada: entrada ?? this.entrada,
       salida: salida ?? this.salida,
@@ -65,6 +69,7 @@ class Movimiento {
       articuloId: s(['ART', 'art']),
       articuloRef: s(['ART.REF', 'art.ref', 'ref']),
       articuloNombre: s(['ART.NAME', 'art.name', 'name']),
+      clienteId: s(['CLT_ENT', 'clt_ent', 'CLT', 'clt', 'cliente']),
       fecha: s(['FCH', 'fch', 'fecha']),
       entrada: d(['CAN_ENT', 'can_ent']),
       salida: d(['CAN_SAL', 'can_sal']),
@@ -72,4 +77,16 @@ class Movimiento {
       numDoc: s(['NUM_DOC', 'num_doc']),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'ART': articuloId,
+        'ART.REF': articuloRef,
+        'ART.NAME': articuloNombre,
+        'CLT_ENT': clienteId,
+        'FCH': fecha,
+        'CAN_ENT': entrada,
+        'CAN_SAL': salida,
+        'PRE': precio,
+        'NUM_DOC': numDoc,
+      };
 }

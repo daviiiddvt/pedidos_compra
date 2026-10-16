@@ -11,6 +11,19 @@ class RepositorioPedidos {
 
   void setOrders(List<Pedido> orders) {
     _todosLosPedidos = orders;
+    for (final o in orders) {
+      final cid = o.clienteId > 0 ? o.clienteId : (int.tryParse(o.cliente) ?? 0);
+      final nom = o.clienteNombre.trim();
+      final esNumero = int.tryParse(nom) != null;
+      if (cid > 0 && nom.isNotEmpty && nom != o.cliente.trim() && !esNumero) {
+        _clienteCache[cid] = Cliente(
+          id: cid,
+          nombreComercial: nom,
+          cif: o.clienteCif,
+          telefono: o.clienteTelefono,
+        );
+      }
+    }
     _enrichOrders();
   }
 
@@ -19,21 +32,32 @@ class RepositorioPedidos {
     _enrichOrders();
   }
 
+  void setClientesMap(Map<int, Cliente> clientesMap) {
+    _clienteCache = {..._clienteCache, ...clientesMap};
+    _enrichOrders();
+  }
+
   void _enrichOrders() {
     if (_clienteCache.isEmpty) return;
 
     _todosLosPedidos = _todosLosPedidos.map((order) {
-      final cliente = _clienteCache[order.clienteId];
+      final cid = order.clienteId > 0 ? order.clienteId : (int.tryParse(order.cliente) ?? 0);
+      final cliente = _clienteCache[cid] ?? (order.clienteId > 0 ? _clienteCache[order.clienteId] : null);
       if (cliente == null) return order;
       return order.copyWith(
-        clienteNombre: cliente.nombreComercial,
-        clienteTelefono: cliente.telefono,
-        clienteCif: cliente.cif,
+        clienteId: cid > 0 ? cid : order.clienteId,
+        clienteNombre: cliente.nombreComercial.isNotEmpty ? cliente.nombreComercial : order.clienteNombre,
+        clienteTelefono: cliente.telefono.isNotEmpty ? cliente.telefono : order.clienteTelefono,
+        clienteCif: cliente.cif.isNotEmpty ? cliente.cif : order.clienteCif,
       );
     }).toList();
   }
 
   void clearCache() {
+    _todosLosPedidos = [];
+  }
+
+  void clearAll() {
     _todosLosPedidos = [];
     _clienteCache = {};
   }

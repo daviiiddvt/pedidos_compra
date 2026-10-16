@@ -31,6 +31,8 @@ class LineasTable extends StatelessWidget {
   final void Function(LineaPedido linea, int index)? onEdit; // Si no es null → editables.
   final VoidCallback? onAdd; // Si no es null → se muestra el botón de añadir.
   final String emptyText; // Texto cuando no hay líneas.
+  final String? clienteId;
+  final String? clienteNombre;
 
   const LineasTable({
     super.key,
@@ -38,6 +40,8 @@ class LineasTable extends StatelessWidget {
     this.onEdit,
     this.onAdd,
     this.emptyText = 'Sin líneas',
+    this.clienteId,
+    this.clienteNombre,
   });
 
   @override
@@ -75,7 +79,11 @@ class LineasTable extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => LineaDetailScreen(linea: linea),
+                              builder: (_) => LineaDetailScreen(
+                                linea: linea,
+                                clienteId: clienteId ?? (linea.clienteVenta.isNotEmpty ? linea.clienteVenta : null),
+                                clienteNombre: clienteNombre,
+                              ),
                             ),
                           );
                         }

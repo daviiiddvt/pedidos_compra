@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:diacritic/diacritic.dart';
 import 'package:flutter/material.dart';
 
 import '../core/articulos_service.dart';
@@ -23,7 +22,6 @@ class _ArticulosListScreenState extends State<ArticulosListScreen> {
   final _searchController = TextEditingController();
   Timer? _searchDebounce;
 
-  List<Articulo> _todos = [];
   List<Articulo> _visibles = [];
   bool _cargando = true;
   bool _cargandoPagina = false;
@@ -49,7 +47,7 @@ class _ArticulosListScreenState extends State<ArticulosListScreen> {
   }
 
   void _onScroll() {
-    if (_busqueda.trim().isNotEmpty) return;
+    if (_cargandoPagina || !_hayMas) return;
     if (_scrollController.position.extentAfter < 400) {
       _cargarPagina();
     }
@@ -59,50 +57,16 @@ class _ArticulosListScreenState extends State<ArticulosListScreen> {
     await _cargarPagina(reset: true);
   }
 
-  void _aplicarFiltros() {
-    final q = removeDiacritics(_busqueda.trim().toLowerCase());
-    final tokens = q.isEmpty
-        ? <String>[]
-        : q.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
-
-    final filtrados = _todos.where((art) {
-      if (tokens.isEmpty) return true;
-
-      final nombre = removeDiacritics(art.nombre.toLowerCase());
-      final ref = removeDiacritics(art.referencia.toLowerCase());
-      final cod = removeDiacritics(art.codigo.toLowerCase());
-      final codBar = removeDiacritics(art.codigoBarras.toLowerCase());
-      final searchable = '$nombre $ref $cod $codBar';
-
-      return tokens.every((token) => searchable.contains(token));
-    }).toList();
-
-    if (mounted) setState(() => _visibles = filtrados);
-  }
-
-  Future<void> _cargarBusquedaCompleta(int version) async {
-    while (mounted && version == _busquedaVersion && _cargandoPagina) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    if (!mounted || version != _busquedaVersion) return;
-
-    while (mounted && version == _busquedaVersion && _hayMas) {
-      if (_cargandoPagina) {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-        continue;
-      }
-      await _cargarPagina();
-    }
-  }
-
   Future<void> _cargarPagina({bool reset = false}) async {
     if (_cargandoPagina || (!reset && !_hayMas)) return;
 
     if (reset) {
+      _busquedaVersion++;
       _pagina = 1;
       _totalArticulos = 0;
       _hayMas = true;
     }
+    final version = _busquedaVersion;
 
     setState(() {
       _cargandoPagina = true;
@@ -113,13 +77,14 @@ class _ArticulosListScreenState extends State<ArticulosListScreen> {
       final resultado = await ArticulosService.list(
         page: _pagina,
         pageSize: AppConfig.pageSize,
+        search: _busqueda.trim(),
       );
 
-      if (!mounted) return;
+      if (!mounted || version != _busquedaVersion) return;
 
       final nuevos = reset
           ? resultado.items
-          : [..._todos, ...resultado.items];
+          : [..._visibles, ...resultado.items];
 
       _pagina++;
       _totalArticulos = resultado.total;
@@ -127,15 +92,14 @@ class _ArticulosListScreenState extends State<ArticulosListScreen> {
           ? nuevos.length < _totalArticulos
           : resultado.items.length >= AppConfig.pageSize;
 
-      _todos = nuevos;
-      _aplicarFiltros();
+      _visibles = nuevos;
 
       setState(() {
         _cargando = false;
         _cargandoPagina = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || version != _busquedaVersion) return;
       setState(() {
         _cargando = false;
         _cargandoPagina = false;
@@ -149,19 +113,17 @@ class _ArticulosListScreenState extends State<ArticulosListScreen> {
   bool get _estaCargandoOBuscando =>
       _cargando ||
       _cargandoPagina ||
-      (_searchDebounce?.isActive ?? false) ||
-      (_busqueda.trim().isNotEmpty && _hayMas);
+      (_searchDebounce?.isActive ?? false);
 
   void _onSearchChanged(String value) {
     _busqueda = value;
-    _aplicarFiltros();
-    _busquedaVersion++;
-    final version = _busquedaVersion;
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-      if (_busqueda.trim().isNotEmpty && _hayMas) {
-        _cargarBusquedaCompleta(version);
-      }
+    if (value.trim().isEmpty) {
+      _cargarPagina(reset: true);
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _cargarPagina(reset: true);
     });
     setState(() {});
   }
@@ -231,7 +193,9 @@ class _ArticulosListScreenState extends State<ArticulosListScreen> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  '${_visibles.length} ${_visibles.length == 1 ? 'artículo' : 'artículos'}${_busqueda.trim().isNotEmpty && _hayMas ? ' (buscando más...)' : ''}',
+                  _totalArticulos > 0
+                      ? '${_visibles.length} de $_totalArticulos ${_totalArticulos == 1 ? 'artículo' : 'artículos'}'
+                      : '${_visibles.length} ${_visibles.length == 1 ? 'artículo' : 'artículos'}',
                   style: TextStyle(
                     fontSize: 11,
                     color: colorScheme.onSurfaceVariant,

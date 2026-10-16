@@ -26,6 +26,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   bool _hayMasMovs = true;
   int _paginaMovs = 1;
   List<Movimiento> _movimientos = [];
+  bool _errorConexion = false;
 
   @override
   void initState() {
@@ -112,12 +113,14 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
         _movimientos = nuevos;
         _cargandoMovimientos = false;
         _cargandoPaginaMovs = false;
+        _errorConexion = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _cargandoMovimientos = false;
         _cargandoPaginaMovs = false;
+        _errorConexion = reset || _movimientos.isEmpty;
       });
     }
   }
@@ -190,6 +193,37 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   Widget _buildBaseConocimientoTab() {
     if (_cargandoMovimientos) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorConexion) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.wifi_off_rounded, size: 54, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(height: 16),
+              const Text(
+                'Requiere conexión a internet',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'La base de conocimiento de clientes requiere conexión a internet para consultar los movimientos en tiempo real.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => _cargarMovimientosPagina(reset: true),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     if (_movimientos.isEmpty) {

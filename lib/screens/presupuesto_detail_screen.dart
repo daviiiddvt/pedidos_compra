@@ -124,7 +124,19 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                             mostrarFechaValidez: true,
                             mostrarNumeroPresupuesto: true,
                           ),
-                          LineasTable(lineas: pedidoVisual.lineas),
+                          LineasTable(
+                            lineas: pedidoVisual.lineas,
+                            clienteId: presupuesto.clienteId > 0
+                                ? presupuesto.clienteId.toString()
+                                : (presupuesto.cliente.isNotEmpty
+                                    ? presupuesto.cliente
+                                    : (pedidoVisual.clienteId > 0
+                                        ? pedidoVisual.clienteId.toString()
+                                        : pedidoVisual.cliente)),
+                            clienteNombre: presupuesto.clienteNombre.isNotEmpty
+                                ? presupuesto.clienteNombre
+                                : pedidoVisual.clienteNombre,
+                          ),
                           SingleChildScrollView(
                             padding: const EdgeInsets.all(12),
                             child: TotalesCard(

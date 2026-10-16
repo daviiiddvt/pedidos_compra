@@ -5,11 +5,26 @@ import '../theme/app_theme.dart';
 import 'api_service.dart';
 import 'master_cache_service.dart';
 import '../models/models.dart';
+import 'offline/offline_database.dart';
 
 /// API operations for sales budgets. Budgets use the same document models and
 /// line payloads as orders, but are stored in their own Velneo tables.
 class PresupuestosService {
   static final _api = ApiClient.instance;
+
+  static Future<List<LineaPresupuestoVenta>> getLineasPresupuesto(dynamic id) async {
+    try {
+      final lineasJson = await _api.get(
+        AppConfig.endpoint('lineasPresupuesto'),
+        params: {'filter[vta_pre]': '$id', 'page[size]': 100},
+      );
+      return payloadLista(lineasJson)
+          .map(LineaPresupuestoVenta.fromJson)
+          .toList();
+    } catch (_) {
+      return OfflineDatabase.instance.getLineasPresupuestoOffline(id);
+    }
+  }
 
   static Future<ResultadoLista<PresupuestoVenta>> list({
     int page = 1,
@@ -28,25 +43,78 @@ class PresupuestosService {
       if (search != null && search.isNotEmpty) 'filter[words]': search,
       if (comercial != null && comercial.isNotEmpty) 'filter[cmr]': comercial,
     };
-    final json = await _api.get(
-      AppConfig.endpoint('presupuestos'),
-      params: params,
-    );
-    final items = payloadLista(json).map(PresupuestoVenta.fromJson).toList();
-    final reportedTotal = payloadTotal(json);
-    final total = reportedTotal == items.length &&
-            items.length >= AppConfig.pageSize
-        ? 0
-        : reportedTotal;
-    debugPrint(
-      '[PRESUPUESTOS] página=$page, recibidos=${items.length}, '
-      'total=${total == 0 ? "no informado" : total}',
-    );
-    return ResultadoLista<PresupuestoVenta>(
-      items: items,
-      total: total,
-      page: page,
-    );
+    try {
+      final json = await _api.get(
+        AppConfig.endpoint('presupuestos'),
+        params: params,
+      );
+      final rawItems = payloadLista(json).map(PresupuestoVenta.fromJson).toList();
+      final items = await enrichPresupuestosWithClientNames(rawItems);
+      final reportedTotal = payloadTotal(json);
+      final total = reportedTotal == items.length &&
+              items.length >= AppConfig.pageSize
+          ? 0
+          : reportedTotal;
+      debugPrint(
+        '[PRESUPUESTOS] página=$page, recibidos=${items.length}, '
+        'total=${total == 0 ? "no informado" : total}',
+      );
+      return ResultadoLista<PresupuestoVenta>(
+        items: items,
+        total: total,
+        page: page,
+      );
+    } catch (e) {
+      debugPrint('[PRESUPUESTOS] Error al conectar con el servidor, leyendo de SQLite: $e');
+      final offline = await OfflineDatabase.instance.getPresupuestosOffline(
+        estado: estado,
+        comercialId: comercial,
+        search: search,
+      );
+      final enrichedOffline = await enrichPresupuestosWithClientNames(offline);
+      return ResultadoLista<PresupuestoVenta>(
+        items: enrichedOffline,
+        total: offline.length,
+        page: page,
+      );
+    }
+  }
+
+  /// Enriquece los presupuestos con el nombre del cliente desde memoria/SQLite
+  static Future<List<PresupuestoVenta>> enrichPresupuestosWithClientNames(
+      List<PresupuestoVenta> presupuestos) async {
+    if (presupuestos.isEmpty) return presupuestos;
+
+    final missingIds = <int>{};
+    for (final p in presupuestos) {
+      final cid = p.clienteId > 0 ? p.clienteId : (int.tryParse(p.cliente.trim()) ?? 0);
+      final nom = p.clienteNombre.trim();
+      final esNumero = int.tryParse(nom) != null;
+      final necesitaMapeo = nom.isEmpty || nom == p.cliente.trim() || esNumero;
+      if (necesitaMapeo && cid > 0) {
+        missingIds.add(cid);
+      }
+    }
+
+    if (missingIds.isEmpty) return presupuestos;
+
+    final map = await PedidosService.getClientesMapByIds(missingIds.toList());
+
+    return presupuestos.map((p) {
+      final cid = p.clienteId > 0 ? p.clienteId : (int.tryParse(p.cliente.trim()) ?? 0);
+      final nom = p.clienteNombre.trim();
+      final esNumero = int.tryParse(nom) != null;
+      if (nom.isNotEmpty && nom != p.cliente.trim() && !esNumero) return p;
+
+      final c = map[cid];
+      if (c != null && c.nombreComercial.isNotEmpty) {
+        return p.copyWith(
+          clienteId: cid,
+          clienteNombre: c.nombreComercial,
+        );
+      }
+      return p;
+    }).toList();
   }
 
   static Future<List<PresupuestoVenta>> listAll({String? comercial}) async {
@@ -68,53 +136,58 @@ class PresupuestosService {
   }
 
   static Future<PresupuestoVenta> getById(dynamic id) async {
-    final json = await _api.get('${AppConfig.endpoint('presupuestos')}/$id');
-    final data = payloadData(json);
-    if (data is! Map) throw ApiException('No se pudo leer el presupuesto.');
-    var presupuesto = PresupuestoVenta.fromJson(
-      Map<String, dynamic>.from(data),
-    );
-    final lineasJson = await _api.get(
-      AppConfig.endpoint('lineasPresupuesto'),
-      params: {'filter[vta_pre]': '$id', 'page[size]': 100},
-    );
-    final lineas = payloadLista(lineasJson)
-        .map(LineaPresupuestoVenta.fromJson)
-        .toList();
-    final clientes = await PedidosService.getClientesByIds([
-      presupuesto.clienteId,
-    ]);
-    if (clientes.isNotEmpty) {
-      final cliente = clientes.first;
-      presupuesto = presupuesto.copyWith(
-        clienteNombre: cliente.nombreComercial,
+    try {
+      final json = await _api.get('${AppConfig.endpoint('presupuestos')}/$id');
+      final data = payloadData(json);
+      if (data is! Map) throw ApiException('No se pudo leer el presupuesto.');
+      var presupuesto = PresupuestoVenta.fromJson(
+        Map<String, dynamic>.from(data),
       );
-    }
-    if (presupuesto.comercial.isNotEmpty &&
-        presupuesto.comercialNombre.isEmpty) {
-      try {
-        final comercialNombre = await PedidosService.getContactName(
-          presupuesto.comercial,
+      final lineas = await getLineasPresupuesto(id);
+      final clientes = await PedidosService.getClientesByIds([
+        presupuesto.clienteId,
+      ]);
+      if (clientes.isNotEmpty) {
+        final cliente = clientes.first;
+        presupuesto = presupuesto.copyWith(
+          clienteNombre: cliente.nombreComercial,
         );
-        if (comercialNombre.isNotEmpty) {
-          presupuesto = presupuesto.copyWith(comercialNombre: comercialNombre);
-        }
-      } catch (_) {
-        // El código sigue siendo válido aunque no se pueda resolver el nombre.
       }
+      if (presupuesto.comercial.isNotEmpty &&
+          presupuesto.comercialNombre.isEmpty) {
+        try {
+          final comercialNombre = await PedidosService.getContactName(
+            presupuesto.comercial,
+          );
+          if (comercialNombre.isNotEmpty) {
+            presupuesto = presupuesto.copyWith(comercialNombre: comercialNombre);
+          }
+        } catch (_) {
+          // El código sigue siendo válido aunque no se pueda resolver el nombre.
+        }
+      }
+
+      final cache = MasterCacheService();
+      final cachedSeries = cache.getSync<List<OpcionMaestra>>('series');
+      final cachedFpg = cache.getSync<List<OpcionMaestra>>('formas_pago');
+      final serieOpcion = PedidosService.findMatchingOption(cachedSeries ?? [], presupuesto.serie);
+      final fpgOpcion = PedidosService.findMatchingOption(cachedFpg ?? [], presupuesto.formaPago);
+
+      return presupuesto.copyWith(
+        lineas: lineas,
+        serieNombre: serieOpcion?.nombre ?? presupuesto.serieNombre,
+        formaPagoNombre: fpgOpcion?.nombre ?? presupuesto.formaPagoNombre,
+      );
+    } catch (e) {
+      debugPrint('[PRESUPUESTOS] Error conectando con el servidor para presupuesto $id, buscando en SQLite: $e');
+      final offlineList = await OfflineDatabase.instance.getPresupuestosOffline();
+      final found = offlineList.firstWhere(
+        (p) => '${p.id}' == '$id' || p.numeroPresupuesto == '$id',
+        orElse: () => throw ApiException('Presupuesto no encontrado localmente ($e)'),
+      );
+      final lineas = await getLineasPresupuesto(id);
+      return found.copyWith(lineas: lineas);
     }
-
-    final cache = MasterCacheService();
-    final cachedSeries = cache.getSync<List<OpcionMaestra>>('series');
-    final cachedFpg = cache.getSync<List<OpcionMaestra>>('formas_pago');
-    final serieOpcion = PedidosService.findMatchingOption(cachedSeries ?? [], presupuesto.serie);
-    final fpgOpcion = PedidosService.findMatchingOption(cachedFpg ?? [], presupuesto.formaPago);
-
-    return presupuesto.copyWith(
-      lineas: lineas,
-      serieNombre: serieOpcion?.nombre ?? presupuesto.serieNombre,
-      formaPagoNombre: fpgOpcion?.nombre ?? presupuesto.formaPagoNombre,
-    );
   }
 
   static Map<String, dynamic> _payload(PresupuestoVenta pedido) => {
@@ -147,24 +220,46 @@ class PresupuestosService {
   }
 
   static Future<PresupuestoVenta> createComplete(
-    PresupuestoVenta pedido,
-  ) async {
-    final dirId = await _ensureDireccionId(pedido.clienteId, pedido.direccionEnvio);
-    final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
-    
-    final json = await _api.post(
-      AppConfig.endpoint('presupuestos'),
-      body: _payload(pedidoMapeado),
-    );
-    final data = payloadData(json);
-    if (data is! Map) throw ApiException('No se pudo crear el presupuesto.');
-    final created = PresupuestoVenta.fromJson(Map<String, dynamic>.from(data));
-    final id = created.id;
-    if (id == null) {
-      throw ApiException('Velneo no devolviÃ³ el ID del presupuesto creado.');
+    PresupuestoVenta pedido, {
+    bool isSync = false,
+  }) async {
+    try {
+      final dirId = await _ensureDireccionId(pedido.clienteId, pedido.direccionEnvio);
+      final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
+      
+      final json = await _api.post(
+        AppConfig.endpoint('presupuestos'),
+        body: _payload(pedidoMapeado),
+      );
+      final data = payloadData(json);
+      if (data is! Map) throw ApiException('No se pudo crear el presupuesto.');
+      final created = PresupuestoVenta.fromJson(Map<String, dynamic>.from(data));
+      final id = created.id;
+      if (id == null) {
+        throw ApiException('El servidor no devolvió el ID del presupuesto creado.');
+      }
+      await enviarLineas(id, pedido.lineas);
+      return created.copyWith(id: id, lineas: pedido.lineas);
+    } catch (e) {
+      if (isSync) {
+        // En sincronización Outbox: propagar el error para reintentar más tarde, NUNCA duplicar
+        rethrow;
+      }
+      final tempId = (pedido.id != null && pedido.id! < 0)
+          ? pedido.id!
+          : -(DateTime.now().millisecondsSinceEpoch % 1000000000);
+      final offlinePresupuesto = pedido.copyWith(
+        id: tempId,
+        numeroPresupuesto: pedido.numeroPresupuesto.isNotEmpty
+            ? pedido.numeroPresupuesto
+            : 'OFFLINE-${tempId.abs()}',
+      );
+      await OfflineDatabase.instance.savePresupuestoOfflineOutbox(
+        presupuesto: offlinePresupuesto,
+      );
+      debugPrint('[PRESUPUESTOS] Presupuesto guardado en cola Outbox offline: $tempId');
+      return offlinePresupuesto;
     }
-    await enviarLineas(id, pedido.lineas);
-    return created.copyWith(id: id, lineas: pedido.lineas);
   }
 
   static Future<void> marcarAceptado(dynamic budgetId) async {
@@ -218,31 +313,61 @@ class PresupuestosService {
   static Future<PresupuestoVenta> updateComplete(
     dynamic id,
     PresupuestoVenta pedido,
-    Set<int> removedLineIds,
-  ) async {
-    final dirId = await _ensureDireccionId(pedido.clienteId, pedido.direccionEnvio);
-    final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
+    Set<int> removedLineIds, {
+    bool isSync = false,
+  }) async {
+    final isOfflineId = (id is num && id < 0) || (int.tryParse('$id') != null && int.parse('$id') < 0);
+    if (isOfflineId && !isSync) {
+      // Documento temporal creado sin conexión: guardar directamente en SQLite/Outbox
+      await OfflineDatabase.instance.savePresupuestoOfflineOutbox(
+        presupuesto: pedido,
+        accion: 'crear',
+        removedLineIds: removedLineIds.toList(),
+      );
+      return pedido.copyWith(id: id is int ? id : pedido.id, lineas: pedido.lineas);
+    }
 
-    final json = await _api.post(
-      '${AppConfig.endpoint('presupuestos')}/$id',
-      body: _payload(pedidoMapeado),
-    );
-    final data = payloadData(json);
-    for (final lineId in removedLineIds) {
-      await eliminarLinea(lineId);
+    try {
+      final dirId = await _ensureDireccionId(pedido.clienteId, pedido.direccionEnvio);
+      final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
+
+      final json = await _api.post(
+        '${AppConfig.endpoint('presupuestos')}/$id',
+        body: _payload(pedidoMapeado),
+      );
+      final data = payloadData(json);
+      for (final lineId in removedLineIds) {
+        if (lineId > 0) {
+          await eliminarLinea(lineId);
+        }
+      }
+      await enviarLineas(id, pedido.lineas);
+      if (AppColors.estadoCodigo(pedido.estado) == 'A') {
+        await _marcarLineasAceptadas(id);
+      }
+      if (data is Map) {
+        return PresupuestoVenta.fromJson(Map<String, dynamic>.from(data))
+            .copyWith(id: id is int ? id : pedido.id, lineas: pedido.lineas);
+      }
+      return pedido.copyWith(
+        id: id is int ? id : pedido.id,
+        lineas: pedido.lineas,
+      );
+    } catch (e) {
+      if (isSync) {
+        rethrow;
+      }
+      debugPrint('[PRESUPUESTOS] Sin conexión al editar presupuesto $id, guardando en Outbox offline: $e');
+      await OfflineDatabase.instance.savePresupuestoOfflineOutbox(
+        presupuesto: pedido,
+        accion: isOfflineId ? 'crear' : 'editar',
+        removedLineIds: removedLineIds.toList(),
+      );
+      return pedido.copyWith(
+        id: id is int ? id : pedido.id,
+        lineas: pedido.lineas,
+      );
     }
-    await enviarLineas(id, pedido.lineas);
-    if (AppColors.estadoCodigo(pedido.estado) == 'A') {
-      await _marcarLineasAceptadas(id);
-    }
-    if (data is Map) {
-      return PresupuestoVenta.fromJson(Map<String, dynamic>.from(data))
-          .copyWith(id: id is int ? id : pedido.id, lineas: pedido.lineas);
-    }
-    return pedido.copyWith(
-      id: id is int ? id : pedido.id,
-      lineas: pedido.lineas,
-    );
   }
 
   static String _fechaVelneo(String value) {
@@ -295,7 +420,7 @@ class PresupuestosService {
       };
       try {
         int? lineaId = linea.id;
-        if (lineaId == null) {
+        if (lineaId == null || lineaId <= 0) {
           final res = await _api.post(endpoint, body: body);
           final data = payloadData(res);
           if (data is Map) {

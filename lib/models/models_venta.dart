@@ -276,6 +276,23 @@ class LineaPresupuestoVenta {
       dto3: dto3,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'art': articulo,
+    'art_nom': articuloNombre,
+    'dsc': descripcion,
+    'can': cantidad,
+    'pre': precio,
+    'por_dto': dto,
+    'DTO1': dto1,
+    'DTO2': dto2,
+    'DTO3': dto3,
+    'imp': importe,
+    'por_iva': tipoIva,
+    'reg_iva_vta': regIvaVta,
+    'est': estado,
+  };
 }
 
 class PedidoVenta {
@@ -415,81 +432,116 @@ class PresupuestoVenta {
     vtaPedG: vtaPedG ?? this.vtaPedG,
   );
 
-  factory PresupuestoVenta.fromJson(Map<String, dynamic> json) =>
-      PresupuestoVenta(
-        id: json['id'] == null ? null : _int(json['id']),
-        numeroPresupuesto: _text(json['num_pre']),
-        clienteId: _int(json['clt']),
-        estado: _text(json['est']),
-        total: _double(json['tot_pre'] ?? json['tot_ped']),
-        cliente: _text(json['clt']),
-        clienteNombre: _text(json['clt_nom'] ?? json['clienteNombre']),
-        serie: _text(json['ser']),
-        comercial: _text(json['cmr']),
-        comercialNombre: _text(json['cmr_nom'] ?? json['comercialNombre']),
-        fecha: _date(json['fch']),
-        fechaValidez: _date(json['fch_val']),
-        formaPago: _text(json['fpg']),
-        direccionEnvio: _text(json['dir_env']),
-        email: _text(json['EMAIL_DE_ENVIO_CLT'] ?? json['email_de_envio_clt'] ?? json['email'] ?? json['eml']),
-        observaciones: _text(json['obs'] ?? json['OBS'] ?? json['observaciones']),
-        vtaPedG: _int(json['VTA_PED_G'] ?? json['vta_ped_g'] ?? json['vtaPedG']),
-      );
+  factory PresupuestoVenta.fromJson(Map<String, dynamic> json) {
+    final rawLineas = json['lineas'];
+    final lineas = rawLineas is List
+        ? rawLineas
+            .map((l) => LineaPresupuestoVenta.fromJson(Map<String, dynamic>.from(l as Map)))
+            .toList()
+        : <LineaPresupuestoVenta>[];
+    var tot = _double(json['tot_pre'] ?? json['tot_ped'] ?? json['total']);
+    if (tot == 0.0 && lineas.isNotEmpty) {
+      tot = lineas.fold(0.0, (sum, l) => sum + l.getLineTotal());
+    }
+
+    return PresupuestoVenta(
+      id: json['id'] == null ? null : _int(json['id']),
+      numeroPresupuesto: _text(json['num_pre']),
+      clienteId: _int(json['clt']),
+      estado: _text(json['est']),
+      total: tot,
+      lineas: lineas,
+      cliente: _text(json['clt']),
+      clienteNombre: _text(json['clt_nom'] ?? json['clienteNombre'] ?? json['CLT_NOM'] ?? json['CLT.NAME'] ?? json['clt.name'] ?? json['name'] ?? json['clt_name'] ?? json['cliente_nombre']),
+      serie: _text(json['ser']),
+      comercial: _text(json['cmr']),
+      comercialNombre: _text(json['cmr_nom'] ?? json['comercialNombre']),
+      fecha: _date(json['fch']),
+      fechaValidez: _date(json['fch_val']),
+      formaPago: _text(json['fpg']),
+      direccionEnvio: _text(json['dir_env']),
+      email: _text(json['EMAIL_DE_ENVIO_CLT'] ?? json['email_de_envio_clt'] ?? json['email'] ?? json['eml']),
+      observaciones: _text(json['obs'] ?? json['OBS'] ?? json['observaciones']),
+      vtaPedG: _int(json['VTA_PED_G'] ?? json['vta_ped_g'] ?? json['vtaPedG']),
+    );
+  }
 
   double calcularTotal() =>
       lineas.fold(0, (sum, line) => sum + line.getLineTotal());
 
-  Pedido toPedidoVisual() => Pedido(
-    id: id,
-    numeroPresupuesto: numeroPresupuesto,
-    clienteId: clienteId,
-    estado: estado,
-    total: total,
-    lineas: lineas
-        .map(
-          (linea) => LineaPedido(
-            id: linea.id,
-            articulo: linea.articulo,
-            articuloNombre: linea.articuloNombre,
-            descripcion: linea.descripcion,
-            cantidad: linea.cantidad,
-            precio: linea.precio,
-            dto: linea.dto,
-            dto1: linea.dto1,
-            dto2: linea.dto2,
-            dto3: linea.dto3,
-            importe: linea.importe,
-            tipoIva: linea.tipoIva,
-            regIvaVta: linea.regIvaVta,
-            estado: linea.estado,
-          ),
-        )
-        .toList(),
-    cliente: cliente,
-    clienteNombre: clienteNombre,
-    serie: serie,
-    serieNombre: serieNombre,
-    comercial: comercial,
-    comercialNombre: comercialNombre,
-    fecha: fecha,
-    fechaValidez: fechaValidez,
-    formaPago: formaPago,
-    formaPagoNombre: formaPagoNombre,
-    direccionEnvio: direccionEnvio,
-    almacen: almacen,
-    almacenNombre: almacenNombre,
-    email: email,
-    observaciones: observaciones,
-    vtaPedG: vtaPedG,
-  );
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'num_pre': numeroPresupuesto,
+    'clt': clienteId,
+    'est': estado,
+    'tot_pre': total,
+    'clt_nom': clienteNombre,
+    'ser': serie,
+    'ser_nom': serieNombre,
+    'cmr': comercial,
+    'cmr_nom': comercialNombre,
+    'fch': fecha,
+    'fch_val': fechaValidez,
+    'fpg': formaPago,
+    'fpg_nom': formaPagoNombre,
+    'dir_env': direccionEnvio,
+    'alm': almacen,
+    'alm_nom': almacenNombre,
+    'EMAIL_DE_ENVIO_CLT': email,
+    'obs': observaciones,
+    'VTA_PED_G': vtaPedG,
+    'lineas': lineas.map((l) => l.toJson()).toList(),
+  };
 
-  static PresupuestoVenta fromPedidoVisual(Pedido pedido) => PresupuestoVenta(
-    id: pedido.id,
-    numeroPresupuesto: pedido.numeroPresupuesto,
-    clienteId: pedido.clienteId,
-    estado: pedido.estado,
-    total: pedido.total,
-    lineas: pedido.lineas
+  Pedido toPedidoVisual() {
+    final totCalculado = total > 0.0 ? total : calcularTotal();
+    return Pedido(
+      id: id,
+      numeroPresupuesto: numeroPresupuesto,
+      clienteId: clienteId,
+      estado: estado,
+      total: totCalculado,
+      lineas: lineas
+          .map(
+            (linea) => LineaPedido(
+              id: linea.id,
+              articulo: linea.articulo,
+              articuloNombre: linea.articuloNombre,
+              descripcion: linea.descripcion,
+              cantidad: linea.cantidad,
+              precio: linea.precio,
+              dto: linea.dto,
+              dto1: linea.dto1,
+              dto2: linea.dto2,
+              dto3: linea.dto3,
+              importe: linea.importe,
+              tipoIva: linea.tipoIva,
+              regIvaVta: linea.regIvaVta,
+              estado: linea.estado,
+            ),
+          )
+          .toList(),
+      cliente: cliente,
+      clienteNombre: clienteNombre,
+      serie: serie,
+      serieNombre: serieNombre,
+      comercial: comercial,
+      comercialNombre: comercialNombre,
+      fecha: fecha,
+      fechaValidez: fechaValidez,
+      formaPago: formaPago,
+      formaPagoNombre: formaPagoNombre,
+      direccionEnvio: direccionEnvio,
+      almacen: almacen,
+      almacenNombre: almacenNombre,
+      email: email,
+      observaciones: observaciones,
+      vtaPedG: vtaPedG,
+    );
+  }
+
+  static PresupuestoVenta fromPedidoVisual(Pedido pedido) {
+    final parsedLines = pedido.lineas
         .map(
           (linea) => LineaPresupuestoVenta(
             id: linea.id,
@@ -508,24 +560,36 @@ class PresupuestoVenta {
             estado: linea.estado,
           ),
         )
-        .toList(),
-    cliente: pedido.cliente,
-    clienteNombre: pedido.clienteNombre,
-    serie: pedido.serie,
-    serieNombre: pedido.serieNombre,
-    comercial: pedido.comercial,
-    comercialNombre: pedido.comercialNombre,
-    fecha: pedido.fecha,
-    fechaValidez: pedido.fechaValidez,
-    formaPago: pedido.formaPago,
-    formaPagoNombre: pedido.formaPagoNombre,
-    direccionEnvio: pedido.direccionEnvio,
-    almacen: pedido.almacen,
-    almacenNombre: pedido.almacenNombre,
-    email: pedido.email,
-    observaciones: pedido.observaciones,
-    vtaPedG: pedido.vtaPedG,
-  );
+        .toList();
+    final tot = pedido.total > 0.0
+        ? pedido.total
+        : parsedLines.fold<double>(0.0, (s, l) => s + l.getLineTotal());
+
+    return PresupuestoVenta(
+      id: pedido.id,
+      numeroPresupuesto: pedido.numeroPresupuesto,
+      clienteId: pedido.clienteId,
+      estado: pedido.estado,
+      total: tot,
+      lineas: parsedLines,
+      cliente: pedido.cliente,
+      clienteNombre: pedido.clienteNombre,
+      serie: pedido.serie,
+      serieNombre: pedido.serieNombre,
+      comercial: pedido.comercial,
+      comercialNombre: pedido.comercialNombre,
+      fecha: pedido.fecha,
+      fechaValidez: pedido.fechaValidez,
+      formaPago: pedido.formaPago,
+      formaPagoNombre: pedido.formaPagoNombre,
+      direccionEnvio: pedido.direccionEnvio,
+      almacen: pedido.almacen,
+      almacenNombre: pedido.almacenNombre,
+      email: pedido.email,
+      observaciones: pedido.observaciones,
+      vtaPedG: pedido.vtaPedG,
+    );
+  }
 }
 
 OpcionMaestra opcionDesdeCliente(Cliente cliente) =>

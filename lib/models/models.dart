@@ -1,7 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 export 'models_venta.dart';
-export 'visita_agenda.dart';
 
 part 'models.freezed.dart';
 part 'models.g.dart';
@@ -214,7 +213,20 @@ Map<String, dynamic> _normalizePedidoJson(Map<String, dynamic> json) {
     'cliente': ['clt', 'cliente'],
     'clt': ['clt', 'clienteId'],
     'tot_ped': ['tot_ped', 'tot_pre', 'total'],
-    'clienteNombre': ['clt_nom', 'clt_name', 'nom_fis', 'clienteNombre'],
+    'clienteNombre': [
+      'clt_nom',
+      'CLT_NOM',
+      'clt_name',
+      'CLT_NAME',
+      'clt.name',
+      'CLT.NAME',
+      'clt.nom',
+      'CLT.NOM',
+      'name',
+      'clienteNombre',
+      'cliente_nombre',
+      'CLIENTE_NOMBRE',
+    ],
     'ser': ['ser', 'serie'],
     'ser_nom': ['ser_nom', 'serieNombre'],
     'vtaPedG': ['vta_ped_g', 'vta_ped', 'VTA_PED_G'],
@@ -264,7 +276,7 @@ abstract class OpcionMaestra with _$OpcionMaestra {
       _$OpcionMaestraFromJson({
         'codigo': _textValue(_firstValue(json, ['codigo', 'id', 'code'])),
         'nombre': _textValue(
-          _firstValue(json, ['nombre', 'name', 'nom_fis', 'descripcion']),
+          _firstValue(json, ['nombre', 'name', 'name', 'descripcion']),
         ),
         'referencia': _textValue(
           _firstValue(json, ['referencia', 'ref', 'ref_man', 'REF']),
@@ -384,10 +396,10 @@ abstract class Cliente with _$Cliente {
   factory Cliente.fromJson(Map<String, dynamic> json) => _$ClienteFromJson({
     'id': _intValue(_firstValue(json, ['id', 'codigo'])),
     'nombreComercial': _textValue(
-      _firstValue(json, ['nom_fis', 'name', 'nombreComercial']),
+      _firstValue(json, ['name', 'nombre', 'nom_fis', 'nombreComercial']),
     ),
     'nombreFiscal': _textValue(
-      _firstValue(json, ['nom_fis', 'NOM_FIS', 'nombreFiscal']),
+      _firstValue(json, ['nom_fis', 'NOM_FIS', 'name', 'nombreFiscal']),
     ),
     'cif': _textValue(_firstValue(json, ['cif', 'nif'])),
     'email': _textValue(_firstValue(json, ['eml', 'EML', 'email'])),

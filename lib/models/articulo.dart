@@ -27,6 +27,14 @@ class Articulo {
     this.desactivado = false,
   });
 
+  /// Devuelve true si el artículo tiene una familia asignada (FAM_M tiene valor y no es '0').
+  bool get tieneFamilia {
+    final fam = familiaId.trim();
+    if (fam.isNotEmpty && fam != '0' && fam.toLowerCase() != 'null') return true;
+    final nom = familiaNombre.trim();
+    return nom.isNotEmpty && nom != '0' && nom.toLowerCase() != 'null';
+  }
+
   Articulo copyWith({
     String? id,
     String? codigo,
@@ -72,23 +80,24 @@ class Articulo {
     String text(List<String> keys) {
       final val = resolveField(keys);
       if (val is Map) {
-        return '${val['name'] ?? val['nom'] ?? val['nom_fis'] ?? val['id'] ?? val['value'] ?? ''}';
+        return '${val['name'] ?? val['nom'] ?? val['name'] ?? val['id'] ?? val['value'] ?? ''}';
       }
       return val == null ? '' : '$val'.trim();
     }
 
     String refId(List<String> keys) {
       final val = resolveField(keys);
+      if (val == null || val is bool) return '';
       if (val is Map) {
-        return '${val['id'] ?? val['value'] ?? ''}';
+        return '${val['id'] ?? val['value'] ?? ''}'.trim();
       }
-      return val == null ? '' : '$val'.trim();
+      return '$val'.trim();
     }
 
     String refName(List<String> keys) {
       final val = resolveField(keys);
       if (val is Map) {
-        final name = '${val['name'] ?? val['nom'] ?? val['nom_fis'] ?? val['descripcion'] ?? ''}';
+        final name = '${val['name'] ?? val['nom'] ?? val['name'] ?? val['descripcion'] ?? ''}';
         if (name.isNotEmpty && name != 'null') return name;
       }
       return '';
@@ -141,8 +150,8 @@ class Articulo {
       'DSC',
       'des',
     ]);
-    final familiaId = refId(['FAM', 'fam', 'id_fam', 'familia', 'fam_m']);
-    final familiaNombre = refName(['FAM', 'fam', 'familia', 'fam_m']);
+    final familiaId = refId(['FAM_M', 'fam_m', 'FAM', 'fam', 'id_fam', 'familia']);
+    final familiaNombre = refName(['FAM_M', 'fam_m', 'FAM', 'fam', 'familia']);
     final proveedorId = refId(['PRV', 'prv', 'id_prv', 'proveedor', 'ent']);
     final proveedorNombre = refName(['PRV', 'prv', 'proveedor']);
     final codigoBarras = text([

@@ -213,7 +213,7 @@ class _ArticuloDetailScreenState extends State<ArticuloDetailScreen> {
                   // N/Referencia: Campo REF en la tabla ART_M
                   _DatoFila(
                     icon: Icons.tag,
-                    label: 'N/Referencia (REF)',
+                    label: 'N/Referencia',
                     valor: art.referencia.isNotEmpty ? art.referencia : '—',
                   ),
                   const Divider(height: 20),
@@ -221,7 +221,7 @@ class _ArticuloDetailScreenState extends State<ArticuloDetailScreen> {
                   // Nombre: Campo NAME en la tabla ART_M
                   _DatoFila(
                     icon: Icons.inventory_2_outlined,
-                    label: 'Nombre (NAME)',
+                    label: 'Nombre',
                     valor: art.nombre.isNotEmpty ? art.nombre : '—',
                   ),
                   const Divider(height: 20),
@@ -229,7 +229,7 @@ class _ArticuloDetailScreenState extends State<ArticuloDetailScreen> {
                   // Familia: Campo maestro FAM en ART_M (FAM_M)
                   _DatoFila(
                     icon: Icons.category_outlined,
-                    label: 'Familia (FAM / FAM_M)',
+                    label: 'Familia',
                     valor: art.familiaNombre.isNotEmpty
                         ? (art.familiaId.isNotEmpty && art.familiaId != art.familiaNombre
                             ? '${art.familiaNombre} (${art.familiaId})'
@@ -241,7 +241,7 @@ class _ArticuloDetailScreenState extends State<ArticuloDetailScreen> {
                   // Proveedor: Campo PRV en ART_M (ENT_M)
                   _DatoFila(
                     icon: Icons.business_outlined,
-                    label: 'Proveedor (PRV / ENT_M)',
+                    label: 'Proveedor',
                     valor: art.proveedorNombre.isNotEmpty
                         ? (art.proveedorId.isNotEmpty && art.proveedorId != art.proveedorNombre
                             ? '${art.proveedorNombre} (${art.proveedorId})'
@@ -253,7 +253,7 @@ class _ArticuloDetailScreenState extends State<ArticuloDetailScreen> {
                   // Código de barras: Campo COD_BAR en ART_M
                   _DatoFila(
                     icon: Icons.qr_code_scanner,
-                    label: 'Código de barras (COD_BAR)',
+                    label: 'Código de barras',
                     valor: art.codigoBarras.isNotEmpty ? art.codigoBarras : '—',
                   ),
                   const Divider(height: 20),
@@ -261,7 +261,7 @@ class _ArticuloDetailScreenState extends State<ArticuloDetailScreen> {
                   // Precio: Campo PVP en ART_M
                   _DatoFila(
                     icon: Icons.euro,
-                    label: 'Precio (PVP)',
+                    label: 'Precio',
                     valor: '${formatNumber(art.precio)} €',
                     destacada: true,
                   ),

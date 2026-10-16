@@ -179,12 +179,13 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
       // Los datos auxiliares no bloquean la primera pintura de la lista.
       try {
         final clienteIds = resultado.items
-            .map((pedido) => pedido.clienteId)
+            .map((pedido) => pedido.clienteId > 0 ? pedido.clienteId : (int.tryParse(pedido.cliente) ?? 0))
+            .where((id) => id > 0)
             .toSet()
             .toList();
-        final clientes = await PedidosService.getClientesByIds(clienteIds);
+        final clientesMap = await PedidosService.getClientesMapByIds(clienteIds);
         if (!mounted) return;
-        repository.setClientes(clientes);
+        repository.setClientesMap(clientesMap);
         _aplicarFiltros();
       } catch (_) {
         // Los pedidos siguen siendo utilizables si el endpoint de clientes no responde.

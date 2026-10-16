@@ -413,7 +413,11 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
               comercialNombre: user.name,
             )
           : _pedido;
-      final pedidoParaGuardar = pedidoConComercial.copyWith(lineas: _lineas);
+      final totales = calcularTotales(_lineas);
+      final pedidoParaGuardar = pedidoConComercial.copyWith(
+        lineas: _lineas,
+        total: totales.total,
+      );
       if (_editando) {
         await PedidosService.updateComplete(
           _pedidoIdReal,

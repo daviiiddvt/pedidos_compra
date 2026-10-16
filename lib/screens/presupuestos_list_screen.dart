@@ -140,17 +140,19 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
 
       try {
         final clienteIds = presupuestosVisuales
-            .map((b) => b.clienteId)
+            .map((b) => b.clienteId > 0 ? b.clienteId : (int.tryParse(b.cliente) ?? 0))
+            .where((id) => id > 0)
             .toSet()
             .toList();
-        final clientes = await PedidosService.getClientesByIds(clienteIds);
-        final mapClientes = {for (var c in clientes) c.id: c};
+        final mapClientes = await PedidosService.getClientesMapByIds(clienteIds);
         if (!mounted) return;
         setState(() {
           _todos = _todos.map((presupuesto) {
-            final c = mapClientes[presupuesto.clienteId];
-            if (c != null) {
+            final cid = presupuesto.clienteId > 0 ? presupuesto.clienteId : (int.tryParse(presupuesto.cliente) ?? 0);
+            final c = mapClientes[cid];
+            if (c != null && c.nombreComercial.isNotEmpty) {
               return presupuesto.copyWith(
+                clienteId: cid > 0 ? cid : presupuesto.clienteId,
                 clienteNombre: c.nombreComercial,
               );
             }

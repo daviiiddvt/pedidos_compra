@@ -123,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final finalUrl = _currentUrl;
     if (!_modoManual && _instanceCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, indica la instancia de datos de Velneo')),
+        const SnackBar(content: Text('Por favor, indica la instancia de datos')),
       );
       return;
     }
@@ -343,7 +343,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             key: const ValueKey('username'),
                             label: 'Usuario',
                             controller: _usernameCtrl,
-                            placeholder: 'Usuario de Velneo',
+                            placeholder: 'Usuario',
                           ),
                           const SizedBox(height: 14),
 
@@ -351,7 +351,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             key: const ValueKey('password'),
                             label: 'Contraseña',
                             controller: _passwordCtrl,
-                            placeholder: 'Contraseña de Velneo',
+                            placeholder: 'Contraseña',
                             obscureText: true,
                           ),
                           const SizedBox(height: 20),

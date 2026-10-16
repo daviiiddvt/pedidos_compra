@@ -200,57 +200,40 @@ class _PresupuestoFormScreenState extends State<PresupuestoFormScreen> {
             .map((line) => line.id!)
             .toSet(),
       );
+      final totales = calcularTotales(_lineas);
+      final lineasPresupuesto = _lineas
+          .map(
+            (linea) => LineaPresupuestoVenta(
+              id: linea.id,
+              articulo: linea.articulo,
+              articuloNombre: linea.articuloNombre,
+              descripcion: linea.descripcion,
+              cantidad: linea.cantidad,
+              precio: linea.precio,
+              dto: linea.dto,
+              dto1: linea.dto1,
+              dto2: linea.dto2,
+              dto3: linea.dto3,
+              importe: linea.importe,
+              tipoIva: linea.tipoIva,
+              regIvaVta: linea.regIvaVta,
+              estado: linea.estado,
+            ),
+          )
+          .toList();
+      final presupuestoParaGuardar = presupuesto.copyWith(
+        lineas: lineasPresupuesto,
+        total: totales.total,
+      );
       if (_editando) {
         await PresupuestosService.updateComplete(
           _presupuestoIdReal,
-          presupuesto.copyWith(
-            lineas: _lineas
-                .map(
-                  (linea) => LineaPresupuestoVenta(
-                    id: linea.id,
-                    articulo: linea.articulo,
-                    articuloNombre: linea.articuloNombre,
-                    descripcion: linea.descripcion,
-                    cantidad: linea.cantidad,
-                    precio: linea.precio,
-                    dto: linea.dto,
-                    dto1: linea.dto1,
-                    dto2: linea.dto2,
-                    dto3: linea.dto3,
-                    importe: linea.importe,
-                    tipoIva: linea.tipoIva,
-                    regIvaVta: linea.regIvaVta,
-                    estado: linea.estado,
-                  ),
-                )
-                .toList(),
-          ),
+          presupuestoParaGuardar,
           removed,
         );
       } else {
         await PresupuestosService.createComplete(
-          presupuesto.copyWith(
-            lineas: _lineas
-                .map(
-                  (linea) => LineaPresupuestoVenta(
-                    id: linea.id,
-                    articulo: linea.articulo,
-                    articuloNombre: linea.articuloNombre,
-                    descripcion: linea.descripcion,
-                    cantidad: linea.cantidad,
-                    precio: linea.precio,
-                    dto: linea.dto,
-                    dto1: linea.dto1,
-                    dto2: linea.dto2,
-                    dto3: linea.dto3,
-                    importe: linea.importe,
-                    tipoIva: linea.tipoIva,
-                    regIvaVta: linea.regIvaVta,
-                    estado: linea.estado,
-                  ),
-                )
-                .toList(),
-          ),
+          presupuestoParaGuardar,
         );
       }
       if (!mounted) return;

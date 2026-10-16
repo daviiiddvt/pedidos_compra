@@ -195,7 +195,7 @@ class _LineaFormModalState extends State<LineaFormModal> {
   /// descripción) y los vuelca en los campos del formulario de la línea.
   Future<void> _cargarDatosArticulo(String articuloCodigo) async {
     debugPrint(
-      '🔧 _cargarDatosArticulo("$articuloCodigo") → pidiendo defaults a Velneo...',
+      '🔧 _cargarDatosArticulo("$articuloCodigo") → pidiendo defaults al servidor...',
     );
     final defaults = await PedidosService.getArticuloDefaultsParaCliente(
       articuloCodigo,
@@ -209,6 +209,10 @@ class _LineaFormModalState extends State<LineaFormModal> {
       final descripcion = (defaults['descripcion'] ?? '').toString().trim();
       if (descripcion.isNotEmpty && _descripcion.text.trim().isEmpty) {
         _descripcion.text = descripcion;
+      }
+      final referencia = (defaults['referencia'] ?? defaults['ref'] ?? '').toString().trim();
+      if (referencia.isNotEmpty && _nReferencia.text.trim().isEmpty) {
+        _nReferencia.text = referencia;
       }
       final precio =
           double.tryParse((defaults['precio'] ?? '').toString()) ?? 0;

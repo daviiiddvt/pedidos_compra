@@ -183,7 +183,7 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
 
         if (widget.onConfigured != null) {
           widget.onConfigured!(lic);
-        } else {
+        } else if (widget.showBack && Navigator.of(context).canPop()) {
           Navigator.of(context).pop(lic);
         }
       } else {

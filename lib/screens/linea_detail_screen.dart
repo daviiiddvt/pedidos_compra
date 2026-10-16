@@ -8,8 +8,15 @@ import '../theme/app_theme.dart';
 
 class LineaDetailScreen extends StatefulWidget {
   final LineaPedido linea;
+  final String? clienteId;
+  final String? clienteNombre;
 
-  const LineaDetailScreen({super.key, required this.linea});
+  const LineaDetailScreen({
+    super.key,
+    required this.linea,
+    this.clienteId,
+    this.clienteNombre,
+  });
 
   @override
   State<LineaDetailScreen> createState() => _LineaDetailScreenState();
@@ -53,9 +60,13 @@ class _LineaDetailScreenState extends State<LineaDetailScreen> with SingleTicker
     if (!_hayMasMovs || _cargandoMovimientos) return;
     setState(() => _cargandoMovimientos = true);
     
-    // El artículo guardado en LineaPedido.articulo es el ID (código).
+    final cltId = (widget.clienteId != null && widget.clienteId!.trim().isNotEmpty)
+        ? widget.clienteId!.trim()
+        : widget.linea.clienteVenta.trim();
+
     final res = await ArticulosService.getMovimientosArticulo(
       articuloId: widget.linea.articulo,
+      clienteId: cltId.isNotEmpty ? cltId : null,
       page: _pageMovs,
       pageSize: 50,
     );
@@ -264,79 +275,130 @@ class _LineaDetailScreenState extends State<LineaDetailScreen> with SingleTicker
   }
 
   Widget _buildBaseConocimientoTab() {
+    final cltNombre = widget.clienteNombre?.trim() ?? '';
+    final cltId = (widget.clienteId != null && widget.clienteId!.trim().isNotEmpty)
+        ? widget.clienteId!.trim()
+        : widget.linea.clienteVenta.trim();
+    final clientLabel = cltNombre.isNotEmpty
+        ? cltNombre
+        : (cltId.isNotEmpty ? 'Cliente #$cltId' : '');
+
     if (_cargandoMovimientos && _movimientos.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    Widget content;
     if (_movimientos.isEmpty) {
-      return Center(
-        child: Text(
-          'No hay movimientos para este artículo.',
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      content = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.history_outlined, size: 48, color: Theme.of(context).colorScheme.outline),
+              const SizedBox(height: 12),
+              Text(
+                clientLabel.isNotEmpty
+                    ? 'No hay movimientos registrados para este artículo y el cliente $clientLabel.'
+                    : 'No hay movimientos para este artículo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
+      );
+    } else {
+      content = ListView.builder(
+        controller: _scrollControllerMovs,
+        padding: const EdgeInsets.all(8),
+        itemCount: _movimientos.length + (_hayMasMovs ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _movimientos.length) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          final m = _movimientos[index];
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${m.articuloRef} - ${m.articuloNombre}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        formatDate(m.fecha),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Entrada: ${formatNumber(m.entrada)}'),
+                      Text('Salida: ${formatNumber(m.salida)}'),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Precio: ${formatNumber(m.precio)} €'),
+                      Text('Nº Doc: ${m.numDoc}'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       );
     }
 
-    return ListView.builder(
-      controller: _scrollControllerMovs,
-      padding: const EdgeInsets.all(8),
-      itemCount: _movimientos.length + (_hayMasMovs ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == _movimientos.length) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        final m = _movimientos[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${m.articuloRef} - ${m.articuloNombre}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      formatDate(m.fecha),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+    if (clientLabel.isEmpty) {
+      return content;
+    }
+
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          child: Row(
+            children: [
+              Icon(Icons.person_outline, size: 18, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Cliente: $clientLabel',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Entrada: ${formatNumber(m.entrada)}'),
-                    Text('Salida: ${formatNumber(m.salida)}'),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Precio: ${formatNumber(m.precio)} €'),
-                    Text('Nº Doc: ${m.numDoc}'),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+        Expanded(child: content),
+      ],
     );
   }
 

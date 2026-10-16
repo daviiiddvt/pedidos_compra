@@ -25,26 +25,29 @@
 
 import 'package:flutter/material.dart'; // Librería estándar de Flutter (interfaz).
 import 'package:flutter/foundation.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart'; // Librería que comparte datos globales.
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
+
 
 // Importamos nuestras propias pantallas y clases (los archivos de la carpeta lib).
 import 'core/app_log.dart'; // Logs a fichero (imprescindible en Windows).
 import 'core/repositorio_pedidos.dart';
 import 'core/app_lifecycle_manager.dart'; // Nuevo manager de ciclo de vida.
-import 'core/crm_repository.dart';
 import 'core/search/entity_search_repository.dart'; // Repositorio local-first.
 import 'core/search/local_cache_db.dart'; // Caché local (SQLite en escritorio/móvil).
 import 'core/licencia/licencia.dart';
 import 'core/licencia/licencia_service.dart';
+import 'core/offline/offline_database.dart';
+import 'core/offline/offline_outbox_service.dart';
+import 'core/offline/connection_status_service.dart';
 import 'screens/licencia_config_screen.dart';
 import 'screens/login_screen.dart'; // Pantalla de conexión al servidor.
 import 'screens/dashboard_screen.dart';
 import 'screens/pedidos_list_screen.dart'; // Pantalla con la lista de pedidos.
 import 'screens/pedido_detail_screen.dart'; // Pantalla con el detalle de un pedido.
 import 'screens/pedido_form_screen.dart'; // Pantalla para crear/editar pedidos.
-import 'screens/agenda_calendar_screen.dart';
 import 'screens/presupuestos_list_screen.dart';
 import 'screens/presupuesto_detail_screen.dart';
 import 'screens/presupuesto_form_screen.dart';
@@ -71,6 +74,9 @@ Future<void> main() async {
   // inicializado" y la sincronización diferida lanza también TimeoutException.
   // Es idempotente: si ya está abierta, no hace nada.
   await localCacheDbInstance.init();
+  await OfflineDatabase.instance.init();
+  await OfflineOutboxService.instance.init();
+  ConnectionStatusService.instance.init();
   final themeSettings = ThemeSettings();
   await themeSettings.load();
   
@@ -87,8 +93,8 @@ Future<void> main() async {
         ChangeNotifierProvider.value(value: authState),
         ChangeNotifierProvider.value(value: themeSettings),
         ChangeNotifierProvider.value(value: licenciaService),
+        ChangeNotifierProvider.value(value: ConnectionStatusService.instance),
         Provider(create: (_) => RepositorioPedidos()),
-        Provider(create: (_) => CrmRepository()),
         Provider(create: (_) => EntitySearchRepository()),
       ],
       child: const AppLifecycleManager(
@@ -114,6 +120,16 @@ class PedidosVentaApp extends StatelessWidget {
       theme: AppTheme.light(), // Tema claro con los colores definidos en theme/app_theme.dart.
       darkTheme: AppTheme.dark(),
       themeMode: themeSettings.themeMode,
+      locale: const Locale('es', 'ES'),
+      supportedLocales: const [
+        Locale('es', 'ES'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      builder: (context, child) => ConnectivityBannerWrapper(child: child),
 
       // initialRoute: ¿qué pantalla se muestra al abrir la app? La "/".
       initialRoute: '/',
@@ -126,7 +142,6 @@ class PedidosVentaApp extends StatelessWidget {
         '/': (context) => _RootScreen(),
         '/home': (context) => const DashboardScreen(),
         '/pedidos': (context) => const PedidosListScreen(),
-        '/cmr': (context) => const AgendaCalendarScreen(),
 
         // Ruta de DETALLE: pedidoId se recibe como argumento.
         '/pedido': (context) =>
@@ -219,6 +234,11 @@ class _RootScreenState extends State<_RootScreen> {
         initialLicencia: licService.licencia ?? Licencia(),
         licenseService: licService,
         showBack: false,
+        onConfigured: (lic) {
+          if (mounted) {
+            setState(() {});
+          }
+        },
       );
     }
 

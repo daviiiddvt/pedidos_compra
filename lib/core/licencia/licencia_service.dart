@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
 import 'device_id_service.dart';
 import 'licencia.dart';
@@ -31,6 +32,13 @@ class LicenciaResult {
 class LicenciaService extends ChangeNotifier {
   static const String _storageKey = 'app_licencia_data_secure';
   static const Duration _timeout = Duration(seconds: 15);
+
+  /// Cliente HTTP con tolerancia a certificados intermedios no provistos por el servidor TLS.
+  static final http.Client _client = IOClient(
+    HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true,
+  );
+
   Licencia? _licencia;
 
   LicenciaService();
@@ -147,7 +155,7 @@ class LicenciaService extends ChangeNotifier {
     debugPrint('🔍 Validando licencia: $url');
 
     try {
-      final response = await http.get(
+      final response = await _client.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
       ).timeout(_timeout);
@@ -233,6 +241,12 @@ class LicenciaService extends ChangeNotifier {
       return const LicenciaResult(
         estado: LicenciaEstado.errorConexion,
         mensaje: 'Sin conexión con el servidor de licencias',
+      );
+    } on HandshakeException catch (e) {
+      debugPrint('⚠️ Error SSL/TLS al validar licencia: $e');
+      return LicenciaResult(
+        estado: LicenciaEstado.errorConexion,
+        mensaje: 'Error de certificado de seguridad SSL/TLS: $e',
       );
     } on TimeoutException catch (e) {
       debugPrint('⚠️ Timeout al validar licencia: $e');

@@ -11,5 +11,5 @@ void main() {
     final json = await api.get('VTA_PED_G', params: {'page[size]': '1'});
     // ignore: avoid_print
     print('PEDIDO: \n${jsonEncode(json)}');
-  });
+  }, skip: 'Requiere servidor Velneo real en vivo');
 }

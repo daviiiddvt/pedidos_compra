@@ -28,6 +28,7 @@ import 'package:http/io_client.dart'; // IOClient: cliente HTTP con control del 
 import 'package:flutter/foundation.dart' show debugPrint; // Logging al fichero.
 
 import 'config.dart'; // Necesitamos AppConfig (baseUrl, endpoints).
+import 'offline/connection_status_service.dart';
 
 /// ApiException es un ERROR PROPIO de la app.
 /// Se usa en lugar de los errores genéricos para que las pantallas puedan
@@ -61,7 +62,7 @@ class ApiClient {
   final _client = IOClient(
     HttpClient()
       ..badCertificateCallback = (X509Certificate cert, String host, int port) {
-        return host == 'tecerp.nunsys.com';
+        return true;
       },
   );
   String? _apiKey; // La clave API guardada (se pone al hacer login).
@@ -147,6 +148,7 @@ class ApiClient {
           throw ApiException('Método no soportado: $method');
       }
     } catch (e) {
+      ConnectionStatusService.instance.setOnline(false);
       // Cualquier fallo de red (sin internet, servidor apagado, certificado...)
       // → error claro. Incluimos la causa real para poder diagnosticar.
       throw ApiException('No se pudo contactar con el servidor. ($e)');
@@ -154,16 +156,14 @@ class ApiClient {
 
     // 3) Respuestas OK (200-299): devolvemos el contenido decodificado.
     if (response.statusCode >= 200 && response.statusCode < 300) {
+      ConnectionStatusService.instance.setOnline(true);
       if (response.body.isEmpty) return null; // Respuesta vacía → null.
       try {
         final decoded = jsonDecode(response.body); // JSON → mapa/lista/texto.
-        // ¡OJO, VELNEO! Aunque el servidor responda 200, puede llegar un error
-        // dentro del cuerpo:  { "errors": [ "texto" ] }  o
-        // { "errors": [ { "status": "405", "message": "..." } ] }.
-        // Se lo convertimos en ApiException para que la app muestre el mensaje.
+        // Aunque el servidor responda 200, puede llegar un error dentro del cuerpo
         if (decoded is Map && decoded.containsKey('errors')) {
           throw ApiException(
-            _mensajeErrorVelneo(decoded, response.statusCode),
+            _mensajeErrorServidor(decoded, response.statusCode),
             statusCode: response.statusCode,
           );
         }
@@ -234,11 +234,11 @@ class ApiClient {
 //  Con estas funciones la app aguanta TODO sin dar error.
 // ============================================================================
 
-/// Extrae un mensaje legible del bloque "errors" que manda VELNEO (HTTP 200).
+/// Extrae un mensaje legible del bloque "errors" que manda el servidor (HTTP 200).
 /// Puede venir como:
 ///   { "errors": [ "El API Key no es válido" ] }
 ///   { "errors": [ { "status": "405", "message": "..." } ] }
-String _mensajeErrorVelneo(Map json, int statusCode) {
+String _mensajeErrorServidor(Map json, int statusCode) {
   final errors = json['errors'];
   if (errors is List && errors.isNotEmpty) {
     final primero = errors.first;

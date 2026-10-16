@@ -4,8 +4,10 @@ import 'api_client.dart';
 import 'api_service.dart';
 import 'config.dart';
 import '../models/articulo.dart';
+import '../models/models.dart';
 import '../models/tarifa_articulo.dart';
 import '../models/movimiento.dart';
+import 'offline/offline_database.dart';
 
 class ArticulosService {
   static final _api = ApiClient.instance;
@@ -16,29 +18,50 @@ class ArticulosService {
   static Future<ResultadoLista<Articulo>> list({
     int page = 1,
     int pageSize = AppConfig.pageSize,
+    String? search,
   }) async {
-    final params = <String, dynamic>{
-      'page[number]': page,
-      'page[size]': pageSize,
-      'filter[baj]': 0,
-    };
+    final q = search?.trim() ?? '';
+    final Map<String, dynamic> params;
+    if (q.isNotEmpty) {
+      params = PedidosService.buildArticuloSearchParams(
+        q,
+        limit: pageSize,
+        page: page,
+      );
+    } else {
+      params = {
+        'page[number]': page,
+        'page[size]': pageSize,
+        'filter[baj]': 0,
+      };
+    }
 
-    final json = await _api.get(
-      AppConfig.endpoint('articulos'),
-      params: params,
-    );
+    try {
+      final json = await _api.get(
+        AppConfig.endpoint('articulos'),
+        params: params,
+      );
 
-    final items = payloadLista(json).map((r) => Articulo.fromJson(r)).toList();
-    final reportedTotal = payloadTotal(json);
-    final total = reportedTotal == items.length && items.length >= pageSize
-        ? 0
-        : reportedTotal;
+      final rawItems = payloadLista(json).map((r) => Articulo.fromJson(r)).toList();
+      final items = rawItems.where((art) => art.tieneFamilia).toList();
+      final reportedTotal = payloadTotal(json);
+      final total = reportedTotal == rawItems.length && rawItems.length >= pageSize
+          ? 0
+          : reportedTotal;
 
-    return ResultadoLista<Articulo>(
-      items: items,
-      total: total,
-      page: page,
-    );
+      return ResultadoLista<Articulo>(
+        items: items,
+        total: total,
+        page: page,
+      );
+    } catch (e) {
+      debugPrint('[ARTICULOS] Error al conectar con el servidor, leyendo de SQLite: $e');
+      return OfflineDatabase.instance.getArticulosOffline(
+        query: search,
+        page: page,
+        pageSize: pageSize,
+      );
+    }
   }
 
   static Future<Articulo?> getById(String id) async {
@@ -118,7 +141,7 @@ class ArticulosService {
         final rec = records.first;
         final name = rec.s('name').isNotEmpty
             ? rec.s('name')
-            : (rec.s('nom_fis').isNotEmpty ? rec.s('nom_fis') : rec.s('nombre'));
+            : (rec.s('name').isNotEmpty ? rec.s('name') : rec.s('nombre'));
         if (name.isNotEmpty) {
           _proveedorCache[cleanId] = name;
           return name;
@@ -128,6 +151,152 @@ class ArticulosService {
       debugPrint('[PROVEEDORES] Error al resolver proveedor $cleanId: $e');
     }
     return '';
+  }
+
+  static List<OpcionMaestra>? _familiasCache;
+  static List<OpcionMaestra>? _proveedoresCache;
+
+  /// Carga el maestro de familias desde `FAM_M`.
+  static Future<List<OpcionMaestra>> getFamilias({bool forceRefresh = false}) async {
+    if (!forceRefresh && _familiasCache != null && _familiasCache!.isNotEmpty) {
+      return _familiasCache!;
+    }
+    try {
+      final json = await _api.get(
+        AppConfig.endpoint('familias'),
+        params: {'page[size]': 500},
+      );
+      final records = payloadLista(json);
+      final list = records
+          .map((r) {
+            final id = r.s('id').isNotEmpty ? r.s('id') : r.s('codigo');
+            final name = r.s('name').isNotEmpty
+                ? r.s('name')
+                : (r.s('nombre').isNotEmpty ? r.s('nombre') : r.s('nom'));
+            if (id.isNotEmpty && name.isNotEmpty) {
+              _familiaCache[id] = name;
+            }
+            return OpcionMaestra(codigo: id, nombre: name.isNotEmpty ? name : id);
+          })
+          .where((f) => f.codigo.isNotEmpty && f.codigo != '0')
+          .toList();
+      _familiasCache = list;
+      return list;
+    } catch (e) {
+      debugPrint('[FAMILIAS] Error al obtener familias: $e');
+      return _familiasCache ?? [];
+    }
+  }
+
+  /// Carga el maestro de proveedores desde `ENT_M`.
+  static Future<List<OpcionMaestra>> getProveedores({bool forceRefresh = false}) async {
+    if (!forceRefresh && _proveedoresCache != null && _proveedoresCache!.isNotEmpty) {
+      return _proveedoresCache!;
+    }
+    try {
+      final json = await _api.get(
+        AppConfig.endpoint('proveedores'),
+        params: {'page[size]': 500, 'filter[es_prv]': 1},
+      );
+      var records = payloadLista(json);
+      if (records.isEmpty) {
+        final jsonAll = await _api.get(
+          AppConfig.endpoint('proveedores'),
+          params: {'page[size]': 200},
+        );
+        records = payloadLista(jsonAll);
+      }
+      final list = records
+          .map((r) {
+            final id = r.s('id').isNotEmpty ? r.s('id') : r.s('codigo');
+            final name = r.s('name').isNotEmpty
+                ? r.s('name')
+                : (r.s('nombre').isNotEmpty ? r.s('nombre') : r.s('nom'));
+            if (id.isNotEmpty && name.isNotEmpty) {
+              _proveedorCache[id] = name;
+            }
+            return OpcionMaestra(codigo: id, nombre: name.isNotEmpty ? name : id);
+          })
+          .where((p) => p.codigo.isNotEmpty && p.codigo != '0')
+          .toList();
+      _proveedoresCache = list;
+      return list;
+    } catch (e) {
+      debugPrint('[PROVEEDORES] Error al obtener proveedores: $e');
+      return _proveedoresCache ?? [];
+    }
+  }
+
+  /// Crea un nuevo artículo en `ART_M`.
+  ///
+  /// Es imprescindible que cuente con una familia asignada para que el artículo
+  /// sea visible en el catálogo y en las búsquedas con `filter[PARTS_BAJ]`.
+  static Future<Articulo> create({
+    required String nombre,
+    required String familiaId,
+    String referencia = '',
+    double precio = 0.0,
+    String codigoBarras = '',
+    String proveedorId = '',
+    String descripcion = '',
+  }) async {
+    final cleanFam = familiaId.trim();
+    if (cleanFam.isEmpty || cleanFam == '0') {
+      throw ApiException('El artículo debe tener una familia asignada obligatoriamente.');
+    }
+
+    final payload = <String, dynamic>{
+      'name': nombre.trim(),
+      'fam': int.tryParse(cleanFam) ?? cleanFam,
+      'fam_m': int.tryParse(cleanFam) ?? cleanFam,
+      'FAM_M': int.tryParse(cleanFam) ?? cleanFam,
+      if (referencia.trim().isNotEmpty) ...{
+        'ref': referencia.trim(),
+        'REF': referencia.trim(),
+      },
+      'pvp': precio,
+      'pre': precio,
+      if (codigoBarras.trim().isNotEmpty) ...{
+        'cod_bar': codigoBarras.trim(),
+        'COD_BAR': codigoBarras.trim(),
+      },
+      if (proveedorId.trim().isNotEmpty) ...{
+        'prv': int.tryParse(proveedorId) ?? proveedorId.trim(),
+        'PRV': int.tryParse(proveedorId) ?? proveedorId.trim(),
+      },
+      if (descripcion.trim().isNotEmpty) ...{
+        'dsc': descripcion.trim(),
+        'DSC': descripcion.trim(),
+      },
+      'emp': '1',
+      'emp_div': '1',
+      'baj': 0,
+    };
+
+    final json = await _api.post(
+      AppConfig.endpoint('articulos'),
+      body: payload,
+    );
+
+    final data = payloadData(json);
+    Articulo created;
+    if (data is Map) {
+      created = Articulo.fromJson(Map<String, dynamic>.from(data));
+    } else if (json is Map) {
+      created = Articulo.fromJson(Map<String, dynamic>.from(json));
+    } else {
+      throw ApiException('El servidor no devolvió los datos del artículo tras su creación.');
+    }
+
+    return created.copyWith(
+      id: created.id.isNotEmpty ? created.id : (created.codigo.isNotEmpty ? created.codigo : ''),
+      nombre: created.nombre.isNotEmpty ? created.nombre : nombre.trim(),
+      referencia: created.referencia.isNotEmpty ? created.referencia : referencia.trim(),
+      familiaId: created.familiaId.isNotEmpty ? created.familiaId : cleanFam,
+      precio: created.precio > 0 ? created.precio : precio,
+      codigoBarras: created.codigoBarras.isNotEmpty ? created.codigoBarras : codigoBarras.trim(),
+      proveedorId: created.proveedorId.isNotEmpty ? created.proveedorId : proveedorId.trim(),
+    );
   }
 
   static final Map<String, String> _tarifaCache = {};
@@ -191,6 +360,7 @@ class ArticulosService {
 
   static Future<ResultadoLista<Movimiento>> getMovimientosArticulo({
     required String articuloId,
+    String? clienteId,
     int page = 1,
     int pageSize = 50,
   }) async {
@@ -198,15 +368,22 @@ class ArticulosService {
       return ResultadoLista<Movimiento>(items: [], total: 0, page: page);
     }
     
+    final cleanClt = clienteId?.trim() ?? '';
+
     try {
+      final params = <String, dynamic>{
+        'filter[ART]': articuloId.trim(),
+        'sort': '-fch',
+        'page[number]': page,
+        'page[size]': pageSize,
+      };
+      if (cleanClt.isNotEmpty) {
+        params['filter[CLT_ENT]'] = cleanClt;
+      }
+
       final json = await _api.get(
         AppConfig.endpoint('movimientos'),
-        params: {
-          'filter[ART]': articuloId.trim(),
-          'sort': '-fch',
-          'page[number]': page,
-          'page[size]': pageSize,
-        },
+        params: params,
       );
       final rawList = payloadLista(json);
       
@@ -215,6 +392,11 @@ class ArticulosService {
 
       for (final r in rawList) {
         var m = Movimiento.fromJson(r);
+
+        // Si el movimiento no traía clienteId explícito, asignamos el consultado
+        if (m.clienteId.isEmpty && cleanClt.isNotEmpty) {
+          m = m.copyWith(clienteId: cleanClt);
+        }
 
         // Resolver el nombre del artículo si no viene incluido
         if (m.articuloId.isNotEmpty && (m.articuloNombre.isEmpty || m.articuloRef.isEmpty)) {
@@ -248,7 +430,27 @@ class ArticulosService {
         page: page,
       );
     } catch (e) {
-      debugPrint('[MOVIMIENTOS] Error al obtener movimientos del artículo $articuloId: $e');
+      debugPrint('[MOVIMIENTOS] Error o sin conexión al obtener movimientos del artículo $articuloId (cliente $cleanClt): $e');
+
+      // Fallback offline: buscar en la base de datos local
+      try {
+        final offlineMovs = await OfflineDatabase.instance.getMovimientosArticuloOffline(
+          articuloId.trim(),
+          clienteId: cleanClt.isNotEmpty ? cleanClt : null,
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
+        );
+        if (offlineMovs.isNotEmpty) {
+          return ResultadoLista<Movimiento>(
+            items: offlineMovs,
+            total: offlineMovs.length,
+            page: page,
+          );
+        }
+      } catch (dbErr) {
+        debugPrint('[MOVIMIENTOS] Error al consultar movimientos offline: $dbErr');
+      }
+
       return ResultadoLista<Movimiento>(items: [], total: 0, page: page);
     }
   }

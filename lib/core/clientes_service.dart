@@ -7,6 +7,7 @@ import 'articulos_service.dart';
 import '../models/models.dart';
 import '../models/articulo.dart';
 import '../models/movimiento.dart';
+import 'offline/offline_database.dart';
 
 class ClientesService {
   static final _api = ApiClient.instance;
@@ -26,22 +27,31 @@ class ClientesService {
       params['filter[cmr]'] = comercialId.trim();
     }
 
-    final json = await _api.get(
-      AppConfig.endpoint('clientes'),
-      params: params,
-    );
+    try {
+      final json = await _api.get(
+        AppConfig.endpoint('clientes'),
+        params: params,
+      );
 
-    final items = payloadLista(json).map((r) => Cliente.fromJson(r)).toList();
-    final reportedTotal = payloadTotal(json);
-    final total = reportedTotal == items.length && items.length >= pageSize
-        ? 0
-        : reportedTotal;
+      final items = payloadLista(json).map((r) => Cliente.fromJson(r)).toList();
+      final reportedTotal = payloadTotal(json);
+      final total = reportedTotal == items.length && items.length >= pageSize
+          ? 0
+          : reportedTotal;
 
-    return ResultadoLista<Cliente>(
-      items: items,
-      total: total,
-      page: page,
-    );
+      return ResultadoLista<Cliente>(
+        items: items,
+        total: total,
+        page: page,
+      );
+    } catch (e) {
+      debugPrint('[CLIENTES] Error al conectar con el servidor, leyendo de SQLite: $e');
+      return OfflineDatabase.instance.getClientesOffline(
+        comercialId: comercialId,
+        page: page,
+        pageSize: pageSize,
+      );
+    }
   }
 
   static Future<ResultadoLista<Movimiento>> getMovimientosCliente({
@@ -104,7 +114,7 @@ class ClientesService {
       );
     } catch (e) {
       debugPrint('[MOVIMIENTOS] Error al obtener movimientos del cliente $clienteId: $e');
-      return ResultadoLista<Movimiento>(items: [], total: 0, page: page);
+      rethrow;
     }
   }
 }

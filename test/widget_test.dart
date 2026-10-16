@@ -26,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart'; // El "marco" de tests de Flutt
 
 import 'package:pedidos_venta/core/api_client.dart';
 import 'package:pedidos_venta/core/api_service.dart';
+import 'package:pedidos_venta/core/articulos_service.dart';
 import 'package:pedidos_venta/core/config.dart';
 import 'package:pedidos_venta/core/formatters.dart'; // Las funciones que probamos.
 import 'package:pedidos_venta/core/master_cache_service.dart';
@@ -34,7 +35,9 @@ import 'package:pedidos_venta/core/licencia/licencia.dart';
 import 'package:pedidos_venta/core/licencia/licencia_service.dart';
 import 'package:pedidos_venta/models/articulo.dart';
 import 'package:pedidos_venta/models/models.dart';
+import 'package:pedidos_venta/models/movimiento.dart';
 import 'package:pedidos_venta/theme/app_theme.dart';
+import 'package:pedidos_venta/widgets/articulo_form_modal.dart';
 import 'package:pedidos_venta/widgets/campo_form.dart';
 
 void main() {
@@ -239,9 +242,9 @@ void main() {
   test('searchClientes genera una petición paginada y filtrada por cliente', () {
     final params = PedidosService.buildClienteSearchParams('alfa', limit: 25, page: 2);
     final records = [
-      {'id': '10', 'nom_fis': 'Alfa Distribuciones', 'ES_CLT': true},
-      {'id': '11', 'nom_fis': 'Beta S.L.', 'ES_CLT': true},
-      {'id': '12', 'nom_fis': 'Alfabeta', 'ES_CLT': false},
+      {'id': '10', 'name': 'Alfa Distribuciones', 'ES_CLT': true},
+      {'id': '11', 'name': 'Beta S.L.', 'ES_CLT': true},
+      {'id': '12', 'name': 'Alfabeta', 'ES_CLT': false},
     ];
 
     expect(params['page[size]'], 25);
@@ -250,7 +253,7 @@ void main() {
     expect(params['filter[TRO_ES_CLT]'], '"alfa"');
     // No se envían los filtros especulativos que el API ignora.
     expect(params.containsKey('search'), isFalse);
-    expect(params.containsKey('filter[nom_fis]'), isFalse);
+    expect(params.containsKey('filter[name]'), isFalse);
     expect(
       PedidosService.filterClienteRecords(records, 'alfa').map((r) => r['id']).toList(),
       ['10'],
@@ -422,6 +425,49 @@ void main() {
     expect(Articulo.fromJson({}).desactivado, isFalse);
   });
 
+  test('Articulo.tieneFamilia evalúa correctamente si el artículo tiene familia en FAM_M', () {
+    // Casos con familia (válidos)
+    expect(Articulo.fromJson({'FAM_M': 5}).tieneFamilia, isTrue);
+    expect(Articulo.fromJson({'FAM_M': '00200002'}).tieneFamilia, isTrue);
+    expect(Articulo.fromJson({'FAM_M': {'id': 10, 'name': 'Tornillos'}}).tieneFamilia, isTrue);
+    expect(Articulo.fromJson({'fam_m': '12'}).tieneFamilia, isTrue);
+    expect(Articulo.fromJson({'FAM': '7'}).tieneFamilia, isTrue);
+
+    // Casos sin familia (vacío, nulo, cero o false)
+    expect(Articulo.fromJson({'FAM_M': ''}).tieneFamilia, isFalse);
+    expect(Articulo.fromJson({'FAM_M': '0'}).tieneFamilia, isFalse);
+    expect(Articulo.fromJson({'FAM_M': 0}).tieneFamilia, isFalse);
+    expect(Articulo.fromJson({'FAM_M': null}).tieneFamilia, isFalse);
+    expect(Articulo.fromJson({'FAM_M': false}).tieneFamilia, isFalse);
+    expect(Articulo.fromJson({'FAM_M': {'id': ''}}).tieneFamilia, isFalse);
+    expect(Articulo.fromJson({}).tieneFamilia, isFalse);
+  });
+
+  test('Búsqueda de artículos excluye artículos sin familia asignada', () {
+    final articulos = [
+      const Articulo(id: '1', nombre: 'Martillo con familia', familiaId: '10'),
+      const Articulo(id: '2', nombre: 'Martillo sin familia', familiaId: ''),
+      const Articulo(id: '3', nombre: 'Martillo con familia cero', familiaId: '0'),
+      const Articulo(id: '4', nombre: 'Destornillador con familia', familiaId: '15'),
+    ];
+
+    List<Articulo> buscar(String query) {
+      final q = removeDiacritics(query.trim().toLowerCase());
+      return articulos.where((art) {
+        if (!art.tieneFamilia) return false;
+        if (q.isEmpty) return true;
+        return removeDiacritics(art.nombre.toLowerCase()).contains(q);
+      }).toList();
+    }
+
+    final resultadosMartillo = buscar('martillo');
+    expect(resultadosMartillo.length, 1);
+    expect(resultadosMartillo.first.id, '1');
+
+    final todosConFamilia = buscar('');
+    expect(todosConFamilia.map((a) => a.id).toList(), ['1', '4']);
+  });
+
   test('AppConfig tiene configurado el endpoint descuentosPorFamilia apuntando a DTO_POR_FAM', () {
     expect(AppConfig.endpoint('descuentosPorFamilia'), 'DTO_POR_FAM');
   });
@@ -578,5 +624,139 @@ void main() {
     expect(AppConfig.serverInstance, 'MI_INSTANCIA');
     expect(AppConfig.serverVersion, 'v2');
     expect(AppConfig.baseUrl, 'https://custom.server.es:8080/MI_INSTANCIA/TecERPv7_dat_dat/v2');
+  });
+
+  // ------ Tests de Búsqueda de Artículos y Filtro de Familia ------
+  test('PedidosService.buildArticuloSearchParams construye filter[PARTS_BAJ] con comillas', () {
+    final params = PedidosService.buildArticuloSearchParams('tornillo');
+    expect(params['page[size]'], 25);
+    expect(params['page[number]'], 1);
+    expect(params['filter[PARTS_BAJ]'], '"tornillo"');
+
+    final paramsCustom = PedidosService.buildArticuloSearchParams(
+      '"arandela"',
+      limit: 50,
+      page: 2,
+    );
+    expect(paramsCustom['page[size]'], 50);
+    expect(paramsCustom['page[number]'], 2);
+    expect(paramsCustom['filter[PARTS_BAJ]'], '"arandela"');
+  });
+
+  test('Articulo.tieneFamilia verifica que familiaId sea válida y no vacía', () {
+    final conFam = Articulo.fromJson({
+      'id': '1',
+      'name': 'Tornillo M6',
+      'FAM_M': '10',
+    });
+    expect(conFam.tieneFamilia, isTrue);
+
+    final sinFamVacia = Articulo.fromJson({
+      'id': '2',
+      'name': 'Arandela',
+      'FAM_M': '',
+    });
+    expect(sinFamVacia.tieneFamilia, isFalse);
+
+    final sinFamCero = Articulo.fromJson({
+      'id': '3',
+      'name': 'Tuerca',
+      'FAM_M': '0',
+    });
+    expect(sinFamCero.tieneFamilia, isFalse);
+
+    final sinFamNula = Articulo.fromJson({
+      'id': '4',
+      'name': 'Perno',
+      'FAM_M': null,
+    });
+    expect(sinFamNula.tieneFamilia, isFalse);
+  });
+
+  test('ArticulosService.create rechaza crear artículos sin familia asignada', () async {
+    expect(
+      () => ArticulosService.create(nombre: 'Artículo test', familiaId: ''),
+      throwsA(isA<ApiException>()),
+    );
+    expect(
+      () => ArticulosService.create(nombre: 'Artículo test', familiaId: '0'),
+      throwsA(isA<ApiException>()),
+    );
+  });
+
+  testWidgets('mostrarCrearArticuloModal se renderiza con campos y validación', (tester) async {
+    tester.view.physicalSize = const Size(1024, 1024);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Builder(
+          builder: (ctx) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => mostrarCrearArticuloModal(ctx, initialSearch: 'Tornillo test'),
+                child: const Text('Abrir Modal'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Tocamos para abrir el modal
+    await tester.tap(find.text('Abrir Modal'));
+    await tester.pumpAndSettle();
+
+    // Verificamos que se muestre el título y los campos principales
+    expect(find.text('Nuevo Artículo'), findsOneWidget);
+    expect(find.text('Tornillo test'), findsOneWidget);
+    expect(find.text('Crear Artículo'), findsOneWidget);
+    expect(find.text('Cancelar'), findsOneWidget);
+
+    // Si pulsamos Crear Artículo sin haber seleccionado familia, muestra error
+    await tester.ensureVisible(find.text('Crear Artículo'));
+    await tester.tap(find.text('Crear Artículo'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Debe seleccionar una familia obligatoriamente'), findsOneWidget);
+
+    // Cancelar cierra el modal
+    await tester.ensureVisible(find.text('Cancelar'));
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nuevo Artículo'), findsNothing);
+  });
+
+  test('Movimiento serializa a JSON y deserializa correctamente', () {
+    const mov = Movimiento(
+      articuloId: 'ART01',
+      articuloRef: 'REF01',
+      articuloNombre: 'Artículo Uno',
+      clienteId: 'CLT99',
+      fecha: '2026-10-15',
+      entrada: 10.0,
+      salida: 2.0,
+      precio: 15.5,
+      numDoc: 'PED-001',
+    );
+
+    final json = mov.toJson();
+    final reconstructed = Movimiento.fromJson(json);
+
+    expect(reconstructed.articuloId, 'ART01');
+    expect(reconstructed.articuloRef, 'REF01');
+    expect(reconstructed.articuloNombre, 'Artículo Uno');
+    expect(reconstructed.clienteId, 'CLT99');
+    expect(reconstructed.fecha, '2026-10-15');
+    expect(reconstructed.entrada, 10.0);
+    expect(reconstructed.salida, 2.0);
+    expect(reconstructed.precio, 15.5);
+    expect(reconstructed.numDoc, 'PED-001');
   });
 }

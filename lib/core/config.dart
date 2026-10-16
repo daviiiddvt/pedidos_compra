@@ -125,9 +125,6 @@ class AppConfig {
     'almacenes': 'ALM_M', // Lista de almacenes.
     'series': 'SER_M', // Numeración de documentos.
     'formasPago': 'FPG_M', // Formas de pago aceptadas.
-    'agenda': 'CRM_AGE', // Visitas de agenda CRM.
-    'campanas': 'CRM_CAM_COM', // Campañas comerciales CRM.
-    'tiposVisita': 'TIP_VIS', // Tipos de visita CRM.
     'zonasTecnicas': 'ZN_TCN', // Zonas técnicas
     'zonasComerciales':
         'ZN_TCN_CMR', // Tabla intermedia zonas-comercial

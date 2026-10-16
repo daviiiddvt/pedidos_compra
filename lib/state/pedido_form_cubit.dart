@@ -78,9 +78,14 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
 
     // Almacén central fijo: siempre el código '1' o '001', con su nombre real de inmediato
     final cache = MasterCacheService();
-    final listaAlmacenes = almacenes.isNotEmpty
+    var listaAlmacenes = almacenes.isNotEmpty
         ? almacenes
         : (cache.getSync<List<OpcionMaestra>>('almacenes') ?? const []);
+    if (listaAlmacenes.isEmpty) {
+      try {
+        listaAlmacenes = await PedidosService.getAlmacenes();
+      } catch (_) {}
+    }
 
     final almacenOpcion = _opcionPorCodigo(listaAlmacenes, '1') ??
         _opcionPorCodigo(listaAlmacenes, '001') ??
@@ -116,23 +121,35 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
       final defaults = resultados[0] as Map<String, dynamic>;
       final direcciones = resultados[1] as List<OpcionMaestra>;
 
-      debugPrint('[selectCliente] Defaults de Velneo recibidos → $defaults');
+      debugPrint('[selectCliente] Defaults recibidos → $defaults');
       var pedido = state.pedido;
 
       // ── Mapeo explícito de campos del cliente al Pedido ────────────────
       // Forma de pago: la del cliente. Traducimos el código numérico a su
       // nombre descriptivo buscándolo en la lista de formas de pago.
       final cache = MasterCacheService();
-      final listaFormasPago = formasPago.isNotEmpty
+      var listaFormasPago = formasPago.isNotEmpty
           ? formasPago
           : (cache.getSync<List<OpcionMaestra>>('formas_pago') ?? const []);
-      final listaSeries = series.isNotEmpty
+      if (listaFormasPago.isEmpty) {
+        try {
+          listaFormasPago = await PedidosService.getFormasPago();
+        } catch (_) {}
+      }
+
+      var listaSeries = series.isNotEmpty
           ? series
           : (cache.getSync<List<OpcionMaestra>>('series') ?? const []);
+      if (listaSeries.isEmpty) {
+        try {
+          listaSeries = await PedidosService.getSeries();
+        } catch (_) {}
+      }
 
       final formaPagoDefault = defaults['formaPago'];
       if (formaPagoDefault is String && formaPagoDefault.isNotEmpty) {
         final opcion = _opcionPorCodigo(listaFormasPago, formaPagoDefault) ??
+            PedidosService.findMatchingOption(listaFormasPago, formaPagoDefault) ??
             OpcionMaestra(codigo: formaPagoDefault, nombre: formaPagoDefault);
         pedido = pedido.copyWith(
           formaPago: opcion.codigo,
@@ -147,6 +164,7 @@ class PedidoFormCubit extends Cubit<PedidoFormState> {
       final serieDefault = defaults['serie'];
       if (serieDefault is String && serieDefault.isNotEmpty) {
         final opcion = _opcionPorCodigo(listaSeries, serieDefault) ??
+            PedidosService.findMatchingOption(listaSeries, serieDefault) ??
             OpcionMaestra(codigo: serieDefault, nombre: serieDefault);
         pedido = pedido.copyWith(
           serie: opcion.codigo,
