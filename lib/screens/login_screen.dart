@@ -175,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(18),
                     ),
                     child: const Text(
-                      'TecAPP',
+                      'TecERP',
                       style: TextStyle(
                         color: AppColors.white,
                         fontSize: 26,
@@ -187,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // ---- Título ----
                   Text(
-                    'Pedidos de Venta',
+                    'TecERP',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,

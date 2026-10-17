@@ -1,4 +1,4 @@
-package com.velneo.pedidos_compra
+package com.velneo.TecERP
 
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity

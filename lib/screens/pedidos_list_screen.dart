@@ -338,8 +338,8 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
               segments: const [
                 ButtonSegment<bool>(
                   value: false,
-                  label: Text('Mis clientes asignados'),
-                  icon: Icon(Icons.person),
+                  label: Text('Mis clientes'),
+                  icon: Icon(Icons.person_2),
                 ),
                 ButtonSegment<bool>(
                   value: true,
@@ -368,7 +368,7 @@ class _PedidosListScreenState extends State<PedidosListScreen> {
             child: Row(
               children: [
                 _buildFiltroChip(
-                  label: 'Todos',
+                  label: 'TODOS',
                   estado: '',
                   selected: _filtroEstado.isEmpty,
                   onSelected: () => _cambiarFiltro(''),

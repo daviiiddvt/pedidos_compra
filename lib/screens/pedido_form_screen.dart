@@ -103,7 +103,20 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
         _fotoBytes = base64Decode(initial.fotoBase64);
       }
       _cargandoDetalle = false;
-        _cubit.init(initial);
+      _cubit.init(initial);
+      if (initial.conKyr) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Un pedido confirmado no puede editarse.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            Navigator.of(context).pop();
+          }
+        });
+      }
     } else {
       _cubit = PedidoFormCubit(Pedido(fecha: todayIso()));
       if (_editando) {
@@ -126,6 +139,16 @@ class _PedidoFormScreenState extends State<PedidoFormScreen> {
     try {
       final detalle = await PedidosService.getById(widget.pedidoId);
       if (!mounted) return;
+      if (detalle.conKyr) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Un pedido confirmado no puede editarse.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        Navigator.of(context).pop();
+        return;
+      }
       _cubit.init(detalle);
       setState(() {
         _lineas = [...detalle.lineas]; // Copiamos las líneas.

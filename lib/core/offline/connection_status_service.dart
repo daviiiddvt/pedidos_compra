@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../state/auth_state.dart';
 import '../api_client.dart';
 import '../config.dart';
+import '../licencia/licencia_service.dart';
 import 'offline_outbox_service.dart';
 
 /// Servicio singleton que monitoriza el estado de conexión al servidor
@@ -47,9 +50,10 @@ class ConnectionStatusService extends ChangeNotifier {
     try {
       final host = AppConfig.serverHost.trim();
       final apiKey = AppConfig.apiKey.trim();
+      // Si la app aún no tiene host o API key configurada (ej: instalación nueva o sin login),
+      // no debemos intentar ping a las tablas ni forzar modo offline.
       if (host.isEmpty || apiKey.isEmpty) {
-        setOnline(false);
-        return false;
+        return _isOnline;
       }
 
       await ApiClient.instance
@@ -76,8 +80,11 @@ class ConnectionStatusService extends ChangeNotifier {
   }
 }
 
-/// Widget que envuelve todas las pantallas de la aplicación para mostrar
-/// el banner "Modo: Sin conexión" en la parte superior cuando no hay conexión.
+/// Widget que envuelve las pantallas de la aplicación para mostrar
+/// el banner "Modo: Sin conexión" en la parte superior cuando se pierde la conexión.
+///
+/// Solo se muestra cuando existe una sesión activa y validada, evitando falsos positivos
+/// durante la primera instalación o configuración de licencia y login.
 class ConnectivityBannerWrapper extends StatelessWidget {
   final Widget? child;
 
@@ -85,36 +92,52 @@ class ConnectivityBannerWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final licService = context.watch<LicenciaService?>();
+    final authState = context.watch<AuthState?>();
+    final bool isSessionActive =
+        (licService?.isValida ?? false) && (authState?.connected ?? false);
+
     return AnimatedBuilder(
       animation: ConnectionStatusService.instance,
       builder: (context, _) {
         final isOnline = ConnectionStatusService.instance.isOnline;
+        final shouldShowBanner = isSessionActive && !isOnline;
+
+        Widget content = child ?? const SizedBox.shrink();
+        if (shouldShowBanner) {
+          content = MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            child: content,
+          );
+        }
+
         return Column(
           children: [
-            if (!isOnline)
+            if (shouldShowBanner)
               Material(
                 color: Colors.amber.shade900,
-                elevation: 4,
+                elevation: 2,
                 child: SafeArea(
                   bottom: false,
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.wifi_off,
-                          size: 16,
+                          size: 14,
                           color: Colors.white,
                         ),
-                        SizedBox(width: 8),
+                        SizedBox(width: 6),
                         Text(
                           'Modo: Sin conexión',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                            fontSize: 12,
                             decoration: TextDecoration.none,
                           ),
                         ),
@@ -123,11 +146,10 @@ class ConnectivityBannerWrapper extends StatelessWidget {
                   ),
                 ),
               ),
-            Expanded(child: child ?? const SizedBox.shrink()),
+            Expanded(child: content),
           ],
         );
       },
     );
   }
 }
-

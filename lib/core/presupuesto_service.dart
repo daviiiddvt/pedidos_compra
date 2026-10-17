@@ -6,6 +6,7 @@ import 'api_service.dart';
 import 'master_cache_service.dart';
 import '../models/models.dart';
 import 'offline/offline_database.dart';
+import 'offline/connection_status_service.dart';
 
 /// API operations for sales budgets. Budgets use the same document models and
 /// line payloads as orders, but are stored in their own Velneo tables.
@@ -80,42 +81,158 @@ class PresupuestosService {
     }
   }
 
-  /// Enriquece los presupuestos con el nombre del cliente desde memoria/SQLite
-  static Future<List<PresupuestoVenta>> enrichPresupuestosWithClientNames(
+  /// Enriquece los presupuestos con cliente, comercial, serie, almacén y forma de pago.
+  static Future<List<PresupuestoVenta>> enrichPresupuestosWithMasterData(
       List<PresupuestoVenta> presupuestos) async {
     if (presupuestos.isEmpty) return presupuestos;
 
-    final missingIds = <int>{};
+    final missingClientIds = <int>{};
+    final missingComercialIds = <String>{};
+    final missingSeries = <String>{};
+    final missingAlmacenes = <String>{};
+    final missingFpg = <String>{};
+
     for (final p in presupuestos) {
       final cid = p.clienteId > 0 ? p.clienteId : (int.tryParse(p.cliente.trim()) ?? 0);
       final nom = p.clienteNombre.trim();
       final esNumero = int.tryParse(nom) != null;
-      final necesitaMapeo = nom.isEmpty || nom == p.cliente.trim() || esNumero;
-      if (necesitaMapeo && cid > 0) {
-        missingIds.add(cid);
+      if ((nom.isEmpty || nom == p.cliente.trim() || esNumero) && cid > 0) {
+        missingClientIds.add(cid);
+      }
+      final cmrNom = p.comercialNombre.trim();
+      final cmrVal = p.comercial.trim();
+      if ((cmrNom.isEmpty || cmrNom == cmrVal) && cmrVal.isNotEmpty) {
+        missingComercialIds.add(cmrVal);
+      }
+      final serNom = p.serieNombre.trim();
+      final serVal = p.serie.trim();
+      if ((serNom.isEmpty || serNom == serVal) && serVal.isNotEmpty) {
+        missingSeries.add(serVal);
+      }
+      final almNom = p.almacenNombre.trim();
+      final almVal = p.almacen.trim();
+      if ((almNom.isEmpty || almNom == almVal) && almVal.isNotEmpty) {
+        missingAlmacenes.add(almVal);
+      }
+      final fpgNom = p.formaPagoNombre.trim();
+      final fpgVal = p.formaPago.trim();
+      if ((fpgNom.isEmpty || fpgNom == fpgVal) && fpgVal.isNotEmpty) {
+        missingFpg.add(fpgVal);
       }
     }
 
-    if (missingIds.isEmpty) return presupuestos;
+    final clientesMap = missingClientIds.isNotEmpty 
+        ? await PedidosService.getClientesMapByIds(missingClientIds.toList()) 
+        : <int, Cliente>{};
 
-    final map = await PedidosService.getClientesMapByIds(missingIds.toList());
+    final comercialesMap = <String, String>{};
+    for (final cmrId in missingComercialIds) {
+      final nom = await PedidosService.getContactName(cmrId);
+      if (nom.isNotEmpty && nom != cmrId) {
+        comercialesMap[cmrId] = nom;
+      }
+    }
+
+    // Series map
+    final seriesMap = <String, String>{};
+    if (missingSeries.isNotEmpty) {
+      try {
+        final seriesList = await MasterCacheService().getOrLoad(
+          key: 'series',
+          loader: PedidosService.getSeries,
+        );
+        for (final s in seriesList) {
+          seriesMap[s.codigo] = s.nombre;
+        }
+      } catch (_) {}
+      for (final sCod in missingSeries) {
+        if (!seriesMap.containsKey(sCod)) {
+          final nom = await OfflineDatabase.instance.getNombreMaestroOffline('SER_M', sCod);
+          if (nom.isNotEmpty) seriesMap[sCod] = nom;
+        }
+      }
+    }
+
+    // Almacenes map
+    final almacenesMap = <String, String>{};
+    if (missingAlmacenes.isNotEmpty) {
+      try {
+        final almacenesList = await MasterCacheService().getOrLoad(
+          key: 'almacenes',
+          loader: PedidosService.getAlmacenes,
+        );
+        for (final a in almacenesList) {
+          almacenesMap[a.codigo] = a.nombre;
+        }
+      } catch (_) {}
+      for (final aCod in missingAlmacenes) {
+        if (!almacenesMap.containsKey(aCod)) {
+          final nom = await OfflineDatabase.instance.getNombreMaestroOffline('ALM_M', aCod);
+          if (nom.isNotEmpty) almacenesMap[aCod] = nom;
+        }
+      }
+    }
+
+    // Formas de pago map
+    final fpgMap = <String, String>{};
+    if (missingFpg.isNotEmpty) {
+      try {
+        final fpgList = await MasterCacheService().getOrLoad(
+          key: 'formas_pago',
+          loader: PedidosService.getFormasPago,
+        );
+        for (final f in fpgList) {
+          fpgMap[f.codigo] = f.nombre;
+        }
+      } catch (_) {}
+      for (final fCod in missingFpg) {
+        if (!fpgMap.containsKey(fCod)) {
+          final nom = await OfflineDatabase.instance.getNombreMaestroOffline('FPG_M', fCod);
+          if (nom.isNotEmpty) fpgMap[fCod] = nom;
+        }
+      }
+    }
 
     return presupuestos.map((p) {
+      var item = p;
       final cid = p.clienteId > 0 ? p.clienteId : (int.tryParse(p.cliente.trim()) ?? 0);
       final nom = p.clienteNombre.trim();
       final esNumero = int.tryParse(nom) != null;
-      if (nom.isNotEmpty && nom != p.cliente.trim() && !esNumero) return p;
-
-      final c = map[cid];
-      if (c != null && c.nombreComercial.isNotEmpty) {
-        return p.copyWith(
-          clienteId: cid,
-          clienteNombre: c.nombreComercial,
-        );
+      if (nom.isEmpty || nom == p.cliente.trim() || esNumero) {
+        final c = clientesMap[cid];
+        if (c != null && c.nombreComercial.isNotEmpty) {
+          item = item.copyWith(
+            clienteId: cid,
+            clienteNombre: c.nombreComercial,
+          );
+        }
       }
-      return p;
+
+      final cmrTrim = item.comercial.trim();
+      if ((item.comercialNombre.trim().isEmpty || item.comercialNombre.trim() == cmrTrim) && comercialesMap.containsKey(cmrTrim)) {
+        item = item.copyWith(comercialNombre: comercialesMap[cmrTrim]!);
+      }
+      final serTrim = item.serie.trim();
+      if ((item.serieNombre.trim().isEmpty || item.serieNombre.trim() == serTrim) && seriesMap.containsKey(serTrim)) {
+        item = item.copyWith(serieNombre: seriesMap[serTrim]!);
+      }
+      final almTrim = item.almacen.trim();
+      if ((item.almacenNombre.trim().isEmpty || item.almacenNombre.trim() == almTrim) && almacenesMap.containsKey(almTrim)) {
+        item = item.copyWith(almacenNombre: almacenesMap[almTrim]!);
+      }
+      final fpgTrim = item.formaPago.trim();
+      if ((item.formaPagoNombre.trim().isEmpty || item.formaPagoNombre.trim() == fpgTrim) && fpgMap.containsKey(fpgTrim)) {
+        item = item.copyWith(formaPagoNombre: fpgMap[fpgTrim]!);
+      }
+
+      return item;
     }).toList();
   }
+
+  /// Enriquece los presupuestos con el nombre del cliente desde memoria/SQLite
+  static Future<List<PresupuestoVenta>> enrichPresupuestosWithClientNames(
+      List<PresupuestoVenta> presupuestos) =>
+      enrichPresupuestosWithMasterData(presupuestos);
 
   static Future<List<PresupuestoVenta>> listAll({String? comercial}) async {
     final all = <PresupuestoVenta>[];
@@ -186,7 +303,8 @@ class PresupuestosService {
         orElse: () => throw ApiException('Presupuesto no encontrado localmente ($e)'),
       );
       final lineas = await getLineasPresupuesto(id);
-      return found.copyWith(lineas: lineas);
+      final enriched = await enrichPresupuestosWithMasterData([found.copyWith(lineas: lineas)]);
+      return enriched.first;
     }
   }
 
@@ -262,10 +380,34 @@ class PresupuestosService {
     }
   }
 
-  static Future<void> marcarAceptado(dynamic budgetId) async {
+  static Future<void> marcarAceptado(dynamic budgetId, {bool isSync = false}) async {
     if (budgetId == null) return;
-    await _api.post('${AppConfig.endpoint('presupuestos')}/$budgetId', body: {'est': 'A'});
-    await _marcarLineasAceptadas(budgetId);
+    final isOfflineId = (budgetId is num && budgetId < 0) || (int.tryParse('$budgetId') != null && int.parse('$budgetId') < 0);
+    final isOffline = isOfflineId || !ConnectionStatusService.instance.isOnline;
+
+    if (isOffline && !isSync) {
+      await OfflineDatabase.instance.marcarPresupuestoAceptadoOffline(
+        budgetId,
+        queueOutbox: !isOfflineId,
+      );
+      return;
+    }
+
+    try {
+      await _api.post('${AppConfig.endpoint('presupuestos')}/$budgetId', body: {'est': 'A'});
+      await _marcarLineasAceptadas(budgetId);
+      await OfflineDatabase.instance.marcarPresupuestoAceptadoOffline(
+        budgetId,
+        queueOutbox: false,
+      );
+    } catch (e) {
+      if (isSync) rethrow;
+      debugPrint('[PRESUPUESTOS] Error o sin conexión en marcarAceptado: $e, guardando offline');
+      await OfflineDatabase.instance.marcarPresupuestoAceptadoOffline(
+        budgetId,
+        queueOutbox: !isOfflineId,
+      );
+    }
   }
 
   static Future<void> _marcarLineasAceptadas(dynamic budgetId) async {
@@ -292,8 +434,17 @@ class PresupuestosService {
     }
   }
 
-  static Future<void> linkPedido(dynamic budgetId, dynamic pedidoId) async {
+  static Future<void> linkPedido(dynamic budgetId, dynamic pedidoId, {bool isSync = false}) async {
     if (budgetId == null || pedidoId == null) return;
+    final isOfflineId = (budgetId is num && budgetId < 0) || (int.tryParse('$budgetId') != null && int.parse('$budgetId') < 0);
+    final isPedidoOfflineId = (pedidoId is num && pedidoId < 0) || (int.tryParse('$pedidoId') != null && int.parse('$pedidoId') < 0);
+    final isOffline = isOfflineId || isPedidoOfflineId || !ConnectionStatusService.instance.isOnline;
+
+    if (isOffline && !isSync) {
+      await OfflineDatabase.instance.linkPedidoPresupuestoOffline(budgetId, pedidoId);
+      return;
+    }
+
     try {
       // 1. Actualizamos cabecera del presupuesto
       await _api.post(
@@ -303,10 +454,13 @@ class PresupuestosService {
           'vta_ped_g': pedidoId,
         },
       );
-      // 2. Actualizamos las lÃ­neas a Aceptado
+      // 2. Actualizamos las líneas a Aceptado
       await _marcarLineasAceptadas(budgetId);
+      await OfflineDatabase.instance.linkPedidoPresupuestoOffline(budgetId, pedidoId);
     } catch (e) {
-      debugPrint('Error enlazando presupuesto a pedido: $e');
+      if (isSync) rethrow;
+      debugPrint('[PRESUPUESTOS] Error o sin conexión en linkPedido: $e, actualizando offline');
+      await OfflineDatabase.instance.linkPedidoPresupuestoOffline(budgetId, pedidoId);
     }
   }
 

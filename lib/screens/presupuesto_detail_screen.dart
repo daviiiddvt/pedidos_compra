@@ -11,6 +11,9 @@ import '../widgets/estado_badge.dart';
 import '../widgets/lineas_table.dart';
 import '../widgets/segment_tabs.dart';
 import '../widgets/totales_card.dart';
+import '../core/offline/connection_status_service.dart';
+import '../core/offline/offline_database.dart';
+import '../core/offline/offline_outbox_service.dart';
 
 class PresupuestoDetailScreen extends StatefulWidget {
   final dynamic presupuestoId;
@@ -57,6 +60,57 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('$error')));
     }
+  }
+
+  Future<void> _convertirAPedidoOffline({
+    required PresupuestoVenta presupuesto,
+    required Pedido pedidoVisual,
+    required ScaffoldMessengerState messenger,
+    required NavigatorState navigator,
+  }) async {
+    final tempPedidoId = -(DateTime.now().millisecondsSinceEpoch % 1000000000);
+    final nuevoPedidoOffline = pedidoVisual.copyWith(
+      id: tempPedidoId,
+      codigo: tempPedidoId,
+      nDocumento: 0,
+      numeroPedido: 'OFFLINE-${tempPedidoId.abs()}',
+      numeroPresupuesto: presupuesto.numeroPresupuesto.isNotEmpty
+          ? presupuesto.numeroPresupuesto
+          : '${presupuesto.id}',
+      fecha: todayIso(),
+      estado: 'P',
+      lineas: pedidoVisual.lineas
+          .map((l) => l.copyWith(id: null))
+          .toList(),
+    );
+
+    // 1. Guardar nuevo pedido en SQLite y cola Outbox
+    await OfflineDatabase.instance.savePedidoOfflineOutbox(
+      pedido: nuevoPedidoOffline,
+      accion: 'crear',
+    );
+
+    // 2. Enlazar presupuesto con el pedido y marcar aceptado en SQLite
+    await OfflineDatabase.instance.linkPedidoPresupuestoOffline(
+      presupuesto.id,
+      tempPedidoId,
+    );
+    await PresupuestosService.marcarAceptado(presupuesto.id);
+    await OfflineOutboxService.instance.refreshPendingCount();
+
+    if (!mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Presupuesto aceptado. Pedido creado y pendiente de subir.'),
+      ),
+    );
+    _cargar();
+
+    await navigator.pushNamed(
+      '/pedido/form',
+      arguments: nuevoPedidoOffline,
+    );
+    if (mounted) _cargar();
   }
 
   @override
@@ -198,31 +252,61 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                                     final messenger = ScaffoldMessenger.of(context);
                                     final navigator = Navigator.of(context);
 
-                                    // Marcamos el presupuesto como aceptado en Velneo
-                                    await PresupuestosService.marcarAceptado(
-                                      presupuesto.id,
-                                    );
-                                    if (!mounted) return;
-                                    messenger.showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Presupuesto aceptado'),
-                                      ),
-                                    );
-                                    _cargar();
+                                    try {
+                                      final isOnline = ConnectionStatusService.instance.isOnline;
+                                      if (!isOnline) {
+                                        await _convertirAPedidoOffline(
+                                          presupuesto: presupuesto,
+                                          pedidoVisual: pedidoVisual,
+                                          messenger: messenger,
+                                          navigator: navigator,
+                                        );
+                                      } else {
+                                        try {
+                                          await PresupuestosService.marcarAceptado(
+                                            presupuesto.id,
+                                          );
+                                          if (!mounted) return;
+                                          messenger.showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Presupuesto aceptado'),
+                                            ),
+                                          );
+                                          _cargar();
 
-                                    await navigator.pushNamed(
-                                      '/pedido/form',
-                                      arguments: pedidoVisual.copyWith(
-                                        fecha: todayIso(),
-                                        codigo: 0,
-                                        numeroPedido: '',
-                                        estado: 'P',
-                                        lineas: pedidoVisual.lineas
-                                            .map((l) => l.copyWith(id: null))
-                                            .toList(),
-                                      ),
-                                    );
-                                    if (mounted) _cargar();
+                                          await navigator.pushNamed(
+                                            '/pedido/form',
+                                            arguments: pedidoVisual.copyWith(
+                                              fecha: todayIso(),
+                                              codigo: 0,
+                                              numeroPedido: '',
+                                              estado: 'P',
+                                              lineas: pedidoVisual.lineas
+                                                  .map((l) => l.copyWith(id: null))
+                                                  .toList(),
+                                            ),
+                                          );
+                                          if (mounted) _cargar();
+                                        } catch (e) {
+                                          // Si falla la conexión online, recurrir al flujo offline
+                                          debugPrint('Fallo online en A Pedido, usando fallback offline: $e');
+                                          await _convertirAPedidoOffline(
+                                            presupuesto: presupuesto,
+                                            pedidoVisual: pedidoVisual,
+                                            messenger: messenger,
+                                            navigator: navigator,
+                                          );
+                                        }
+                                      }
+                                    } catch (e) {
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text('Error al procesar presupuesto: $e'),
+                                          backgroundColor: AppColors.error,
+                                        ),
+                                      );
+                                    }
                                   },
                                   icon: const Icon(Icons.shopping_cart_checkout),
                                   label: Text(

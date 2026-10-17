@@ -7,9 +7,11 @@ import 'package:provider/provider.dart';
 import '../core/config.dart';
 import '../core/formatters.dart';
 import '../core/licencia/licencia_service.dart';
+import '../core/offline/connection_status_service.dart';
 import '../core/offline/offline_database.dart';
 import '../core/offline/offline_outbox_service.dart';
 import '../core/offline/offline_sync_service.dart';
+import '../core/update/update_service.dart';
 import '../state/theme_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -21,11 +23,33 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   int _syncDays = 30;
+  String _appVersion = 'Cargando...';
+  bool _buscandoActualizacion = false;
 
   @override
   void initState() {
     super.initState();
     _cargarConfiguracionOffline();
+    _cargarVersionApp();
+  }
+
+  Future<void> _cargarVersionApp() async {
+    final v = await UpdateService.instance.getCurrentVersion();
+    if (mounted) {
+      setState(() => _appVersion = v);
+    }
+  }
+
+  Future<void> _buscarActualizaciones() async {
+    if (_buscandoActualizacion) return;
+    setState(() => _buscandoActualizacion = true);
+    try {
+      await UpdateService.instance.checkUpdate(context, silent: false);
+    } finally {
+      if (mounted) {
+        setState(() => _buscandoActualizacion = false);
+      }
+    }
   }
 
   Future<void> _cargarConfiguracionOffline() async {
@@ -50,6 +74,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _subirPendientesAhora() async {
+    if (!ConnectionStatusService.instance.isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay conexión a internet para transmitir documentos.')),
+      );
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(
       const SnackBar(
@@ -247,32 +277,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ValueListenableBuilder<int>(
                   valueListenable: OfflineOutboxService.instance.pendingCount,
                   builder: (context, count, _) {
-                    return ListTile(
-                      leading: Icon(
-                        count > 0 ? Icons.cloud_upload : Icons.cloud_done,
-                        color: count > 0 ? Colors.orange.shade800 : Colors.green,
-                      ),
-                      title: Text(
-                        count > 0
-                            ? '$count documento(s) pendiente(s) de subir'
-                            : 'Cola de salida sincronizada',
-                        style: TextStyle(
-                          fontWeight: count > 0 ? FontWeight.bold : FontWeight.normal,
-                          color: count > 0 ? Colors.orange.shade900 : null,
+                    return InkWell(
+                      onTap: count > 0 ? _mostrarDetallePendientes : null,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  count > 0 ? Icons.cloud_upload : Icons.cloud_done,
+                                  color: count > 0 ? Colors.orange.shade800 : Colors.green,
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        count > 0
+                                            ? '$count documento(s) pendiente(s) de subir'
+                                            : 'Cola de salida sincronizada',
+                                        style: TextStyle(
+                                          fontWeight: count > 0 ? FontWeight.bold : FontWeight.w600,
+                                          fontSize: 15,
+                                          color: count > 0 ? Colors.orange.shade900 : null,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        count > 0
+                                            ? 'Ventas guardadas sin conexión. Toca para ver el detalle.'
+                                            : 'No hay documentos pendientes de transmitir.',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (count > 0)
+                                  Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                              ],
+                            ),
+                            if (count > 0) ...[
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.tonalIcon(
+                                  icon: const Icon(Icons.upload, size: 18),
+                                  label: const Text('Subir pendientes ahora'),
+                                  onPressed: ConnectionStatusService.instance.isOnline
+                                      ? _subirPendientesAhora
+                                      : null,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                      subtitle: Text(
-                        count > 0
-                            ? 'Ventas guardadas sin conexión. Toca para ver el detalle.'
-                            : 'No hay documentos pendientes de transmitir.',
-                      ),
-                      trailing: count > 0
-                          ? FilledButton.tonal(
-                              onPressed: _subirPendientesAhora,
-                              child: const Text('Subir ahora'),
-                            )
-                          : null,
-                      onTap: count > 0 ? _mostrarDetallePendientes : null,
                     );
                   },
                 ),
@@ -379,6 +445,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           },
                         )
                       : null,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Versión y Actualizaciones',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('Versión instalada'),
+                  subtitle: Text('v$_appVersion'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.system_update_alt),
+                  title: const Text('Buscar actualizaciones'),
+                  subtitle: const Text('Comprobar si existe una nueva versión en el servidor'),
+                  trailing: _buscandoActualizacion
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh),
+                  onTap: _buscandoActualizacion ? null : _buscarActualizaciones,
                 ),
               ],
             ),

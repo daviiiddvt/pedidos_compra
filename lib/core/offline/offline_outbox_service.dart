@@ -40,6 +40,9 @@ class OfflineOutboxService {
   bool get isProcessing => _isProcessing;
 
   Future<void> init() async {
+    _db.onOutboxChanged = () {
+      refreshPendingCount();
+    };
     await refreshPendingCount();
     _startPeriodicSync();
   }
@@ -110,82 +113,113 @@ class OfflineOutboxService {
           final accion = (item['accion'] ?? 'crear') as String;
 
           if (tipo == 'pedido') {
-            final pedidoMap = payload['pedido'] as Map<String, dynamic>;
-            var pedido = Pedido.fromJson(pedidoMap);
-            if (pedido.lineas.isEmpty) {
-              final dbLineas = await _db.getLineasPedidoOffline(docId);
-              if (dbLineas.isNotEmpty) {
-                final calcTot = dbLineas.fold<double>(0.0, (s, l) => s + l.getLineTotal());
-                pedido = pedido.copyWith(
-                  lineas: dbLineas,
-                  total: pedido.total > 0.0 ? pedido.total : calcTot,
-                );
-              }
-            }
-            final fotoBase64 = payload['fotoBase64'] as String?;
-            final fotoBytes = fotoBase64 != null ? base64Decode(fotoBase64) : null;
-            final deleteFoto = payload['deleteFoto'] == true;
-            final removedLineIds = (payload['removedLineIds'] as List? ?? [])
-                .map((e) => int.tryParse('$e') ?? 0)
-                .where((e) => e > 0)
-                .toSet();
-
-            if (accion == 'editar') {
-              final updated = await PedidosService.updateComplete(
-                docId,
-                pedido,
-                removedLineIds,
-                fotoBytes: fotoBytes,
-                deleteFoto: deleteFoto,
-                isSync: true,
-              );
-              await _db.markOutboxCompleted(
-                outboxId: outboxId,
-                tempDocId: docId,
-                tipo: 'pedido',
-                docReal: updated.toJson(),
-              );
+            if (accion == 'confirmar') {
+              await PedidosService.confirmarPedido(docId, isSync: true);
+              await _db.removeOutboxItem(outboxId);
               successCount++;
             } else {
-              // Intentar crear en el servidor
-              final created = await PedidosService.createComplete(
-                pedido,
-                fotoBytes: fotoBytes,
-                isSync: true,
-              );
+              final pedidoMap = (payload['pedido'] as Map<String, dynamic>?) ?? {};
+              var pedido = Pedido.fromJson(pedidoMap);
+              if (pedido.lineas.isEmpty) {
+                final dbLineas = await _db.getLineasPedidoOffline(docId);
+                if (dbLineas.isNotEmpty) {
+                  final calcTot = dbLineas.fold<double>(0.0, (s, l) => s + l.getLineTotal());
+                  pedido = pedido.copyWith(
+                    lineas: dbLineas,
+                    total: pedido.total > 0.0 ? pedido.total : calcTot,
+                  );
+                }
+              }
+              final fotoBase64 = payload['fotoBase64'] as String?;
+              final fotoBytes = fotoBase64 != null ? base64Decode(fotoBase64) : null;
+              final deleteFoto = payload['deleteFoto'] == true;
+              final removedLineIds = (payload['removedLineIds'] as List? ?? [])
+                  .map((e) => int.tryParse('$e') ?? 0)
+                  .where((e) => e > 0)
+                  .toSet();
 
-              // Si se creó con éxito (id real positivo)
-              if (created.id != null && created.id! > 0) {
+              if (accion == 'editar') {
+                final updated = await PedidosService.updateComplete(
+                  docId,
+                  pedido,
+                  removedLineIds,
+                  fotoBytes: fotoBytes,
+                  deleteFoto: deleteFoto,
+                  isSync: true,
+                );
                 await _db.markOutboxCompleted(
                   outboxId: outboxId,
                   tempDocId: docId,
                   tipo: 'pedido',
-                  docReal: created.toJson(),
+                  docReal: updated.toJson(),
                 );
                 successCount++;
               } else {
-                throw Exception('No se pudo obtener el ID confirmado del servidor.');
+                // Intentar crear en el servidor
+                final created = await PedidosService.createComplete(
+                  pedido,
+                  fotoBytes: fotoBytes,
+                  isSync: true,
+                );
+
+                // Si se creó con éxito (id real positivo)
+                if (created.id != null && created.id! > 0) {
+                  // Si el pedido offline fue marcado como confirmado antes de sincronizar
+                  if (pedido.conKyr) {
+                    try {
+                      await PedidosService.confirmarPedido(created.id!, isSync: true);
+                    } catch (e) {
+                      debugPrint('Error confirmando pedido creado en servidor tras sincronizar: $e');
+                    }
+                  }
+
+                  await _db.markOutboxCompleted(
+                    outboxId: outboxId,
+                    tempDocId: docId,
+                    tipo: 'pedido',
+                    docReal: created.copyWith(conKyr: pedido.conKyr).toJson(),
+                  );
+                  final numPre = pedido.numeroPresupuesto;
+                  if (numPre.isNotEmpty) {
+                    final budgetId = int.tryParse(numPre);
+                    if (budgetId != null && budgetId > 0) {
+                      try {
+                        await PresupuestosService.linkPedido(budgetId, created.id!, isSync: true);
+                      } catch (e) {
+                        debugPrint('Error enlazando presupuesto tras sincronizar pedido: $e');
+                      }
+                    }
+                  }
+                  successCount++;
+                } else {
+                  throw Exception('No se pudo obtener el ID confirmado del servidor.');
+                }
               }
             }
           } else if (tipo == 'presupuesto') {
-            final preMap = payload['presupuesto'] as Map<String, dynamic>;
-            var pre = PresupuestoVenta.fromJson(preMap);
-            if (pre.lineas.isEmpty) {
-              final dbLineas = await _db.getLineasPresupuestoOffline(docId);
-              if (dbLineas.isNotEmpty) {
-                final calcTot = dbLineas.fold<double>(0.0, (s, l) => s + l.getLineTotal());
-                pre = pre.copyWith(
-                  lineas: dbLineas,
-                  total: pre.total > 0.0 ? pre.total : calcTot,
-                );
+            if (accion == 'marcarAceptado') {
+              await PresupuestosService.marcarAceptado(docId, isSync: true);
+              await _db.removeOutboxItem(outboxId);
+              successCount++;
+            } else {
+              final preMap = payload['presupuesto'] as Map<String, dynamic>;
+              var pre = PresupuestoVenta.fromJson(preMap);
+              if (pre.lineas.isEmpty) {
+                final dbLineas = await _db.getLineasPresupuestoOffline(docId);
+                if (dbLineas.isNotEmpty) {
+                  final calcTot = dbLineas.fold<double>(0.0, (s, l) => s + l.getLineTotal());
+                  pre = pre.copyWith(
+                    lineas: dbLineas,
+                    total: pre.total > 0.0 ? pre.total : calcTot,
+                  );
+                }
               }
-            }
-            final removedLineIds = (payload['removedLineIds'] as List? ?? [])
-                .map((e) => int.tryParse('$e') ?? 0)
-                .where((e) => e > 0)
-                .toSet();
+              final removedLineIds = (payload['removedLineIds'] as List? ?? [])
+                  .map((e) => int.tryParse('$e') ?? 0)
+                  .where((e) => e > 0)
+                  .toSet();
 
-            if (accion == 'editar') {
+              if (accion == 'editar') {
               final updated = await PresupuestosService.updateComplete(
                 docId,
                 pre,
@@ -214,7 +248,8 @@ class OfflineOutboxService {
               }
             }
           }
-        } catch (e) {
+        }
+      } catch (e) {
           failedCount++;
           final errStr = e.toString();
           errorMessages.add(errStr);

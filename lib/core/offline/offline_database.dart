@@ -24,6 +24,7 @@ class OfflineDatabase {
   /// Ruta personalizada para pruebas unitarias.
   String? dbPathOverride;
   DatabaseFactory? factoryOverride;
+  void Function()? onOutboxChanged;
 
   Database get db {
     final d = _db;
@@ -63,6 +64,37 @@ class OfflineDatabase {
     } catch (_) {}
     await _db!.execute('CREATE INDEX IF NOT EXISTS idx_mov_lin_art ON movimientos_lineas_offline(articulo_id)');
     await _db!.execute('CREATE INDEX IF NOT EXISTS idx_mov_lin_art_clt ON movimientos_lineas_offline(articulo_id, cliente_id)');
+
+    // Tabla de licencia según especificación Velneo
+    await _db!.execute('''
+      CREATE TABLE IF NOT EXISTS licencia (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        tecnico TEXT DEFAULT '',
+        id_licencia TEXT DEFAULT '',
+        identificador TEXT DEFAULT '',
+        licencia_codigo TEXT DEFAULT '',
+        uuid TEXT DEFAULT '',
+        server_host TEXT DEFAULT 'https://tecerp.nunsys.com:4331',
+        server_api TEXT DEFAULT '',
+        version TEXT DEFAULT '',
+        validada INTEGER DEFAULT 0,
+        ent_m TEXT DEFAULT '',
+        contraclave TEXT DEFAULT '',
+        offline_intentos INTEGER DEFAULT 0,
+        api_key TEXT DEFAULT ''
+      )
+    ''');
+    await _db!.execute('INSERT OR IGNORE INTO licencia (id) VALUES (1)');
+    try {
+      await _db!.execute('ALTER TABLE licencia ADD COLUMN tecnico TEXT DEFAULT ""');
+    } catch (_) {}
+    try {
+      await _db!.execute('ALTER TABLE licencia ADD COLUMN api_key TEXT DEFAULT ""');
+    } catch (_) {}
+    try {
+      await _db!.execute('ALTER TABLE licencia ADD COLUMN server_host TEXT DEFAULT ""');
+    } catch (_) {}
+
     _initialized = true;
     debugPrint('[OFFLINE_DB] Base de datos SQLite inicializada en: $path');
   }
@@ -318,12 +350,117 @@ class OfflineDatabase {
   }
 
   String _extractNombre(Map<String, dynamic> item) {
-    for (final k in ['name', 'nom', 'nombre', 'dsc', 'dsc_edt', 'des', 'raz_soc', 'nombreComercial']) {
+    for (final k in [
+      'name', 'nom', 'nombre', 'raz_soc', 'nombreComercial',
+      'dir_com', 'DIR_COM', 'dir', 'DIR', 'dom', 'DOM',
+      'nom_alm', 'alm_nom', 'dsc', 'dsc_edt', 'des'
+    ]) {
       final val = item[k];
       if (val != null && val.toString().trim().isNotEmpty) {
         return val.toString().trim();
       }
     }
+    return '';
+  }
+
+  /// Recupera la lista de comerciales desde SQLite (tabla ENT_M con es_cmr = 1).
+  Future<List<OpcionMaestra>> getComercialesOffline() async {
+    final rows = await db.query(
+      'maestros_data',
+      columns: ['id', 'codigo', 'nombre', 'extra_json'],
+      where: 'tabla = ? AND es_cmr = 1',
+      whereArgs: ['ENT_M'],
+      orderBy: 'nombre ASC',
+    );
+    if (rows.isNotEmpty) {
+      return rows.map((r) {
+        final id = (r['id'] ?? '').toString().trim();
+        final cod = (r['codigo'] ?? '').toString().trim();
+        final nom = (r['nombre'] ?? '').toString().trim();
+        return OpcionMaestra(
+          codigo: id.isNotEmpty ? id : cod,
+          nombre: nom.isNotEmpty ? nom : (cod.isNotEmpty ? cod : id),
+        );
+      }).toList();
+    }
+
+    // Fallback si no tenían la marca es_cmr = 1 en la columna
+    final allEnt = await db.query(
+      'maestros_data',
+      columns: ['id', 'codigo', 'nombre', 'extra_json'],
+      where: 'tabla = ?',
+      whereArgs: ['ENT_M'],
+      orderBy: 'nombre ASC',
+    );
+    final resultado = <OpcionMaestra>[];
+    for (final r in allEnt) {
+      try {
+        final extraStr = r['extra_json'] as String?;
+        if (extraStr != null && extraStr.isNotEmpty) {
+          final m = jsonDecode(extraStr) as Map<String, dynamic>;
+          final esCmr = m['es_cmr'] ?? m['cmr'] ?? m['ES_CMR'] ?? 0;
+          if (esCmr == 1 || esCmr == true || esCmr == '1' || esCmr == 'true') {
+            final id = (r['id'] ?? '').toString().trim();
+            final cod = (r['codigo'] ?? '').toString().trim();
+            final nom = (r['nombre'] ?? '').toString().trim();
+            resultado.add(OpcionMaestra(
+              codigo: id.isNotEmpty ? id : cod,
+              nombre: nom.isNotEmpty ? nom : (cod.isNotEmpty ? cod : id),
+            ));
+          }
+        }
+      } catch (_) {}
+    }
+    return resultado;
+  }
+
+  /// Recupera el nombre de un comercial desde SQLite (ENT_M) por su ID o código.
+  Future<String> getNombreComercialOffline(String idOrCod) async {
+    final clean = idOrCod.trim();
+    if (clean.isEmpty) return '';
+    try {
+      final rows = await db.query(
+        'maestros_data',
+        columns: ['nombre'],
+        where: 'tabla = ? AND (id = ? OR codigo = ?)',
+        whereArgs: ['ENT_M', clean, clean],
+        limit: 1,
+      );
+      if (rows.isNotEmpty) {
+        final nom = (rows.first['nombre'] ?? '').toString().trim();
+        if (nom.isNotEmpty) return nom;
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  /// Recupera el nombre de una opción maestra en SQLite por su tabla e ID o código.
+  Future<String> getNombreMaestroOffline(String tabla, String idOrCod) async {
+    final clean = idOrCod.trim();
+    if (clean.isEmpty) return '';
+    try {
+      final rows = await db.query(
+        'maestros_data',
+        columns: ['nombre', 'extra_json'],
+        where: 'tabla = ? AND (id = ? OR codigo = ?)',
+        whereArgs: [tabla, clean, clean],
+        limit: 1,
+      );
+      if (rows.isNotEmpty) {
+        final nom = (rows.first['nombre'] ?? '').toString().trim();
+        if (nom.isNotEmpty) return nom;
+        final extra = rows.first['extra_json'] as String?;
+        if (extra != null && extra.isNotEmpty) {
+          final m = jsonDecode(extra) as Map<String, dynamic>;
+          for (final k in ['DIR_COM', 'dir_com', 'DIR', 'dir', 'name', 'nom', 'nombre']) {
+            final val = m[k];
+            if (val != null && val.toString().trim().isNotEmpty) {
+              return val.toString().trim();
+            }
+          }
+        }
+      }
+    } catch (_) {}
     return '';
   }
 
@@ -443,29 +580,52 @@ class OfflineDatabase {
       whereArgs.addAll([q, q]);
     }
 
-    final offset = (page - 1) * pageSize;
     final rows = await db.query(
       'maestros_data',
       columns: ['extra_json'],
       where: where,
       whereArgs: whereArgs,
       orderBy: 'nombre ASC',
-      limit: pageSize * 2,
-      offset: offset,
     );
+
+    final cleanComercialId = comercialId?.trim() ?? '';
+    final comercialNum = int.tryParse(cleanComercialId);
 
     final items = <Cliente>[];
     for (final r in rows) {
       try {
         final map = jsonDecode(r['extra_json'] as String) as Map<String, dynamic>;
-        final esClt = map['es_clt'] ?? map['ES_CLT'] ?? 1;
-        if (esClt == 0 || esClt == false || esClt == '0' || esClt == 'false') {
-          continue;
+        final esClt = map['es_clt'] ?? map['ES_CLT'] ?? map['clt'] ?? map['CLT'];
+        if (esClt != null) {
+          if (esClt == 0 || esClt == false || esClt == '0' || esClt == 'false') {
+            continue;
+          }
         }
 
-        if (comercialId != null && comercialId.trim().isNotEmpty) {
-          final cmr = (map['cmr'] ?? map['CMR'] ?? '').toString().trim();
-          if (cmr.isNotEmpty && cmr != comercialId.trim()) {
+        if (cleanComercialId.isNotEmpty) {
+          final rawCmr = map['cmr'] ??
+              map['CMR'] ??
+              map['cmr_m'] ??
+              map['CMR_M'] ??
+              map['ent_cmr'] ??
+              map['ENT_CMR'] ??
+              map['comercial'] ??
+              map['COMERCIAL'] ??
+              map['id_cmr'] ??
+              map['ID_CMR'];
+
+          String cmrStr = '';
+          if (rawCmr is Map) {
+            cmrStr = '${rawCmr['id'] ?? rawCmr['codigo'] ?? rawCmr['value'] ?? ''}'.trim();
+          } else if (rawCmr != null) {
+            cmrStr = rawCmr.toString().trim();
+          }
+
+          final cmrNum = int.tryParse(cmrStr);
+          final matches = (cmrStr.isNotEmpty && cmrStr == cleanComercialId) ||
+              (comercialNum != null && cmrNum != null && comercialNum == cmrNum);
+
+          if (!matches) {
             continue;
           }
         }
@@ -474,9 +634,13 @@ class OfflineDatabase {
       } catch (_) {}
     }
 
+    final total = items.length;
+    final offset = (page - 1) * pageSize;
+    final pagedItems = items.skip(offset).take(pageSize).toList();
+
     return ResultadoLista<Cliente>(
-      items: items.take(pageSize).toList(),
-      total: items.length,
+      items: pagedItems,
+      total: total,
       page: page,
     );
   }
@@ -1004,6 +1168,90 @@ class OfflineDatabase {
     }
 
     await batch.commit(noResult: true);
+    onOutboxChanged?.call();
+  }
+
+  /// Confirma un pedido offline, actualizando SQLite y encolando en Outbox si corresponde.
+  Future<void> confirmarPedidoOffline(dynamic id, {bool queueOutbox = true}) async {
+    final idStr = '$id';
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final rows = await db.query(
+      'pedidos_offline',
+      where: 'id = ?',
+      whereArgs: [idStr],
+      limit: 1,
+    );
+
+    if (rows.isNotEmpty) {
+      try {
+        final map = jsonDecode(rows.first['json_data'] as String) as Map<String, dynamic>;
+        map['con_kyr'] = 1;
+        map['conKyr'] = true;
+
+        await db.update(
+          'pedidos_offline',
+          {
+            'json_data': jsonEncode(map),
+            'updated_at': now,
+          },
+          where: 'id = ?',
+          whereArgs: [idStr],
+        );
+      } catch (e) {
+        debugPrint('[OFFLINE_DB] Error al actualizar json de pedido a confirmado: $e');
+      }
+    }
+
+    // Comprobar si ya existe en la cola Outbox
+    final outboxRows = await db.query(
+      'outbox_cola',
+      where: 'tipo = ? AND documento_id = ? AND estado != ?',
+      whereArgs: ['pedido', idStr, 'completado'],
+      limit: 1,
+    );
+
+    if (outboxRows.isNotEmpty) {
+      // Ya estaba en la cola: actualizar el payload con con_kyr: 1
+      try {
+        final item = outboxRows.first;
+        final payload = jsonDecode(item['payload_json'] as String) as Map<String, dynamic>;
+        if (payload['pedido'] is Map) {
+          final pMap = payload['pedido'] as Map<String, dynamic>;
+          pMap['con_kyr'] = 1;
+          pMap['conKyr'] = true;
+        }
+        await db.update(
+          'outbox_cola',
+          {
+            'payload_json': jsonEncode(payload),
+          },
+          where: 'id = ?',
+          whereArgs: [item['id']],
+        );
+      } catch (e) {
+        debugPrint('[OFFLINE_DB] Error al actualizar outbox de pedido confirmado: $e');
+      }
+    } else if (queueOutbox) {
+      // Pedido existente en servidor: registrar acción de confirmación pendiente
+      await db.insert(
+        'outbox_cola',
+        {
+          'id': 'outbox_ped_conf_$idStr',
+          'tipo': 'pedido',
+          'accion': 'confirmar',
+          'documento_id': idStr,
+          'payload_json': jsonEncode({'id': id, 'con_kyr': 1}),
+          'estado': 'pendiente',
+          'error_msg': null,
+          'created_at': now,
+          'intentos': 0,
+        },
+        conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
+      );
+    }
+
+    onOutboxChanged?.call();
   }
 
   Future<void> savePresupuestoOfflineOutbox({
@@ -1077,6 +1325,166 @@ class OfflineDatabase {
     }
 
     await batch.commit(noResult: true);
+    onOutboxChanged?.call();
+  }
+
+  /// Marca un presupuesto como aceptado en SQLite (estado='A', etc.) y encola en outbox si corresponde.
+  Future<void> marcarPresupuestoAceptadoOffline(dynamic budgetId, {bool queueOutbox = true}) async {
+    final idStr = '$budgetId';
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final rows = await db.query(
+      'presupuestos_offline',
+      where: 'id = ?',
+      whereArgs: [idStr],
+      limit: 1,
+    );
+
+    if (rows.isNotEmpty) {
+      try {
+        final map = jsonDecode(rows.first['json_data'] as String) as Map<String, dynamic>;
+        map['est'] = 'A';
+        map['estado'] = 'A';
+
+        await db.update(
+          'presupuestos_offline',
+          {
+            'estado': 'A',
+            'json_data': jsonEncode(map),
+            'updated_at': now,
+          },
+          where: 'id = ?',
+          whereArgs: [idStr],
+        );
+      } catch (e) {
+        debugPrint('[OFFLINE_DB] Error al actualizar json de presupuesto a aceptado: $e');
+      }
+    }
+
+    // Comprobar si ya existe en la cola Outbox
+    final outboxRows = await db.query(
+      'outbox_cola',
+      where: 'tipo = ? AND documento_id = ? AND estado != ?',
+      whereArgs: ['presupuesto', idStr, 'completado'],
+      limit: 1,
+    );
+
+    if (outboxRows.isNotEmpty) {
+      // Ya estaba en la cola: actualizar el payload con est: 'A'
+      try {
+        final item = outboxRows.first;
+        final payload = jsonDecode(item['payload_json'] as String) as Map<String, dynamic>;
+        if (payload['presupuesto'] is Map) {
+          final pMap = payload['presupuesto'] as Map<String, dynamic>;
+          pMap['est'] = 'A';
+          pMap['estado'] = 'A';
+        }
+        await db.update(
+          'outbox_cola',
+          {
+            'payload_json': jsonEncode(payload),
+          },
+          where: 'id = ?',
+          whereArgs: [item['id']],
+        );
+      } catch (e) {
+        debugPrint('[OFFLINE_DB] Error al actualizar outbox de presupuesto aceptado: $e');
+      }
+    } else if (queueOutbox) {
+      // Presupuesto existente en servidor: registrar acción de aceptar pendiente
+      await db.insert(
+        'outbox_cola',
+        {
+          'id': 'outbox_pre_acep_$idStr',
+          'tipo': 'presupuesto',
+          'accion': 'marcarAceptado',
+          'documento_id': idStr,
+          'payload_json': jsonEncode({'id': budgetId, 'est': 'A'}),
+          'estado': 'pendiente',
+          'error_msg': null,
+          'created_at': now,
+          'intentos': 0,
+        },
+        conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
+      );
+    }
+
+    onOutboxChanged?.call();
+  }
+
+  /// Enlaza un presupuesto con un pedido en SQLite (vta_ped_g y est='A').
+  Future<void> linkPedidoPresupuestoOffline(dynamic budgetId, dynamic pedidoId) async {
+    final idStr = '$budgetId';
+    final pedIdNum = int.tryParse('$pedidoId') ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final rows = await db.query(
+      'presupuestos_offline',
+      where: 'id = ?',
+      whereArgs: [idStr],
+      limit: 1,
+    );
+
+    if (rows.isNotEmpty) {
+      try {
+        final map = jsonDecode(rows.first['json_data'] as String) as Map<String, dynamic>;
+        map['est'] = 'A';
+        map['estado'] = 'A';
+        map['vta_ped_g'] = pedIdNum;
+
+        await db.update(
+          'presupuestos_offline',
+          {
+            'estado': 'A',
+            'json_data': jsonEncode(map),
+            'updated_at': now,
+          },
+          where: 'id = ?',
+          whereArgs: [idStr],
+        );
+      } catch (e) {
+        debugPrint('[OFFLINE_DB] Error al enlazar presupuesto a pedido offline: $e');
+      }
+    }
+
+    // Comprobar si ya existe en outbox_cola
+    final outboxRows = await db.query(
+      'outbox_cola',
+      where: 'tipo = ? AND documento_id = ? AND estado != ?',
+      whereArgs: ['presupuesto', idStr, 'completado'],
+      limit: 1,
+    );
+
+    if (outboxRows.isNotEmpty) {
+      try {
+        final item = outboxRows.first;
+        final payload = jsonDecode(item['payload_json'] as String) as Map<String, dynamic>;
+        if (payload['presupuesto'] is Map) {
+          final pMap = payload['presupuesto'] as Map<String, dynamic>;
+          pMap['est'] = 'A';
+          pMap['estado'] = 'A';
+          pMap['vta_ped_g'] = pedIdNum;
+        }
+        await db.update(
+          'outbox_cola',
+          {
+            'payload_json': jsonEncode(payload),
+          },
+          where: 'id = ?',
+          whereArgs: [item['id']],
+        );
+      } catch (e) {
+        debugPrint('[OFFLINE_DB] Error al actualizar payload outbox con link pedido: $e');
+      }
+    }
+
+    onOutboxChanged?.call();
+  }
+
+  /// Elimina un elemento de la cola outbox por su id.
+  Future<void> removeOutboxItem(String outboxId) async {
+    await db.delete('outbox_cola', where: 'id = ?', whereArgs: [outboxId]);
+    onOutboxChanged?.call();
   }
 
   Future<List<Map<String, dynamic>>> getPendingOutbox() async {
@@ -1114,6 +1522,7 @@ class OfflineDatabase {
       where: 'id = ?',
       whereArgs: [id],
     );
+    onOutboxChanged?.call();
   }
 
   Future<void> markOutboxCompleted({
@@ -1227,6 +1636,46 @@ class OfflineDatabase {
     }
 
     await batch.commit(noResult: true);
+    onOutboxChanged?.call();
+  }
+
+  /// Obtiene la fila única de la tabla licencia en SQLite (id = 1).
+  Future<Map<String, dynamic>?> getLicencia() async {
+    final results = await db.query('licencia', where: 'id = 1', limit: 1);
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  /// Guarda o actualiza la licencia en SQLite (id = 1).
+  Future<void> saveLicencia(Map<String, dynamic> data) async {
+    final values = Map<String, dynamic>.from(data);
+    values['id'] = 1;
+    await db.insert(
+      'licencia',
+      values,
+      conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Resetea la configuración de licencia en SQLite a sus valores por defecto.
+  Future<void> resetLicencia({String uuid = ''}) async {
+    await db.update(
+      'licencia',
+      {
+        'tecnico': '',
+        'id_licencia': '',
+        'identificador': '',
+        'licencia_codigo': '',
+        'uuid': uuid,
+        'server_api': 'https://tecerp.nunsys.com:4331',
+        'version': 'v1',
+        'validada': 0,
+        'ent_m': '',
+        'contraclave': '',
+        'offline_intentos': 0,
+        'api_key': '',
+      },
+      where: 'id = 1',
+    );
   }
 }
 

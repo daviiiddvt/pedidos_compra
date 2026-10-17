@@ -33,6 +33,7 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
   late TextEditingController _apiKeyCtrl;
 
   bool _loading = false;
+  bool _loadingComprobar = false;
   bool _obscureLicencia = true;
   bool _obscureApiKey = true;
   String? _errorMsg;
@@ -58,7 +59,7 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
       text: lic.serverHost.isNotEmpty ? lic.serverHost : Licencia.defaultBaseHost,
     );
     _serverApiCtrl = TextEditingController(
-      text: lic.serverApi.isNotEmpty ? lic.serverApi : 'TECERPV7_TECPASS',
+      text: lic.serverApi == Licencia.defaultBaseHost ? '' : lic.serverApi,
     );
     _versionCtrl = TextEditingController(
       text: lic.version.isNotEmpty ? lic.version : 'v1',
@@ -140,6 +141,130 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
     );
   }
 
+  Future<void> _comprobarLicencia() async {
+    final lic = _buildLicencia();
+
+    if (lic.licenciaCodigo.isEmpty) {
+      setState(() => _errorMsg = 'El código de licencia es obligatorio');
+      return;
+    }
+
+    setState(() {
+      _loadingComprobar = true;
+      _errorMsg = null;
+    });
+
+    try {
+      final result = await widget.licenseService.validate(lic, saveOnSuccess: false);
+      if (!mounted) return;
+
+      setState(() => _loadingComprobar = false);
+
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                result.ok
+                    ? Icons.check_circle
+                    : (result.estado == LicenciaEstado.errorConexion ? Icons.wifi_off : Icons.cancel),
+                color: result.ok
+                    ? Colors.green
+                    : (result.estado == LicenciaEstado.errorConexion ? Colors.orange : Colors.red),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  result.ok ? 'Licencia Válida' : 'Resultado Comprobación',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: (result.ok
+                              ? Colors.green
+                              : (result.estado == LicenciaEstado.errorConexion ? Colors.orange : Colors.red))
+                          .withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      result.mensaje,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: result.ok
+                            ? Colors.green.shade800
+                            : (result.estado == LicenciaEstado.errorConexion
+                                ? Colors.orange.shade900
+                                : Colors.red.shade800),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Respuesta JSON del servidor:',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    constraints: const BoxConstraints(maxHeight: 250),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.grey.shade400),
+                    ),
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        result.rawResponse ?? '(Sin respuesta)',
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            if (result.rawResponse != null && result.rawResponse!.isNotEmpty)
+              TextButton.icon(
+                icon: const Icon(Icons.copy, size: 16),
+                label: const Text('Copiar'),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: result.rawResponse!));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Respuesta copiada al portapapeles'), duration: Duration(seconds: 2)),
+                  );
+                },
+              ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingComprobar = false;
+          _errorMsg = 'Error al comprobar la licencia: $e';
+        });
+      }
+    }
+  }
+
   Future<void> _conectar() async {
     final lic = _buildLicencia();
 
@@ -158,7 +283,7 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
     });
 
     try {
-      final result = await widget.licenseService.validate(lic);
+      final result = await widget.licenseService.validate(lic, saveOnSuccess: false);
 
       if (!mounted) return;
 
@@ -176,7 +301,7 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Licencia validada correctamente'),
+            content: Text('✅ Licencia validada y guardada correctamente en SQLite'),
             backgroundColor: Colors.green,
           ),
         );
@@ -186,19 +311,36 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
         } else if (widget.showBack && Navigator.of(context).canPop()) {
           Navigator.of(context).pop(lic);
         }
-      } else {
-        // Si fue error de red/timeout, no penalizamos con intento fallido
-        if (result.estado == LicenciaEstado.denegada) {
-          _configIntentos++;
-          lic.configIntentos = _configIntentos;
-          await widget.licenseService.save(lic);
-          if (!mounted) return;
-          if (_configIntentos >= 3) {
-            _bloqueado = true;
-          }
-        }
+      } else if (result.estado == LicenciaEstado.errorConexion) {
+        // En caso de sin conexión, se guarda la configuración igualmente según especificación oficial
+        setState(() {
+          _loading = false;
+        });
+        lic.offlineIntentos++;
+        await widget.licenseService.save(lic);
 
         if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Sin conexión con el servidor. Configuración guardada en SQLite.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+
+        if (widget.onConfigured != null) {
+          widget.onConfigured!(lic);
+        } else if (widget.showBack && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(lic);
+        }
+      } else {
+        _configIntentos++;
+        lic.configIntentos = _configIntentos;
+        await widget.licenseService.save(lic);
+        if (!mounted) return;
+        if (_configIntentos >= 3) {
+          _bloqueado = true;
+        }
 
         setState(() {
           _loading = false;
@@ -371,11 +513,12 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
           ),
           const SizedBox(height: 14),
 
-          // ID (opcional)
+          // ID (app_ent)
           TextField(
             controller: _idCtrl,
             decoration: const InputDecoration(
               labelText: 'ID',
+              hintText: 'Se auto-rellena con el Identificador si está vacío',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.tag),
             ),
@@ -399,11 +542,11 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
           ),
           const SizedBox(height: 14),
 
-          // URL Servidor de Licencia
+          // Server API
           TextField(
             controller: _serverHostCtrl,
             decoration: const InputDecoration(
-              labelText: 'URL Servidor de Licencia',
+              labelText: 'Server API (URL base)',
               hintText: 'https://tecerp.nunsys.com:4331',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.cloud_outlined),
@@ -411,12 +554,12 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
           ),
           const SizedBox(height: 14),
 
-          // Nombre de Servidor de Licencia
+          // Nombre / Instancia de Servidor de Licencia
           TextField(
             controller: _serverApiCtrl,
             decoration: const InputDecoration(
-              labelText: 'Nombre Servidor de Licencia',
-              hintText: 'Ej: TECERPV7_TECPASS',
+              labelText: 'Instancia / Subruta API',
+              hintText: 'Ej: Instancia de servidor',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.dns),
             ),
@@ -451,21 +594,45 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Botón Conectar
-          FilledButton.icon(
-            onPressed: _loading ? null : _conectar,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            icon: _loading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Icon(Icons.cloud_done),
-            label: Text(_loading ? 'Validando...' : 'Conectar y Validar'),
+          // Botones de acción: Comprobar Licencia y Conectar
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: (_loading || _loadingComprobar) ? null : _comprobarLicencia,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: _loadingComprobar
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.preview_outlined),
+                  label: Text(_loadingComprobar ? 'Comprobando...' : 'Comprobar Licencia'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: (_loading || _loadingComprobar) ? null : _conectar,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: _loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.cloud_done),
+                  label: Text(_loading ? 'Conectando...' : 'Conectar'),
+                ),
+              ),
+            ],
           ),
 
           if (_errorMsg != null) ...[

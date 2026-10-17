@@ -433,7 +433,7 @@ class OfflineSyncService {
         },
       );
 
-      final pedidosToSave = await PedidosService.enrichPedidosWithClientNames(
+      final pedidosToSave = await PedidosService.enrichPedidosWithMasterData(
         pedidosConLineas.whereType<Pedido>().toList(),
       );
       await _db.savePedidosOffline(
@@ -519,7 +519,7 @@ class OfflineSyncService {
         },
       );
 
-      final presupuestosToSave = await PresupuestosService.enrichPresupuestosWithClientNames(
+      final presupuestosToSave = await PresupuestosService.enrichPresupuestosWithMasterData(
         presupuestosConLineas.whereType<PresupuestoVenta>().toList(),
       );
       await _db.savePresupuestosOffline(

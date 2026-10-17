@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 
 import '../core/api_service.dart';
 import '../core/master_cache_service.dart';
+import '../core/offline/offline_database.dart';
 import '../models/models.dart'; // Pedido + calcularTotales.
  // Colores.
 import '../core/formatters.dart'; // formatDate y formatNumber.
@@ -49,6 +50,7 @@ class _CabeceraViewState extends State<CabeceraView> {
   String _serieNombre = '';
   String _almacenNombre = '';
   String _formaPagoNombre = '';
+  String _comercialNombre = '';
   String _direccionEnvioNombre = '';
 
   @override
@@ -66,7 +68,24 @@ class _CabeceraViewState extends State<CabeceraView> {
     _serieNombre = s?.nombre ?? widget.pedido.serieNombre;
     _formaPagoNombre = f?.nombre ?? widget.pedido.formaPagoNombre;
     _almacenNombre = a?.nombre ?? widget.pedido.almacenNombre;
+    _comercialNombre = widget.pedido.comercialNombre;
+    if (_comercialNombre.isEmpty && widget.pedido.comercial.isNotEmpty) {
+      OfflineDatabase.instance.getNombreComercialOffline(widget.pedido.comercial).then((nom) {
+        if (mounted && nom.isNotEmpty) {
+          setState(() => _comercialNombre = nom);
+        }
+      });
+    }
+
     _direccionEnvioNombre = widget.pedido.direccionEnvio;
+    if (_direccionEnvioNombre.isNotEmpty && int.tryParse(_direccionEnvioNombre) != null) {
+      OfflineDatabase.instance.getNombreMaestroOffline('DIR_M', _direccionEnvioNombre).then((nom) {
+        if (mounted && nom.isNotEmpty) {
+          setState(() => _direccionEnvioNombre = nom);
+        }
+      });
+    }
+
     _loadMaestros();
   }
 
@@ -81,25 +100,41 @@ class _CabeceraViewState extends State<CabeceraView> {
           Future.value(<OpcionMaestra>[]),
         cache.getOrLoad(key: 'formas_pago', loader: PedidosService.getFormasPago, ttl: const Duration(minutes: 10)),
         PedidosService.getDireccionesCliente(widget.pedido.clienteId),
+        if (_comercialNombre.isEmpty && widget.pedido.comercial.isNotEmpty)
+          PedidosService.getContactName(widget.pedido.comercial)
+        else
+          Future.value(_comercialNombre),
       ]);
 
       if (!mounted) return;
 
-      final series = reqs[0];
-      final almacenes = reqs[1];
-      final formasPago = reqs[2];
-      final direcciones = reqs[3];
+      final series = reqs[0] as List<OpcionMaestra>;
+      final almacenes = reqs[1] as List<OpcionMaestra>;
+      final formasPago = reqs[2] as List<OpcionMaestra>;
+      final direcciones = reqs[3] as List<OpcionMaestra>;
+      final cmrNombre = reqs[4] as String;
 
       final s = PedidosService.findMatchingOption(series, widget.pedido.serie);
       final a = PedidosService.findMatchingOption(almacenes, widget.pedido.almacen);
       final f = PedidosService.findMatchingOption(formasPago, widget.pedido.formaPago);
       final d = PedidosService.findMatchingOption(direcciones, widget.pedido.direccionEnvio);
 
+      var dirNombre = d?.nombre;
+      if (dirNombre == null || dirNombre.isEmpty) {
+        if (widget.pedido.direccionEnvio.isNotEmpty && int.tryParse(widget.pedido.direccionEnvio) != null) {
+          final res = await PedidosService.getDireccionNombre(widget.pedido.direccionEnvio);
+          if (res.isNotEmpty && res != widget.pedido.direccionEnvio) {
+            dirNombre = res;
+          }
+        }
+      }
+
       setState(() {
         if (s != null) _serieNombre = s.nombre;
         if (a != null) _almacenNombre = a.nombre;
         if (f != null) _formaPagoNombre = f.nombre;
-        if (d != null) _direccionEnvioNombre = d.nombre;
+        if (dirNombre != null && dirNombre.isNotEmpty) _direccionEnvioNombre = dirNombre;
+        if (cmrNombre.isNotEmpty) _comercialNombre = cmrNombre;
       });
     } catch (_) {}
   }
@@ -150,9 +185,11 @@ class _CabeceraViewState extends State<CabeceraView> {
         ),
         _Campo(
           'Comercial',
-          pedido.comercialNombre.isNotEmpty
-              ? pedido.comercialNombre
-              : pedido.comercial,
+          _comercialNombre.isNotEmpty
+              ? _comercialNombre
+              : (pedido.comercialNombre.isNotEmpty
+                  ? pedido.comercialNombre
+                  : pedido.comercial),
         ),
         if (widget.mostrarAlmacen)
           _Campo(

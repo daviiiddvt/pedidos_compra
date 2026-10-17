@@ -290,7 +290,7 @@ class _PresupuestosListScreenState extends State<PresupuestosListScreen> {
             child: Row(
               children: [
                 _buildFiltroChip(
-                  label: 'Todos',
+                  label: 'TODOS',
                   estado: '',
                   selected: _filtroEstado.isEmpty,
                   onSelected: () => _cambiarFiltro(''),

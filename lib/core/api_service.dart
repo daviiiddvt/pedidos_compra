@@ -32,6 +32,7 @@ import 'config.dart';
 import 'master_cache_service.dart'; // AppConfig (para saber a qué endpoint llamar).
 import '../models/models.dart'; // Nuestros modelos (Pedido, OpcionMaestra).
 import '../models/articulo.dart';
+import 'offline/connection_status_service.dart';
 import 'offline/offline_database.dart';
 import '../theme/app_theme.dart'; // AppColors (para traducir el estado a código VELNEO).
 
@@ -76,6 +77,7 @@ class PedidosService {
   static final _api = ApiClient.instance;
   static final Map<String, String> _articuloNombreCache = <String, String>{};
   static final Map<int, Cliente> _clienteCache = <int, Cliente>{};
+  static final Map<String, String> _contactNameCache = <String, String>{};
   static final Map<String, Set<int>> _technicalZoneClientCache = {};
 
   static void clearTechnicalZoneCache() {
@@ -84,6 +86,10 @@ class PedidosService {
 
   static void clearClienteCache() {
     _clienteCache.clear();
+  }
+
+  static void clearContactNameCache() {
+    _contactNameCache.clear();
   }
 
   static Map<String, String> buildArticleNameMap(
@@ -426,9 +432,35 @@ class PedidosService {
   static Future<String> getContactName(String id) => _getContactName(id);
 
   static Future<String> _getContactName(String id) async {
-    final contact = await _getContact(id);
-    final name = contact.s('name');
-    return name.isNotEmpty ? name : contact.s('name');
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) return '';
+    final cached = _contactNameCache[cleanId];
+    if (cached != null && cached.isNotEmpty) return cached;
+
+    if (!ConnectionStatusService.instance.isOnline) {
+      final offlineName = await OfflineDatabase.instance.getNombreComercialOffline(cleanId);
+      if (offlineName.isNotEmpty) {
+        _contactNameCache[cleanId] = offlineName;
+        return offlineName;
+      }
+      return cleanId;
+    }
+
+    try {
+      final contact = await _getContact(cleanId);
+      final name = contact.s('name').isNotEmpty ? contact.s('name') : contact.s('nom');
+      if (name.isNotEmpty) {
+        _contactNameCache[cleanId] = name;
+        return name;
+      }
+    } catch (_) {
+      final offlineName = await OfflineDatabase.instance.getNombreComercialOffline(cleanId);
+      if (offlineName.isNotEmpty) {
+        _contactNameCache[cleanId] = offlineName;
+        return offlineName;
+      }
+    }
+    return cleanId;
   }
 
   static Future<Map<String, String>> _getArticleNamesByIds(
@@ -803,7 +835,8 @@ class PedidosService {
         orElse: () => throw ApiException('Pedido no encontrado localmente ($e)'),
       );
       final lineas = await getLineasPedido(id);
-      return found.copyWith(lineas: lineas);
+      final enriched = await enrichPedidosWithMasterData([found.copyWith(lineas: lineas)]);
+      return enriched.first;
     }
   }
 
@@ -841,6 +874,7 @@ class PedidosService {
       'obs': pedido.observaciones,
       'emp': '1',
       'emp_div': '1',
+      if (pedido.conKyr) 'con_kyr': 1,
       if (fotoBytes != null) 
         'fot': base64Encode(fotoBytes)
       else if (deleteFoto) 
@@ -1003,16 +1037,39 @@ class PedidosService {
   }
 
   /// Confirma un pedido estableciendo CON_KYR a 1.
-  static Future<Pedido> confirmarPedido(dynamic id) async {
-    final json = await _api.post(
-      '${AppConfig.endpoint('pedidos')}/$id',
-      body: {'con_kyr': 1},
-    );
-    final data = payloadData(json);
-    if (data is Map) {
-      return Pedido.fromJson(Map<String, dynamic>.from(data));
+  static Future<Pedido> confirmarPedido(dynamic id, {bool isSync = false}) async {
+    final isOfflineId = (id is num && id < 0) || (int.tryParse('$id') != null && int.parse('$id') < 0);
+    final isOnline = ConnectionStatusService.instance.isOnline;
+
+    if (!isOnline && !isSync) {
+      // Sin conexión: confirmar localmente en SQLite y poner en Outbox
+      await OfflineDatabase.instance.confirmarPedidoOffline(id, queueOutbox: !isOfflineId);
+      return Pedido(id: int.tryParse('$id'), conKyr: true);
     }
-    throw ApiException('No se pudo confirmar el pedido.');
+
+    if (isOfflineId) {
+      // Pedido creado offline que aún no existe en el servidor
+      await OfflineDatabase.instance.confirmarPedidoOffline(id, queueOutbox: false);
+      return Pedido(id: int.tryParse('$id'), conKyr: true);
+    }
+
+    try {
+      final json = await _api.post(
+        '${AppConfig.endpoint('pedidos')}/$id',
+        body: {'con_kyr': 1},
+      );
+      await OfflineDatabase.instance.confirmarPedidoOffline(id, queueOutbox: false);
+      final data = payloadData(json);
+      if (data is Map) {
+        return Pedido.fromJson(Map<String, dynamic>.from(data));
+      }
+      return Pedido(id: int.tryParse('$id'), conKyr: true);
+    } catch (e) {
+      if (isSync) rethrow;
+      debugPrint('[PEDIDOS] Error al confirmar pedido en servidor, guardando en Outbox: $e');
+      await OfflineDatabase.instance.confirmarPedidoOffline(id, queueOutbox: true);
+      return Pedido(id: int.tryParse('$id'), conKyr: true);
+    }
   }
 
   /// Crea o actualiza las líneas de un pedido en `VTA_PED_LIN_G`.
@@ -1167,6 +1224,10 @@ class PedidosService {
     String key, {
     int size = 1000,
   }) async {
+    final tabla = AppConfig.endpoints[key] ?? key;
+    if (!ConnectionStatusService.instance.isOnline) {
+      return OfflineDatabase.instance.getMaestrosOpciones(tabla);
+    }
     try {
       final records = await _fetchAllRecords(
         AppConfig.endpoint(key),
@@ -1174,7 +1235,6 @@ class PedidosService {
       );
       return records.map(_opcionFromRecord).toList();
     } catch (_) {
-      final tabla = AppConfig.endpoints[key] ?? key;
       return OfflineDatabase.instance.getMaestrosOpciones(tabla);
     }
   }
@@ -1255,43 +1315,158 @@ class PedidosService {
   }
 
   /// Enriquece de forma ultra-rápida (RAM + SQLite indexado) los pedidos con
-  /// el nombre comercial, teléfono y CIF de su cliente antes de pintarlos.
-  static Future<List<Pedido>> enrichPedidosWithClientNames(List<Pedido> pedidos) async {
+  /// el nombre comercial del cliente, comercial, serie, almacén y forma de pago.
+  static Future<List<Pedido>> enrichPedidosWithMasterData(List<Pedido> pedidos) async {
     if (pedidos.isEmpty) return pedidos;
 
-    final missingIds = <int>{};
+    final missingClientIds = <int>{};
+    final missingComercialIds = <String>{};
+    final missingSeries = <String>{};
+    final missingAlmacenes = <String>{};
+    final missingFpg = <String>{};
+
     for (final p in pedidos) {
       final cid = p.clienteId > 0 ? p.clienteId : (int.tryParse(p.cliente.trim()) ?? 0);
       final nom = p.clienteNombre.trim();
       final esNumero = int.tryParse(nom) != null;
-      final necesitaMapeo = nom.isEmpty || nom == p.cliente.trim() || esNumero;
-      if (necesitaMapeo && cid > 0) {
-        missingIds.add(cid);
+      if ((nom.isEmpty || nom == p.cliente.trim() || esNumero) && cid > 0) {
+        missingClientIds.add(cid);
+      }
+      final cmrNom = p.comercialNombre.trim();
+      final cmrVal = p.comercial.trim();
+      if ((cmrNom.isEmpty || cmrNom == cmrVal) && cmrVal.isNotEmpty) {
+        missingComercialIds.add(cmrVal);
+      }
+      final serNom = p.serieNombre.trim();
+      final serVal = p.serie.trim();
+      if ((serNom.isEmpty || serNom == serVal) && serVal.isNotEmpty) {
+        missingSeries.add(serVal);
+      }
+      final almNom = p.almacenNombre.trim();
+      final almVal = p.almacen.trim();
+      if ((almNom.isEmpty || almNom == almVal) && almVal.isNotEmpty) {
+        missingAlmacenes.add(almVal);
+      }
+      final fpgNom = p.formaPagoNombre.trim();
+      final fpgVal = p.formaPago.trim();
+      if ((fpgNom.isEmpty || fpgNom == fpgVal) && fpgVal.isNotEmpty) {
+        missingFpg.add(fpgVal);
       }
     }
 
-    if (missingIds.isEmpty) return pedidos;
+    final clientesMap = missingClientIds.isNotEmpty 
+        ? await getClientesMapByIds(missingClientIds.toList()) 
+        : <int, Cliente>{};
 
-    final map = await getClientesMapByIds(missingIds.toList());
+    final comercialesMap = <String, String>{};
+    for (final cmrId in missingComercialIds) {
+      final nom = await getContactName(cmrId);
+      if (nom.isNotEmpty && nom != cmrId) {
+        comercialesMap[cmrId] = nom;
+      }
+    }
+
+    // Series map
+    final seriesMap = <String, String>{};
+    if (missingSeries.isNotEmpty) {
+      try {
+        final seriesList = await MasterCacheService().getOrLoad(
+          key: 'series',
+          loader: getSeries,
+        );
+        for (final s in seriesList) {
+          seriesMap[s.codigo] = s.nombre;
+        }
+      } catch (_) {}
+      for (final sCod in missingSeries) {
+        if (!seriesMap.containsKey(sCod)) {
+          final nom = await OfflineDatabase.instance.getNombreMaestroOffline('SER_M', sCod);
+          if (nom.isNotEmpty) seriesMap[sCod] = nom;
+        }
+      }
+    }
+
+    // Almacenes map
+    final almacenesMap = <String, String>{};
+    if (missingAlmacenes.isNotEmpty) {
+      try {
+        final almacenesList = await MasterCacheService().getOrLoad(
+          key: 'almacenes',
+          loader: getAlmacenes,
+        );
+        for (final a in almacenesList) {
+          almacenesMap[a.codigo] = a.nombre;
+        }
+      } catch (_) {}
+      for (final aCod in missingAlmacenes) {
+        if (!almacenesMap.containsKey(aCod)) {
+          final nom = await OfflineDatabase.instance.getNombreMaestroOffline('ALM_M', aCod);
+          if (nom.isNotEmpty) almacenesMap[aCod] = nom;
+        }
+      }
+    }
+
+    // Formas de pago map
+    final fpgMap = <String, String>{};
+    if (missingFpg.isNotEmpty) {
+      try {
+        final fpgList = await MasterCacheService().getOrLoad(
+          key: 'formas_pago',
+          loader: getFormasPago,
+        );
+        for (final f in fpgList) {
+          fpgMap[f.codigo] = f.nombre;
+        }
+      } catch (_) {}
+      for (final fCod in missingFpg) {
+        if (!fpgMap.containsKey(fCod)) {
+          final nom = await OfflineDatabase.instance.getNombreMaestroOffline('FPG_M', fCod);
+          if (nom.isNotEmpty) fpgMap[fCod] = nom;
+        }
+      }
+    }
 
     return pedidos.map((p) {
+      var item = p;
       final cid = p.clienteId > 0 ? p.clienteId : (int.tryParse(p.cliente.trim()) ?? 0);
       final nom = p.clienteNombre.trim();
       final esNumero = int.tryParse(nom) != null;
-      if (nom.isNotEmpty && nom != p.cliente.trim() && !esNumero) return p;
-
-      final c = map[cid];
-      if (c != null && c.nombreComercial.isNotEmpty) {
-        return p.copyWith(
-          clienteId: cid,
-          clienteNombre: c.nombreComercial,
-          clienteTelefono: c.telefono,
-          clienteCif: c.cif,
-        );
+      if (nom.isEmpty || nom == p.cliente.trim() || esNumero) {
+        final c = clientesMap[cid];
+        if (c != null && c.nombreComercial.isNotEmpty) {
+          item = item.copyWith(
+            clienteId: cid,
+            clienteNombre: c.nombreComercial,
+            clienteTelefono: c.telefono,
+            clienteCif: c.cif,
+          );
+        }
       }
-      return p;
+
+      final cmrTrim = item.comercial.trim();
+      if ((item.comercialNombre.trim().isEmpty || item.comercialNombre.trim() == cmrTrim) && comercialesMap.containsKey(cmrTrim)) {
+        item = item.copyWith(comercialNombre: comercialesMap[cmrTrim]!);
+      }
+      final serTrim = item.serie.trim();
+      if ((item.serieNombre.trim().isEmpty || item.serieNombre.trim() == serTrim) && seriesMap.containsKey(serTrim)) {
+        item = item.copyWith(serieNombre: seriesMap[serTrim]!);
+      }
+      final almTrim = item.almacen.trim();
+      if ((item.almacenNombre.trim().isEmpty || item.almacenNombre.trim() == almTrim) && almacenesMap.containsKey(almTrim)) {
+        item = item.copyWith(almacenNombre: almacenesMap[almTrim]!);
+      }
+      final fpgTrim = item.formaPago.trim();
+      if ((item.formaPagoNombre.trim().isEmpty || item.formaPagoNombre.trim() == fpgTrim) && fpgMap.containsKey(fpgTrim)) {
+        item = item.copyWith(formaPagoNombre: fpgMap[fpgTrim]!);
+      }
+
+      return item;
     }).toList();
   }
+
+  /// Enriquece de forma ultra-rápida los pedidos con los datos maestros.
+  static Future<List<Pedido>> enrichPedidosWithClientNames(List<Pedido> pedidos) =>
+      enrichPedidosWithMasterData(pedidos);
 
   static Future<Map<String, dynamic>> getClienteDefaults(int clienteId) async {
     if (clienteId <= 0) {
@@ -1409,28 +1584,30 @@ class PedidosService {
     int clienteId,
   ) async {
     if (clienteId <= 0) return [];
-    try {
-      final json = await _api.get(
-        AppConfig.endpoint('direcciones'),
-        params: {
-          'page[size]': 100,
-          'page[number]': 1,
-          "filter['ENT']": '$clienteId',
-        },
-      ).timeout(const Duration(seconds: 3));
-      final dirs = payloadLista(json)
-          .map(
-            (r) => OpcionMaestra(
-              codigo: r.s('id').isNotEmpty ? r.s('id') : r.s('codigo'),
-              nombre: r.s('DIR_COM').isNotEmpty
-                  ? r.s('DIR_COM')
-                  : (r.s('dir_com').isNotEmpty ? r.s('dir_com') : r.s('DIR')),
-            ),
-          )
-          .where((opcion) => opcion.codigo.isNotEmpty)
-          .toList();
-      if (dirs.isNotEmpty) return dirs;
-    } catch (_) {}
+    if (ConnectionStatusService.instance.isOnline) {
+      try {
+        final json = await _api.get(
+          AppConfig.endpoint('direcciones'),
+          params: {
+            'page[size]': 100,
+            'page[number]': 1,
+            "filter['ENT']": '$clienteId',
+          },
+        ).timeout(const Duration(seconds: 3));
+        final dirs = payloadLista(json)
+            .map(
+              (r) => OpcionMaestra(
+                codigo: r.s('id').isNotEmpty ? r.s('id') : r.s('codigo'),
+                nombre: r.s('DIR_COM').isNotEmpty
+                    ? r.s('DIR_COM')
+                    : (r.s('dir_com').isNotEmpty ? r.s('dir_com') : r.s('DIR')),
+              ),
+            )
+            .where((opcion) => opcion.codigo.isNotEmpty)
+            .toList();
+        if (dirs.isNotEmpty) return dirs;
+      } catch (_) {}
+    }
 
     // Fallback SQLite local
     try {
@@ -1451,6 +1628,17 @@ class PedidosService {
     } catch (_) {
       return [];
     }
+  }
+
+  /// Resuelve el nombre/dirección legible a partir de un ID de dirección.
+  static Future<String> getDireccionNombre(dynamic dirId) async {
+    final cleanId = '$dirId'.trim();
+    if (cleanId.isEmpty || cleanId == '0') return '';
+    try {
+      final offlineName = await OfflineDatabase.instance.getNombreMaestroOffline('DIR_M', cleanId);
+      if (offlineName.isNotEmpty) return offlineName;
+    } catch (_) {}
+    return cleanId;
   }
 
   /// Crea un nuevo cliente en ENT_M
@@ -1598,9 +1786,12 @@ class PedidosService {
   /// El filtro final por `ES_CMR` se aplica en Dart para tolerar instalaciones
   /// donde Velneo no interpreta correctamente filtros booleanos.
   static Future<List<OpcionMaestra>> getComerciales() async {
+    if (!ConnectionStatusService.instance.isOnline) {
+      return await OfflineDatabase.instance.getComercialesOffline();
+    }
     try {
       final records = await _fetchAllRecords(AppConfig.endpoint('comerciales'));
-      return records
+      final list = records
           .where((r) => r.b('es_cmr') || r.b('cmr'))
           .map(
             (r) => OpcionMaestra(
@@ -1609,20 +1800,9 @@ class PedidosService {
             ),
           )
           .toList();
-    } catch (_) {
-      try {
-        final raw = await OfflineDatabase.instance.getMaestrosData('ENT_M');
-        return raw.where((r) {
-          final esCmr = r['es_cmr'] ?? r['cmr'] ?? r['ES_CMR'] ?? 0;
-          return esCmr == 1 || esCmr == true || esCmr == '1';
-        }).map((r) => OpcionMaestra(
-          codigo: '${r['id'] ?? r['codigo'] ?? ''}',
-          nombre: '${r['name'] ?? r['nombre'] ?? r['raz_soc'] ?? ''}',
-        )).toList();
-      } catch (_) {
-        return [];
-      }
-    }
+      if (list.isNotEmpty) return list;
+    } catch (_) {}
+    return await OfflineDatabase.instance.getComercialesOffline();
   }
 
   /// Carga artículos desde `ART_M`.
@@ -1680,6 +1860,9 @@ class PedidosService {
 
   /// Carga únicamente series de venta (`ser_tip == 'V'`) desde `SER_M`.
   static Future<List<OpcionMaestra>> getSeries() async {
+    if (!ConnectionStatusService.instance.isOnline) {
+      return OfflineDatabase.instance.getMaestrosOpciones('SER_M');
+    }
     try {
       final records = await _fetchAllRecords(
         AppConfig.endpoint('series'),

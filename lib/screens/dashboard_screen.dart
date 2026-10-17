@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/offline/connection_status_service.dart';
 import '../core/offline/offline_outbox_service.dart';
 import '../core/offline/offline_sync_service.dart';
+import '../core/update/update_service.dart';
 import '../state/auth_state.dart';
 import '../theme/app_theme.dart';
 
@@ -22,6 +24,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _cargarMetadatosSincronizacion();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        UpdateService.instance.checkUpdate(context, silent: true);
+      }
+    });
   }
 
   Future<void> _cargarMetadatosSincronizacion() async {
@@ -47,6 +54,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _sincronizarMaestros() {
+    if (!ConnectionStatusService.instance.isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay conexión a internet para sincronizar maestros.')),
+      );
+      return;
+    }
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -61,6 +74,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _sincronizarDocumentos() {
+    if (!ConnectionStatusService.instance.isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay conexión a internet para sincronizar documentos.')),
+      );
+      return;
+    }
     final auth = context.read<AuthState>();
     showDialog<void>(
       context: context,
@@ -78,6 +97,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _subirPendientesAhora() async {
+    if (!ConnectionStatusService.instance.isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay conexión a internet para subir documentos.')),
+      );
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(
       const SnackBar(
@@ -89,7 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
             ),
             SizedBox(width: 12),
-            Text('Subiendo documentos pendientes al servidor...'),
+            Text('Sincronizando...'),
           ],
         ),
         duration: Duration(seconds: 2),
@@ -130,14 +155,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: 'Presupuestos',
         subtitle: 'Consultar y gestionar presupuestos de venta.',
         color: AppColors.primary,
-        onTap: () => Navigator.of(context).pushNamed('/presupuestos'),
+        onTap: () => Navigator.of(context).pushNamed('/presupuestos').then((_) {
+          OfflineOutboxService.instance.refreshPendingCount();
+          _cargarMetadatosSincronizacion();
+        }),
       ),
       _DashboardCard(
         icon: Icons.shopping_bag_outlined,
         title: 'Pedidos',
         subtitle: 'Revisar pedidos activos y su detalle.',
         color: Colors.green.shade700,
-        onTap: () => Navigator.of(context).pushNamed('/pedidos'),
+        onTap: () => Navigator.of(context).pushNamed('/pedidos').then((_) {
+          OfflineOutboxService.instance.refreshPendingCount();
+          _cargarMetadatosSincronizacion();
+        }),
       ),
       _DashboardCard(
         icon: Icons.inventory_2_outlined,
@@ -189,14 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                'Selecciona la sección que quieres consultar.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 12),
+             
 
               // Alerta reactiva de documentos pendientes en Outbox
               ValueListenableBuilder<int>(
@@ -240,67 +264,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 },
               ),
 
-              // PANEL CON LOS 2 BOTONES DE SINCRONIZACIÓN
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.sync, size: 16, color: colorScheme.primary),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Sincronización para trabajo sin conexión',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        // BOTÓN 1: MAESTROS
-                        Expanded(
-                          child: _SyncActionButton(
-                            icon: Icons.layers_outlined,
-                            title: 'Sincronizar\nMaestros',
-                            subtitle: _lastSyncMasters != null
-                                ? 'Última: ${_formatFechaHora(_lastSyncMasters!)}'
-                                : 'Catálogo y datos generales',
-                            color: Colors.indigo,
-                            onTap: _sincronizarMaestros,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // BOTÓN 2: DOCUMENTOS
-                        Expanded(
-                          child: _SyncActionButton(
-                            icon: Icons.receipt_long_outlined,
-                            title: 'Sincronizar\nDocumentos',
-                            subtitle: _lastSyncDocs != null
-                                ? 'Últimos $_syncDays d · ${_formatFechaHora(_lastSyncDocs!)}'
-                                : 'Últimos $_syncDays días',
-                            color: Colors.teal,
-                            onTap: _sincronizarDocumentos,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              // PANEL CON LOS 2 BOTONES DE SINCRONIZACIÓN (Solo visible en modo con conexión)
+              AnimatedBuilder(
+                animation: ConnectionStatusService.instance,
+                builder: (context, _) {
+                  final isOnline = ConnectionStatusService.instance.isOnline;
+                  if (!isOnline) {
+                    return const SizedBox.shrink();
+                  }
 
-              const SizedBox(height: 12),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.sync,
+                                size: 16,
+                                color: colorScheme.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Sincronización para trabajo sin conexión',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final bool esEstrecho = constraints.maxWidth < 480;
+                              final btnMaestros = _SyncActionButton(
+                                icon: Icons.layers_outlined,
+                                title: esEstrecho ? 'Sincronizar Maestros' : 'Sincronizar\nMaestros',
+                                subtitle: _lastSyncMasters != null
+                                    ? 'Última: ${_formatFechaHora(_lastSyncMasters!)}'
+                                    : 'Catálogo y datos generales',
+                                color: Colors.indigo,
+                                enabled: true,
+                                onTap: _sincronizarMaestros,
+                              );
+                              final btnDocumentos = _SyncActionButton(
+                                icon: Icons.receipt_long_outlined,
+                                title: esEstrecho ? 'Sincronizar Documentos' : 'Sincronizar\nDocumentos',
+                                subtitle: _lastSyncDocs != null
+                                    ? 'Última: ${_formatFechaHora(_lastSyncDocs!)} (últ. $_syncDays d)'
+                                    : 'Últimos $_syncDays días',
+                                color: Colors.teal,
+                                enabled: true,
+                                onTap: _sincronizarDocumentos,
+                              );
+
+                              if (esEstrecho) {
+                                return Column(
+                                  children: [
+                                    btnMaestros,
+                                    const SizedBox(height: 8),
+                                    btnDocumentos,
+                                  ],
+                                );
+                              }
+
+                              return Row(
+                                children: [
+                                  Expanded(child: btnMaestros),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: btnDocumentos),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
               if (isSyncing)
                 Container(
                   width: double.infinity,
@@ -334,10 +387,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
 
               Expanded(
-                child: ListView.separated(
-                  itemCount: cards.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) => cards[index],
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.0,
+                  children: cards,
                 ),
               ),
             ],
@@ -353,26 +408,33 @@ class _SyncActionButton extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool enabled;
 
   const _SyncActionButton({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.color,
-    required this.onTap,
+    this.onTap,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final effectiveColor = enabled ? color : Colors.grey.shade500;
+    final effectiveBgColor = enabled
+        ? theme.colorScheme.surface
+        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4);
+
     return Material(
-      color: theme.colorScheme.surface,
+      color: effectiveBgColor,
       borderRadius: BorderRadius.circular(12),
-      elevation: 1,
+      elevation: enabled ? 1 : 0,
       shadowColor: Colors.black12,
       child: InkWell(
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -382,10 +444,10 @@ class _SyncActionButton extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.14),
+                  color: effectiveColor.withValues(alpha: enabled ? 0.14 : 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: effectiveColor, size: 20),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -395,10 +457,11 @@ class _SyncActionButton extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         height: 1.15,
+                        color: enabled ? null : theme.colorScheme.onSurface.withValues(alpha: 0.45),
                       ),
                       maxLines: 2,
                     ),
@@ -440,53 +503,52 @@ class _DashboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: theme.colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
+                  color: color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 26),
+                child: Icon(icon, color: color, size: 24),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onSurface,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.2,
                     ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ],
           ),

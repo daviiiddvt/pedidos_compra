@@ -32,6 +32,8 @@ import '../widgets/lineas_table.dart'; // Tabla con las líneas.
 import '../widgets/totales_card.dart'; // Tarjeta de totales.
 import '../widgets/estado_badge.dart'; // "Etiqueta" de color con el estado.
 import '../widgets/pedido_foto_tab.dart';
+import '../core/offline/connection_status_service.dart';
+import '../core/offline/offline_outbox_service.dart';
 
 
 /// PedidoDetailScreen: pantalla de DETALLE (no se edita aquí, solo se ve).
@@ -109,7 +111,20 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
     final lineas = pedido.lineas;
     final totales = calcularTotales(lineas); // Sumamos todas las líneas.
     final licService = context.watch<LicenciaService>();
-    final puedeEditar = AppColors.estadoCodigo(pedido.estado) != 'S' && !licService.esSoloLec;
+    final esServido = AppColors.estadoCodigo(pedido.estado) == 'S';
+    final esConfirmado = pedido.conKyr;
+    final puedeEditar = !esServido && !esConfirmado && !licService.esSoloLec;
+
+    String labelEditar = 'Editar';
+    if (!puedeEditar) {
+      if (esConfirmado) {
+        labelEditar = 'CONFIRMADO';
+      } else if (esServido) {
+        labelEditar = 'SERVIDO';
+      } else {
+        labelEditar = 'Solo lectura';
+      }
+    }
 
     return Column(
       children: [
@@ -200,8 +215,8 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: puedeEditar ? () => _editar(pedido) : null,
-                      icon: const Icon(Icons.edit, size: 18),
-                      label: Text(puedeEditar ? 'Editar' : 'SERVIDO', style: const TextStyle(fontSize: 12)),
+                      icon: Icon(puedeEditar ? Icons.edit : (esConfirmado ? Icons.lock : Icons.lock_outline), size: 18),
+                      label: Text(labelEditar, style: const TextStyle(fontSize: 12)),
                     ),
                   ),
                 ],
@@ -312,11 +327,19 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
   Future<void> _confirmar(Pedido pedido) async {
     setState(() => _confirmando = true);
     try {
+      final isOnline = ConnectionStatusService.instance.isOnline;
       await PedidosService.confirmarPedido(pedido.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pedido confirmado correctamente')),
+        SnackBar(
+          content: Text(
+            isOnline
+                ? 'Pedido confirmado correctamente'
+                : 'Pedido confirmado (se sincronizará al recuperar la conexión)',
+          ),
+        ),
       );
+      OfflineOutboxService.instance.refreshPendingCount();
       // Navegar a la lista y refrescar (elimina las vistas hasta /home)
       Navigator.of(context).pushNamedAndRemoveUntil(
         '/pedidos',
