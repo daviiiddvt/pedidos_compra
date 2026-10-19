@@ -97,6 +97,14 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
               ? 'Pedido ${pedido.numeroPedido}'
               : 'Pedido',
         ),
+        actions: [
+          if (pedido != null && ((pedido.id != null && pedido.id! < 0) || pedido.numeroPedido.startsWith('OFFLINE-')))
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              tooltip: 'Rechazar y eliminar subida',
+              onPressed: () => _rechazarSubida(pedido),
+            ),
+        ],
       ),
       body: _cargando
           ? const Center(child: CircularProgressIndicator()) // Mientras carga.
@@ -323,6 +331,55 @@ class _PedidoDetailScreenState extends State<PedidoDetailScreen> {
 
 
 
+
+  Future<void> _rechazarSubida(Pedido pedido) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: AppColors.error),
+            SizedBox(width: 8),
+            Text('Rechazar subida'),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro de que deseas rechazar y eliminar este pedido pendiente de sincronizar?\n\n'
+          'El documento se eliminará permanentemente de tu dispositivo y no se subirá al servidor.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Rechazar y eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    try {
+      await PedidosService.remove(pedido.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pedido pendiente rechazado y eliminado.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al rechazar pedido: $e'), backgroundColor: AppColors.error),
+      );
+    }
+  }
 
   Future<void> _confirmar(Pedido pedido) async {
     setState(() => _confirmando = true);

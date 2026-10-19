@@ -7,6 +7,7 @@ import '../core/offline/offline_sync_service.dart';
 import '../core/update/update_service.dart';
 import '../state/auth_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/cola_salida_modal.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -229,36 +230,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   if (count <= 0) return const SizedBox.shrink();
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.amber.shade400),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.cloud_upload_outlined, color: Colors.amber.shade900),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            '$count documento(s) pendiente(s) de sincronizar',
-                            style: TextStyle(
-                              color: Colors.amber.shade900,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => ColaSalidaModal.show(context),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          child: Row(
+                            children: [
+                              Icon(Icons.cloud_upload_outlined, color: Colors.amber.shade900),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '$count documento(s) pendiente(s)',
+                                      style: TextStyle(
+                                        color: Colors.amber.shade900,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Toca para revisar, subir o rechazar',
+                                      style: TextStyle(
+                                        color: Colors.amber.shade800,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        TextButton(
-                          onPressed: _subirPendientesAhora,
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.amber.shade900,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          child: const Text('Subir ahora'),
-                        ),
-                      ],
+                      ),
                     ),
                   );
                 },

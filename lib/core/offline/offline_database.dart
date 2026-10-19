@@ -1487,6 +1487,104 @@ class OfflineDatabase {
     onOutboxChanged?.call();
   }
 
+  /// Descarta y elimina un elemento de la cola outbox por su ID (o ID de documento).
+  /// Si el documento asociado era temporal (creado offline, con ID negativo o acción 'crear'),
+  /// también se eliminan sus registros locales de pedidos_offline / presupuestos_offline.
+  Future<void> discardOutboxItem(String outboxId) async {
+    final cleanId = outboxId.trim();
+    if (cleanId.isEmpty) return;
+
+    final rows = await db.query(
+      'outbox_cola',
+      where: 'id = ? OR documento_id = ?',
+      whereArgs: [cleanId, cleanId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return;
+
+    final item = rows.first;
+    final realOutboxId = (item['id'] ?? '').toString();
+    final tipo = (item['tipo'] ?? '').toString();
+    final accion = (item['accion'] ?? 'crear').toString();
+    final docId = (item['documento_id'] ?? '').toString();
+
+    final batch = db.batch();
+    batch.delete('outbox_cola', where: 'id = ?', whereArgs: [realOutboxId]);
+
+    final isTempDoc = docId.startsWith('-') ||
+        (int.tryParse(docId) != null && int.parse(docId) < 0) ||
+        docId.startsWith('OFFLINE-') ||
+        accion == 'crear';
+
+    if (tipo == 'pedido') {
+      if (isTempDoc) {
+        batch.delete('pedidos_offline', where: 'id = ?', whereArgs: [docId]);
+        batch.delete('pedidos_lineas_offline', where: 'pedido_id = ?', whereArgs: [docId]);
+      } else {
+        if (accion == 'confirmar') {
+          final pedRows = await db.query('pedidos_offline', where: 'id = ?', whereArgs: [docId], limit: 1);
+          if (pedRows.isNotEmpty) {
+            try {
+              final map = jsonDecode(pedRows.first['json_data'] as String) as Map<String, dynamic>;
+              map['con_kyr'] = 0;
+              map['conKyr'] = false;
+              batch.update(
+                'pedidos_offline',
+                {'json_data': jsonEncode(map), 'is_outbox': 0},
+                where: 'id = ?',
+                whereArgs: [docId],
+              );
+            } catch (_) {
+              batch.update('pedidos_offline', {'is_outbox': 0}, where: 'id = ?', whereArgs: [docId]);
+            }
+          }
+        } else {
+          batch.update('pedidos_offline', {'is_outbox': 0}, where: 'id = ?', whereArgs: [docId]);
+        }
+      }
+    } else if (tipo == 'presupuesto') {
+      if (isTempDoc) {
+        batch.delete('presupuestos_offline', where: 'id = ?', whereArgs: [docId]);
+        batch.delete('presupuestos_lineas_offline', where: 'presupuesto_id = ?', whereArgs: [docId]);
+      } else {
+        if (accion == 'marcarAceptado') {
+          final preRows = await db.query('presupuestos_offline', where: 'id = ?', whereArgs: [docId], limit: 1);
+          if (preRows.isNotEmpty) {
+            try {
+              final map = jsonDecode(preRows.first['json_data'] as String) as Map<String, dynamic>;
+              map['est'] = 'P';
+              map['estado'] = 'P';
+              batch.update(
+                'presupuestos_offline',
+                {'estado': 'P', 'json_data': jsonEncode(map), 'is_outbox': 0},
+                where: 'id = ?',
+                whereArgs: [docId],
+              );
+            } catch (_) {
+              batch.update('presupuestos_offline', {'is_outbox': 0}, where: 'id = ?', whereArgs: [docId]);
+            }
+          }
+        } else {
+          batch.update('presupuestos_offline', {'is_outbox': 0}, where: 'id = ?', whereArgs: [docId]);
+        }
+      }
+    }
+
+    await batch.commit(noResult: true);
+    onOutboxChanged?.call();
+  }
+
+  /// Descarta y elimina todos los elementos pendientes de la cola outbox.
+  Future<void> discardAllOutboxItems() async {
+    final pending = await getPendingOutbox();
+    for (final item in pending) {
+      final id = (item['id'] ?? '').toString();
+      if (id.isNotEmpty) {
+        await discardOutboxItem(id);
+      }
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getPendingOutbox() async {
     return db.query(
       'outbox_cola',
@@ -1494,6 +1592,16 @@ class OfflineDatabase {
       whereArgs: ['completado'],
       orderBy: 'created_at ASC',
     );
+  }
+
+  Future<Map<String, dynamic>?> getOutboxItem(String outboxId) async {
+    final rows = await db.query(
+      'outbox_cola',
+      where: 'id = ? OR documento_id = ?',
+      whereArgs: [outboxId, outboxId],
+      limit: 1,
+    );
+    return rows.isNotEmpty ? rows.first : null;
   }
 
   Future<int> getPendingOutboxCount() async {
@@ -1585,6 +1693,20 @@ class OfflineDatabase {
           }
         }
       }
+
+      final realIdNum = int.tryParse(realIdStr) ?? 0;
+      if (realIdNum > 0) {
+        batch.rawUpdate('''
+          UPDATE presupuestos_offline
+          SET json_data = REPLACE(json_data, '"vta_ped_g":$tempDocId', '"vta_ped_g":$realIdNum')
+          WHERE json_data LIKE '%"vta_ped_g":$tempDocId%'
+        ''');
+        batch.rawUpdate('''
+          UPDATE outbox_cola
+          SET payload_json = REPLACE(payload_json, '"vta_ped_g":$tempDocId', '"vta_ped_g":$realIdNum')
+          WHERE tipo = 'presupuesto' AND payload_json LIKE '%"vta_ped_g":$tempDocId%'
+        ''');
+      }
     } else {
       batch.delete('presupuestos_offline', where: 'id = ?', whereArgs: [tempDocId]);
       batch.delete('presupuestos_lineas_offline', where: 'presupuesto_id = ?', whereArgs: [tempDocId]);
@@ -1632,6 +1754,25 @@ class OfflineDatabase {
             );
           }
         }
+      }
+
+      final realIdNum = int.tryParse(realIdStr) ?? 0;
+      if (realIdNum > 0) {
+        batch.rawUpdate('''
+          UPDATE pedidos_offline
+          SET json_data = REPLACE(json_data, '"num_pre":"$tempDocId"', '"num_pre":"$realIdNum"')
+          WHERE json_data LIKE '%"num_pre":"$tempDocId"%'
+        ''');
+        batch.rawUpdate('''
+          UPDATE outbox_cola
+          SET payload_json = REPLACE(payload_json, '"num_pre":"$tempDocId"', '"num_pre":"$realIdNum"')
+          WHERE tipo = 'pedido' AND payload_json LIKE '%"num_pre":"$tempDocId"%'
+        ''');
+        batch.rawUpdate('''
+          UPDATE outbox_cola
+          SET payload_json = REPLACE(payload_json, '"numeroPresupuesto":"$tempDocId"', '"numeroPresupuesto":"$realIdNum"')
+          WHERE tipo = 'pedido' AND payload_json LIKE '%"numeroPresupuesto":"$tempDocId"%'
+        ''');
       }
     }
 

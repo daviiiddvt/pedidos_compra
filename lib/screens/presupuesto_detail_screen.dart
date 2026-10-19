@@ -62,6 +62,55 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
     }
   }
 
+  Future<void> _rechazarSubida(PresupuestoVenta pre) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: AppColors.error),
+            SizedBox(width: 8),
+            Text('Rechazar subida'),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro de que deseas rechazar y eliminar este presupuesto pendiente de sincronizar?\n\n'
+          'El documento se eliminará permanentemente de tu dispositivo y no se subirá al servidor.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Rechazar y eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    try {
+      await PresupuestosService.remove(pre.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Presupuesto pendiente rechazado y eliminado.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al rechazar presupuesto: $e'), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
   Future<void> _convertirAPedidoOffline({
     required PresupuestoVenta presupuesto,
     required Pedido pedidoVisual,
@@ -134,6 +183,14 @@ class _PresupuestoDetailScreenState extends State<PresupuestoDetailScreen> {
                   ? 'Presupuesto ${presupuesto.numeroPresupuesto}'
                   : 'Presupuesto ${presupuesto.id}'),
         ),
+        actions: [
+          if (presupuesto != null && ((presupuesto.id != null && presupuesto.id! < 0) || presupuesto.numeroPresupuesto.startsWith('OFFLINE-')))
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              tooltip: 'Rechazar y eliminar subida',
+              onPressed: () => _rechazarSubida(presupuesto),
+            ),
+        ],
       ),
       body: _cargando
           ? const Center(child: CircularProgressIndicator())

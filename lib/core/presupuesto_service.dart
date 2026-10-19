@@ -6,6 +6,7 @@ import 'api_service.dart';
 import 'master_cache_service.dart';
 import '../models/models.dart';
 import 'offline/offline_database.dart';
+import 'offline/offline_outbox_service.dart';
 import 'offline/connection_status_service.dart';
 
 /// API operations for sales budgets. Budgets use the same document models and
@@ -341,24 +342,62 @@ class PresupuestosService {
     PresupuestoVenta pedido, {
     bool isSync = false,
   }) async {
+    int? id;
     try {
       final dirId = await _ensureDireccionId(pedido.clienteId, pedido.direccionEnvio);
       final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
       
+      final payload = _payload(pedidoMapeado);
+      final estadoOriginal = payload['est'] ?? 'P';
+      // La cabecera se debe crear SIEMPRE en estado 'P' (Pendiente) para que Velneo
+      // permita el alta de sus líneas sin bloquearlas con "Error alta (3)".
+      payload['est'] = 'P';
+
       final json = await _api.post(
         AppConfig.endpoint('presupuestos'),
-        body: _payload(pedidoMapeado),
+        body: payload,
       );
       final data = payloadData(json);
       if (data is! Map) throw ApiException('No se pudo crear el presupuesto.');
       final created = PresupuestoVenta.fromJson(Map<String, dynamic>.from(data));
-      final id = created.id;
+      id = created.id;
       if (id == null) {
         throw ApiException('El servidor no devolvió el ID del presupuesto creado.');
       }
+
       await enviarLineas(id, pedido.lineas);
-      return created.copyWith(id: id, lineas: pedido.lineas);
+
+      // Si el presupuesto estaba marcado como Aceptado ('A'), lo actualizamos
+      // ahora que las líneas ya han sido dadas de alta correctamente en Velneo.
+      if (estadoOriginal == 'A') {
+        try {
+          await _api.post('${AppConfig.endpoint('presupuestos')}/$id', body: {'est': 'A'});
+          await _marcarLineasAceptadas(id);
+        } catch (e) {
+          debugPrint('[PRESUPUESTOS] Error al marcar presupuesto $id como aceptado tras guardar líneas: $e');
+        }
+      }
+
+      // Si tiene pedido asociado en el servidor, enlazamos
+      if (pedido.vtaPedG > 0) {
+        try {
+          await linkPedido(id, pedido.vtaPedG, isSync: true);
+        } catch (e) {
+          debugPrint('[PRESUPUESTOS] Error enlazando pedido asociado ${pedido.vtaPedG} a presupuesto $id: $e');
+        }
+      }
+
+      return created.copyWith(id: id, lineas: pedido.lineas, estado: estadoOriginal);
     } catch (e) {
+      if (id != null && id > 0) {
+        // Si la cabecera se creó en Velneo pero fallaron las líneas, eliminamos la cabecera vacía
+        // para no dejar presupuestos huérfanos sin líneas en el servidor al reintentar.
+        try {
+          await _api.delete('${AppConfig.endpoint('presupuestos')}/$id');
+        } catch (delErr) {
+          debugPrint('[PRESUPUESTOS] Error al limpiar cabecera huérfana de presupuesto $id tras fallo de líneas: $delErr');
+        }
+      }
       if (isSync) {
         // En sincronización Outbox: propagar el error para reintentar más tarde, NUNCA duplicar
         rethrow;
@@ -485,9 +524,16 @@ class PresupuestosService {
       final dirId = await _ensureDireccionId(pedido.clienteId, pedido.direccionEnvio);
       final pedidoMapeado = pedido.copyWith(direccionEnvio: dirId);
 
+      final payload = _payload(pedidoMapeado);
+      final estadoOriginal = payload['est'] ?? 'P';
+      // Mantener en estado 'P' mientras se actualizan/crean líneas para evitar Error alta (3)
+      if (estadoOriginal == 'A') {
+        payload['est'] = 'P';
+      }
+
       final json = await _api.post(
         '${AppConfig.endpoint('presupuestos')}/$id',
-        body: _payload(pedidoMapeado),
+        body: payload,
       );
       final data = payloadData(json);
       for (final lineId in removedLineIds) {
@@ -496,8 +542,13 @@ class PresupuestosService {
         }
       }
       await enviarLineas(id, pedido.lineas);
-      if (AppColors.estadoCodigo(pedido.estado) == 'A') {
-        await _marcarLineasAceptadas(id);
+      if (estadoOriginal == 'A') {
+        try {
+          await _api.post('${AppConfig.endpoint('presupuestos')}/$id', body: {'est': 'A'});
+          await _marcarLineasAceptadas(id);
+        } catch (e) {
+          debugPrint('[PRESUPUESTOS] Error al marcar presupuesto $id como aceptado tras actualizar líneas: $e');
+        }
       }
       if (data is Map) {
         return PresupuestoVenta.fromJson(Map<String, dynamic>.from(data))
@@ -631,8 +682,21 @@ class PresupuestosService {
     await _api.delete('${AppConfig.endpoint('lineasPresupuesto')}/$id');
   }
 
+  /// Elimina una cabecera mediante `DELETE VTA_PRE_G/{id}` o descarta de la cola offline si es local.
   static Future<void> remove(dynamic id) async {
+    final isOfflineId = (id is num && id < 0) ||
+        (int.tryParse('$id') != null && int.parse('$id') < 0) ||
+        '$id'.startsWith('OFFLINE-');
+    if (isOfflineId) {
+      await OfflineDatabase.instance.discardOutboxItem('$id');
+      await OfflineOutboxService.instance.refreshPendingCount();
+      return;
+    }
     await _api.delete('${AppConfig.endpoint('presupuestos')}/$id');
+    try {
+      await OfflineDatabase.instance.discardOutboxItem('$id');
+      await OfflineOutboxService.instance.refreshPendingCount();
+    } catch (_) {}
   }
 }
 

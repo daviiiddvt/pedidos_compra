@@ -1,18 +1,15 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../core/config.dart';
-import '../core/formatters.dart';
 import '../core/licencia/licencia_service.dart';
 import '../core/offline/connection_status_service.dart';
-import '../core/offline/offline_database.dart';
 import '../core/offline/offline_outbox_service.dart';
 import '../core/offline/offline_sync_service.dart';
 import '../core/update/update_service.dart';
 import '../state/theme_settings.dart';
+import '../widgets/cola_salida_modal.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -119,19 +116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _mostrarDetallePendientes() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => _DetallePendientesModal(
-        onSubir: () {
-          Navigator.of(ctx).pop();
-          _subirPendientesAhora();
-        },
-      ),
-    );
+    ColaSalidaModal.show(context);
   }
 
   @override
@@ -489,163 +474,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-/// Modal inferior para ver el detalle de los documentos pendientes de la cola de salida
-class _DetallePendientesModal extends StatefulWidget {
-  final VoidCallback onSubir;
-
-  const _DetallePendientesModal({required this.onSubir});
-
-  @override
-  State<_DetallePendientesModal> createState() => _DetallePendientesModalState();
-}
-
-class _DetallePendientesModalState extends State<_DetallePendientesModal> {
-  List<Map<String, dynamic>> _items = [];
-  bool _cargando = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _cargar();
-  }
-
-  Future<void> _cargar() async {
-    final list = await OfflineDatabase.instance.getPendingOutbox();
-    if (mounted) {
-      setState(() {
-        _items = list;
-        _cargando = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.outbox, color: theme.colorScheme.primary),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Documentos Pendientes de Transmitir',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_cargando)
-              const Center(child: Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(),
-              ))
-            else if (_items.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text('No hay documentos en la cola de salida.'),
-                ),
-              )
-            else
-              Expanded(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: _items.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (ctx, index) {
-                    final item = _items[index];
-                    final tipo = (item['tipo'] ?? '').toString().toUpperCase();
-                    final estado = (item['estado'] ?? '').toString();
-                    final errorMsg = item['error_msg'] as String?;
-                    final payloadRaw = item['payload_json'] as String? ?? '{}';
-
-                    String clienteNom = 'Cliente desconocido';
-                    String fecha = '';
-                    double total = 0.0;
-                    int lineasCount = 0;
-
-                    try {
-                      final parsed = jsonDecode(payloadRaw) as Map<String, dynamic>;
-                      final doc = (parsed['pedido'] ?? parsed['presupuesto'] ?? parsed) as Map<String, dynamic>;
-                      clienteNom = '${doc['clt_nom'] ?? doc['clienteNombre'] ?? 'Cliente #${doc['clt'] ?? doc['clienteId']}'}';
-                      fecha = '${doc['fch'] ?? doc['fecha'] ?? ''}';
-                      total = (doc['tot_ped'] ?? doc['tot_pre'] ?? doc['total'] ?? 0.0) is num
-                          ? (doc['tot_ped'] ?? doc['tot_pre'] ?? doc['total'] ?? 0.0).toDouble()
-                          : 0.0;
-                      final lins = (doc['lineas'] ?? []) as List;
-                      lineasCount = lins.length;
-                    } catch (_) {}
-
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-                      leading: Chip(
-                        label: Text(tipo, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                        backgroundColor: tipo == 'PEDIDO'
-                            ? Colors.green.shade100
-                            : Colors.blue.shade100,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                      ),
-                      title: Text(
-                        clienteNom,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Fecha: $fecha · $lineasCount línea(s) · Total: ${formatNumber(total, decimals: 2)} €',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          if (errorMsg != null && errorMsg.isNotEmpty)
-                            Text(
-                              'Error: $errorMsg',
-                              style: TextStyle(color: Colors.red.shade700, fontSize: 11),
-                            )
-                          else if (estado == 'subiendo')
-                            Text(
-                              'Transmitiendo ahora...',
-                              style: TextStyle(color: Colors.blue.shade700, fontSize: 11),
-                            ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            const SizedBox(height: 16),
-            if (_items.isNotEmpty)
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: widget.onSubir,
-                  icon: const Icon(Icons.cloud_upload),
-                  label: const Text('Subir todos los pendientes ahora'),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}

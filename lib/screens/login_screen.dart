@@ -42,13 +42,11 @@ class _LoginScreenState extends State<LoginScreen> {
   late final TextEditingController _hostCtrl;
   late final TextEditingController _instanceCtrl;
   late final TextEditingController _versionCtrl;
-  late final TextEditingController _manualUrlCtrl;
   late final TextEditingController _apiKeyCtrl;
   late final TextEditingController _usernameCtrl;
   late final TextEditingController _passwordCtrl;
 
   bool _mostrarConfig = false;
-  bool _modoManual = false;
 
   /// initState: se ejecuta UNA vez, justo cuando la pantalla nace.
   @override
@@ -66,52 +64,26 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordCtrl = TextEditingController();
 
     final currentBase = AppConfig.baseUrl.trim();
-    _manualUrlCtrl = TextEditingController(text: currentBase);
 
     // Si la URL por defecto tiene XXXX, o está vacía, o no hay instancia, mostramos la configuración de red.
     if (currentBase.contains('XXXX') || currentBase.isEmpty || AppConfig.serverInstance.trim().isEmpty) {
       _mostrarConfig = true;
     }
-
-    _hostCtrl.addListener(_onParamChanged);
-    _instanceCtrl.addListener(_onParamChanged);
-    _versionCtrl.addListener(_onParamChanged);
   }
 
-  void _onParamChanged() {
-    if (!_modoManual) {
-      setState(() {
-        _manualUrlCtrl.text = AppConfig.buildBaseUrl(
-          host: _hostCtrl.text,
-          instance: _instanceCtrl.text,
-          version: _versionCtrl.text,
-        );
-      });
-    }
-  }
-
-  String get _currentUrl {
-    if (_modoManual) {
-      return _manualUrlCtrl.text.trim();
-    }
-    return AppConfig.buildBaseUrl(
-      host: _hostCtrl.text,
-      instance: _instanceCtrl.text,
-      version: _versionCtrl.text,
-    );
-  }
+  String get _currentUrl => AppConfig.buildBaseUrl(
+        host: _hostCtrl.text,
+        instance: _instanceCtrl.text,
+        version: _versionCtrl.text,
+      );
 
   /// dispose: se ejecuta cuando la pantalla muere. Libera la memoria de los
   /// controllers (buena práctica: siempre que creamos uno, lo limpiamos).
   @override
   void dispose() {
-    _hostCtrl.removeListener(_onParamChanged);
-    _instanceCtrl.removeListener(_onParamChanged);
-    _versionCtrl.removeListener(_onParamChanged);
     _hostCtrl.dispose();
     _instanceCtrl.dispose();
     _versionCtrl.dispose();
-    _manualUrlCtrl.dispose();
     _apiKeyCtrl.dispose();
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
@@ -121,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
   /// _conectar: lo que pasa al pulsar el botón "Conectar".
   Future<void> _conectar(AuthState auth) async {
     final finalUrl = _currentUrl;
-    if (!_modoManual && _instanceCtrl.text.trim().isEmpty) {
+    if (_instanceCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor, indica la instancia de datos')),
       );
@@ -217,106 +189,73 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (_mostrarConfig) ...[
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Conexión de red',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                TextButton.icon(
-                                  onPressed: () {
-                                    setState(() {
-                                      _modoManual = !_modoManual;
-                                      if (!_modoManual) {
-                                        AppConfig.parseAndSetBaseUrl(_manualUrlCtrl.text);
-                                        _hostCtrl.text = AppConfig.serverHost;
-                                        _instanceCtrl.text = AppConfig.serverInstance;
-                                        _versionCtrl.text = AppConfig.serverVersion;
-                                      }
-                                    });
-                                  },
-                                  icon: Icon(_modoManual ? Icons.tune : Icons.edit_note, size: 16),
-                                  label: Text(
-                                    _modoManual ? 'Modo guiado' : 'URL manual',
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                ),
-                              ],
+                            const Text(
+                              'Conexión de red',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             const SizedBox(height: 12),
 
-                            if (_modoManual) ...[
-                              // Campo URL del servidor manual completo
-                              CampoForm(
-                                key: const ValueKey('serverUrl'),
-                                label: 'URL del servidor (completa)',
-                                controller: _manualUrlCtrl,
-                                placeholder: 'https://tecerp.nunsys.com:4331/...',
-                                keyboardType: TextInputType.url,
-                              ),
-                            ] else ...[
-                              // Modo guiado parametrizado
-                              CampoForm(
-                                key: const ValueKey('serverHost'),
-                                label: 'Servidor (Host)',
-                                controller: _hostCtrl,
-                                placeholder: 'https://tecerp.nunsys.com:4331',
-                                keyboardType: TextInputType.url,
-                              ),
-                              if (licHost != null && licHost.isNotEmpty && licHost != _hostCtrl.text) ...[
-                                const SizedBox(height: 4),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: InkWell(
-                                    onTap: () {
+                            // Modo guiado parametrizado (único modo activo)
+                            CampoForm(
+                              key: const ValueKey('serverHost'),
+                              label: 'Servidor (Host)',
+                              controller: _hostCtrl,
+                              placeholder: 'Server API (URL base)',
+                              keyboardType: TextInputType.url,
+                            ),
+                            if (licHost != null && licHost.isNotEmpty && licHost != _hostCtrl.text) ...[
+                              const SizedBox(height: 4),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() {
                                       _hostCtrl.text = licHost;
-                                      _onParamChanged();
-                                    },
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.copy, size: 13, color: Theme.of(context).colorScheme.primary),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Usar host de licencia ($licHost)',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Theme.of(context).colorScheme.primary,
-                                              fontWeight: FontWeight.w500,
-                                            ),
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.copy, size: 13, color: Theme.of(context).colorScheme.primary),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Usar host de licencia ($licHost)',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Theme.of(context).colorScheme.primary,
+                                            fontWeight: FontWeight.w500,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
-                              ],
-                              const SizedBox(height: 12),
-
-                              // Instancia
-                              CampoForm(
-                                key: const ValueKey('serverInstance'),
-                                label: 'Instancia de datos',
-                                controller: _instanceCtrl,
-                                placeholder: 'Ej: TECMICRO_PRUEBAS_AD_AVANZADO',
-                              ),
-                              const SizedBox(height: 12),
-
-                              // Versión
-                              CampoForm(
-                                key: const ValueKey('serverVersion'),
-                                label: 'Versión de la API',
-                                controller: _versionCtrl,
-                                placeholder: 'v1',
                               ),
                             ],
+                            const SizedBox(height: 12),
+
+                            // Instancia
+                            CampoForm(
+                              key: const ValueKey('serverInstance'),
+                              label: 'Instancia de datos',
+                              controller: _instanceCtrl,
+                              placeholder: 'Instancia del servidor',
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Versión
+                            CampoForm(
+                              key: const ValueKey('serverVersion'),
+                              label: 'Versión de la API',
+                              controller: _versionCtrl,
+                              placeholder: 'Versión de la API',
+                            ),
                             const SizedBox(height: 12),
 
                             // Campo API Key

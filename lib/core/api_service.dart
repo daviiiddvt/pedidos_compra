@@ -34,6 +34,7 @@ import '../models/models.dart'; // Nuestros modelos (Pedido, OpcionMaestra).
 import '../models/articulo.dart';
 import 'offline/connection_status_service.dart';
 import 'offline/offline_database.dart';
+import 'offline/offline_outbox_service.dart';
 import '../theme/app_theme.dart'; // AppColors (para traducir el estado a código VELNEO).
 
 /// Convierte el porcentaje de IVA usado por la interfaz al código de registro
@@ -1211,9 +1212,21 @@ class PedidosService {
     await _api.delete('${AppConfig.endpoint('lineas')}/$id');
   }
 
-  /// Elimina una cabecera mediante `DELETE VTA_PED_G/{id}`.
+  /// Elimina una cabecera mediante `DELETE VTA_PED_G/{id}` o descarta de la cola offline si es local.
   static Future<void> remove(dynamic id) async {
+    final isOfflineId = (id is num && id < 0) ||
+        (int.tryParse('$id') != null && int.parse('$id') < 0) ||
+        '$id'.startsWith('OFFLINE-');
+    if (isOfflineId) {
+      await OfflineDatabase.instance.discardOutboxItem('$id');
+      await OfflineOutboxService.instance.refreshPendingCount();
+      return;
+    }
     await _api.delete('${AppConfig.endpoint('pedidos')}/$id');
+    try {
+      await OfflineDatabase.instance.discardOutboxItem('$id');
+      await OfflineOutboxService.instance.refreshPendingCount();
+    } catch (_) {}
   }
 
   /// Carga una lista maestra genérica como [OpcionMaestra].

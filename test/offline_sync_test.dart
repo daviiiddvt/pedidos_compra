@@ -264,6 +264,72 @@ void main() {
       final outboxCount = await offlineDb.getPendingOutboxCount();
       expect(outboxCount, equals(1));
     });
+
+    test('Rechazar y eliminar subida pendiente (discardOutboxItem)', () async {
+      final pedidoOffline = Pedido(
+        id: -999,
+        nDocumento: 999,
+        numeroPedido: 'OFFLINE-999',
+        clienteId: 10,
+        clienteNombre: 'Cliente Rechazar',
+        comercial: 'COM01',
+        estado: 'PENDIENTE',
+        total: 120.0,
+        lineas: const [
+          LineaPedido(
+            id: -1,
+            articulo: 'ART99',
+            articuloNombre: 'Artículo Temporal',
+            cantidad: 1,
+            precio: 120.0,
+            importe: 120.0,
+          ),
+        ],
+      );
+
+      await offlineDb.savePedidoOfflineOutbox(pedido: pedidoOffline, accion: 'crear');
+      expect(await offlineDb.getPendingOutboxCount(), equals(1));
+
+      var pedidos = await offlineDb.getPedidosOffline();
+      expect(pedidos.any((p) => p.id == -999), isTrue);
+
+      // Descartar la subida
+      await offlineDb.discardOutboxItem('-999');
+
+      expect(await offlineDb.getPendingOutboxCount(), equals(0));
+      pedidos = await offlineDb.getPedidosOffline();
+      expect(pedidos.any((p) => p.id == -999), isFalse);
+    });
+
+    test('Rechazar todas las subidas pendientes (discardAllOutboxItems)', () async {
+      final pedidoOffline = Pedido(
+        id: -1001,
+        nDocumento: 1001,
+        clienteId: 10,
+        clienteNombre: 'Cliente 1',
+        total: 50.0,
+      );
+      final preOffline = PresupuestoVenta(
+        id: -1002,
+        numeroPresupuesto: 'PRE-OFF-1002',
+        clienteId: 20,
+        clienteNombre: 'Cliente 2',
+        total: 75.0,
+      );
+
+      await offlineDb.savePedidoOfflineOutbox(pedido: pedidoOffline, accion: 'crear');
+      await offlineDb.savePresupuestoOfflineOutbox(presupuesto: preOffline, accion: 'crear');
+
+      expect(await offlineDb.getPendingOutboxCount(), equals(2));
+
+      await offlineDb.discardAllOutboxItems();
+
+      expect(await offlineDb.getPendingOutboxCount(), equals(0));
+      final pedidos = await offlineDb.getPedidosOffline();
+      final presupuestos = await offlineDb.getPresupuestosOffline();
+      expect(pedidos.any((p) => p.id == -1001), isFalse);
+      expect(presupuestos.any((p) => p.id == -1002), isFalse);
+    });
   });
 }
 
