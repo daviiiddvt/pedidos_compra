@@ -75,7 +75,7 @@ class OfflineDatabase {
         identificador TEXT DEFAULT '',
         licencia_codigo TEXT DEFAULT '',
         uuid TEXT DEFAULT '',
-        server_host TEXT DEFAULT 'https://tecerp.nunsys.com:4331',
+        server_host TEXT DEFAULT '',
         server_api TEXT DEFAULT '',
         version TEXT DEFAULT '',
         validada INTEGER DEFAULT 0,

@@ -405,7 +405,8 @@ class _ColaSalidaModalState extends State<ColaSalidaModal> {
                               final doc = (parsed['pedido'] ?? parsed['presupuesto'] ?? parsed)
                                   as Map<String, dynamic>;
                               clienteNom = '${doc['clt_nom'] ?? doc['clienteNombre'] ?? 'Cliente #${doc['clt'] ?? doc['clienteId']}'}';
-                              fecha = '${doc['fch'] ?? doc['fecha'] ?? ''}';
+                              final rawFecha = '${doc['fch'] ?? doc['fecha'] ?? ''}';
+                              fecha = rawFecha.isNotEmpty ? formatDateTime(rawFecha) : '';
                               total = (doc['tot_ped'] ?? doc['tot_pre'] ?? doc['total'] ?? 0.0) is num
                                   ? (doc['tot_ped'] ?? doc['tot_pre'] ?? doc['total'] ?? 0.0).toDouble()
                                   : 0.0;

@@ -33,6 +33,24 @@ String formatDate(dynamic iso) {
       '${date.year}';
 }
 
+/// formatDateTime: convierte una fecha y hora a formato español:
+/// - "10/09/2026" si la hora es medianoche o no tiene hora
+/// - "10/09/2026 14:30" si incluye una hora diferente de 00:00.
+String formatDateTime(dynamic iso) {
+  if (iso == null || '$iso'.isEmpty) return '—';
+
+  final text = '$iso';
+  final date = DateTime.tryParse(text.contains('T') ? text : '${text}T00:00:00');
+
+  if (date == null) return text;
+
+  final fecha = '${_diaConCero(date.day)}/${_diaConCero(date.month)}/${date.year}';
+  if (date.hour != 0 || date.minute != 0) {
+    return '$fecha ${_diaConCero(date.hour)}:${_diaConCero(date.minute)}';
+  }
+  return fecha;
+}
+
 /// parseNumber: convierte texto escrito por el usuario a número decimal.
 /// - Entrada:  "1.234,56"  o "1234,56"  o "12.34"
 /// - Salida:   1234.56 (número de verdad)

@@ -96,3 +96,5 @@ flutter_launcher_icons:
 flutter:
   # Habilita los iconos del sistema de Material Design (obligatorio).
   uses-material-design: true
+  assets:
+    - assets/icon/TecPED.jpg

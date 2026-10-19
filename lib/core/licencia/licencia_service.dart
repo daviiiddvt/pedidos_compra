@@ -43,6 +43,9 @@ class LicenciaService extends ChangeNotifier {
   http.Client get _activeClient => _customClient ?? _defaultClient;
 
   Licencia? _licencia;
+  DateTime? _ultimoCheckBaja;
+  bool _verificandoBaja = false;
+  void Function(String motivo)? onLicenciaRevocada;
 
   LicenciaService({http.Client? httpClient}) : _customClient = httpClient;
 
@@ -83,11 +86,57 @@ class LicenciaService extends ChangeNotifier {
         lic.validada = false;
         await save(lic);
         debugPrint('⚠️ Licencia invalidada por el servidor tras comprobación');
+        onLicenciaRevocada?.call(res.mensaje);
       } else if (res.estado == LicenciaEstado.valida) {
         debugPrint('✅ Licencia revalidada en segundo plano con éxito');
       }
     } catch (e) {
       debugPrint('ℹ️ Revalidación silenciosa no completada (offline): $e');
+    }
+  }
+
+  /// Comprueba en el servidor si la licencia sigue activa o ha sido dada de baja.
+  /// Se ejecuta cada vez que el usuario se mueve a otra ventana dentro de la aplicación.
+  Future<void> comprobarBajaSiProcede() async {
+    final lic = _licencia;
+    if (lic == null || !lic.isConfigured || !lic.validada) return;
+
+    if (_verificandoBaja) return;
+
+    final now = DateTime.now();
+    // Throttle mínimo de 1.5s para no solapar peticiones en navegaciones muy rápidas
+    if (_ultimoCheckBaja != null &&
+        now.difference(_ultimoCheckBaja!) < const Duration(milliseconds: 1500)) {
+      return;
+    }
+
+    _verificandoBaja = true;
+    _ultimoCheckBaja = now;
+
+    try {
+      debugPrint('🔍 [LICENCIA] Comprobando si la licencia sigue activa tras cambio de ventana...');
+      final res = await validate(
+        lic,
+        saveOnSuccess: false,
+        timeoutOverride: const Duration(seconds: 5),
+      );
+
+      if (res.estado == LicenciaEstado.denegada) {
+        debugPrint('⛔ [LICENCIA] Licencia denegada/dada de baja en cambio de ventana: ${res.mensaje}');
+        lic.validada = false;
+        await save(lic);
+        onLicenciaRevocada?.call(res.mensaje);
+      } else if (res.estado == LicenciaEstado.valida) {
+        debugPrint('✅ [LICENCIA] Licencia activa y confirmada por el servidor.');
+        lic.offlineIntentos = 0;
+        await save(lic);
+      } else if (res.estado == LicenciaEstado.errorConexion) {
+        debugPrint('ℹ️ [LICENCIA] Sin conexión al verificar licencia (modo offline permitido).');
+      }
+    } catch (e) {
+      debugPrint('ℹ️ [LICENCIA] Error inesperado comprobando estado: $e');
+    } finally {
+      _verificandoBaja = false;
     }
   }
 
@@ -173,7 +222,7 @@ class LicenciaService extends ChangeNotifier {
   Future<String> getOrCreateUuid() => DeviceIdService.getOrCreateUuid();
 
   /// Valida la licencia contra el endpoint app_ent de Velneo según especificación oficial.
-  Future<LicenciaResult> validate(Licencia lic, {bool saveOnSuccess = true}) async {
+  Future<LicenciaResult> validate(Licencia lic, {bool saveOnSuccess = true, Duration? timeoutOverride}) async {
     final url = lic.buildValidateUrl();
     debugPrint('🔍 Validando licencia: $url');
 
@@ -181,7 +230,7 @@ class LicenciaService extends ChangeNotifier {
       final response = await _activeClient.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-      ).timeout(_timeout);
+      ).timeout(timeoutOverride ?? _timeout);
 
       final rawJson = response.body;
       final displayJson = 'URL: $url\n\n$rawJson';

@@ -33,7 +33,6 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
   late TextEditingController _apiKeyCtrl;
 
   bool _loading = false;
-  bool _loadingComprobar = false;
   bool _obscureLicencia = true;
   bool _obscureApiKey = true;
   String? _errorMsg;
@@ -55,9 +54,7 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
     _licenciaCtrl = TextEditingController(text: lic.licenciaCodigo);
     _idCtrl = TextEditingController(text: lic.id);
     _uuidCtrl = TextEditingController(text: lic.uuid);
-    _serverHostCtrl = TextEditingController(
-      text: lic.serverHost.isNotEmpty ? lic.serverHost : Licencia.defaultBaseHost,
-    );
+    _serverHostCtrl = TextEditingController(text: lic.serverHost);
     _serverApiCtrl = TextEditingController(
       text: lic.serverApi == Licencia.defaultBaseHost ? '' : lic.serverApi,
     );
@@ -139,130 +136,6 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
       esAdmin: widget.initialLicencia.esAdmin,
       esSoloLec: widget.initialLicencia.esSoloLec,
     );
-  }
-
-  Future<void> _comprobarLicencia() async {
-    final lic = _buildLicencia();
-
-    if (lic.licenciaCodigo.isEmpty) {
-      setState(() => _errorMsg = 'El código de licencia es obligatorio');
-      return;
-    }
-
-    setState(() {
-      _loadingComprobar = true;
-      _errorMsg = null;
-    });
-
-    try {
-      final result = await widget.licenseService.validate(lic, saveOnSuccess: false);
-      if (!mounted) return;
-
-      setState(() => _loadingComprobar = false);
-
-      await showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(
-                result.ok
-                    ? Icons.check_circle
-                    : (result.estado == LicenciaEstado.errorConexion ? Icons.wifi_off : Icons.cancel),
-                color: result.ok
-                    ? Colors.green
-                    : (result.estado == LicenciaEstado.errorConexion ? Colors.orange : Colors.red),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  result.ok ? 'Licencia Válida' : 'Resultado Comprobación',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: (result.ok
-                              ? Colors.green
-                              : (result.estado == LicenciaEstado.errorConexion ? Colors.orange : Colors.red))
-                          .withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      result.mensaje,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: result.ok
-                            ? Colors.green.shade800
-                            : (result.estado == LicenciaEstado.errorConexion
-                                ? Colors.orange.shade900
-                                : Colors.red.shade800),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('Respuesta JSON del servidor:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: double.infinity,
-                    constraints: const BoxConstraints(maxHeight: 250),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.grey.shade400),
-                    ),
-                    child: SingleChildScrollView(
-                      child: SelectableText(
-                        result.rawResponse ?? '(Sin respuesta)',
-                        style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            if (result.rawResponse != null && result.rawResponse!.isNotEmpty)
-              TextButton.icon(
-                icon: const Icon(Icons.copy, size: 16),
-                label: const Text('Copiar'),
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: result.rawResponse!));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Respuesta copiada al portapapeles'), duration: Duration(seconds: 2)),
-                  );
-                },
-              ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cerrar'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loadingComprobar = false;
-          _errorMsg = 'Error al comprobar la licencia: $e';
-        });
-      }
-    }
   }
 
   Future<void> _conectar() async {
@@ -547,7 +420,7 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
             controller: _serverHostCtrl,
             decoration: const InputDecoration(
               labelText: 'Server API (URL base)',
-              hintText: 'Servidor API de Licencia',
+              hintText: 'https://servidor:puerto',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.cloud_outlined),
             ),
@@ -594,45 +467,21 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Botones de acción: Comprobar Licencia y Conectar
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: (_loading || _loadingComprobar) ? null : _comprobarLicencia,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: _loadingComprobar
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.preview_outlined),
-                  label: Text(_loadingComprobar ? 'Comprobando...' : 'Comprobar Licencia'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: (_loading || _loadingComprobar) ? null : _conectar,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.cloud_done),
-                  label: Text(_loading ? 'Conectando...' : 'Conectar'),
-                ),
-              ),
-            ],
+          // Botón de acción: Conectar
+          FilledButton.icon(
+            onPressed: _loading ? null : _conectar,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: _loading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.cloud_done),
+            label: Text(_loading ? 'Conectando...' : 'Conectar'),
           ),
 
           if (_errorMsg != null) ...[

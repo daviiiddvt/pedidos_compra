@@ -97,51 +97,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ).then((_) => _cargarMetadatosSincronizacion());
   }
 
-  Future<void> _subirPendientesAhora() async {
-    if (!ConnectionStatusService.instance.isOnline) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay conexión a internet para subir documentos.')),
-      );
-      return;
-    }
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            ),
-            SizedBox(width: 12),
-            Text('Sincronizando...'),
-          ],
-        ),
-        duration: Duration(seconds: 2),
-      ),
-    );
-
-    final res = await OfflineOutboxService.instance.processQueue();
-    if (!mounted) return;
-
-    if (res.failed == 0) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Se subieron ${res.success} documentos correctamente.'),
-          backgroundColor: Colors.green.shade700,
-        ),
-      );
-    } else {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Subidos: ${res.success}. Fallaron: ${res.failed}. Revisa la conexión.'),
-          backgroundColor: Colors.orange.shade800,
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
@@ -269,7 +224,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   ],
                                 ),
                               ),
-                             
                               
                             ],
                           ),

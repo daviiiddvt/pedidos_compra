@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:pedidos_venta/core/licencia/licencia.dart';
 import 'package:pedidos_venta/core/licencia/licencia_service.dart';
+import 'package:pedidos_venta/core/licencia/licencia_navigation_observer.dart';
 import 'package:pedidos_venta/core/offline/offline_database.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -23,20 +25,20 @@ void main() {
       final lic = Licencia(
         licenciaCodigo: '3314',
         identificador: '53',
-        serverApi: 'https://tecerp.nunsys.com:4331',
+        serverApi: 'https://servidor.cliente.com:8443',
         version: 'v1',
         apiKey: '2xQmwUXpt8i',
       );
       final url = lic.buildValidateUrl();
       expect(
         url,
-        'https://tecerp.nunsys.com:4331/tecmicro/TecERPv7_dat_dat/v1/app_ent/53?api_key=2xQmwUXpt8i',
+        'https://servidor.cliente.com:8443/tecmicro/TecERPv7_dat_dat/v1/app_ent/53?api_key=2xQmwUXpt8i',
       );
     });
 
     test('buildValidateUrl no duplica instancia cuando se especifica TECMICRO_PRUEBAS_AD_AVANZADO', () {
       final lic = Licencia(
-        serverHost: 'https://tecerp.nunsys.com:4331',
+        serverHost: 'https://servidor.cliente.com:8443',
         serverApi: 'TECMICRO_PRUEBAS_AD_AVANZADO',
         identificador: '45',
         version: 'v1',
@@ -45,7 +47,7 @@ void main() {
       final url = lic.buildValidateUrl();
       expect(
         url,
-        'https://tecerp.nunsys.com:4331/TECMICRO_PRUEBAS_AD_AVANZADO/TecERPv7_dat_dat/v1/app_ent/45?api_key=80IF1kwMQZTknj3BirIz',
+        'https://servidor.cliente.com:8443/TECMICRO_PRUEBAS_AD_AVANZADO/TecERPv7_dat_dat/v1/app_ent/45?api_key=80IF1kwMQZTknj3BirIz',
       );
     });
 
@@ -82,15 +84,18 @@ void main() {
       expect(deserialized.serverApi, 'TECMICRO_PRUEBAS_AD_AVANZADO');
     });
 
-    test('serverApi aparece vacío por defecto y limpia defaultBaseHost en deserialización', () {
+    test('serverApi y serverHost aparecen vacíos por defecto y preservan el servidor configurado por el usuario', () {
       final defaultLic = Licencia();
       expect(defaultLic.serverApi, '');
+      expect(defaultLic.serverHost, '');
 
-      final fromMapWithHost = Licencia.fromDbMap({'server_api': Licencia.defaultBaseHost});
-      expect(fromMapWithHost.serverApi, '');
+      final fromMapWithHost = Licencia.fromDbMap({'server_host': 'https://tecerp.nunsys.com:4331', 'server_api': 'TECMICRO'});
+      expect(fromMapWithHost.serverHost, 'https://tecerp.nunsys.com:4331');
+      expect(fromMapWithHost.serverApi, 'TECMICRO');
 
-      final fromJsonWithHost = Licencia.fromJson({'serverApi': Licencia.defaultBaseHost});
-      expect(fromJsonWithHost.serverApi, '');
+      final fromJsonWithHost = Licencia.fromJson({'serverHost': 'https://tecerp.nunsys.com:4331', 'serverApi': 'TECMICRO'});
+      expect(fromJsonWithHost.serverHost, 'https://tecerp.nunsys.com:4331');
+      expect(fromJsonWithHost.serverApi, 'TECMICRO');
     });
   });
 
@@ -197,7 +202,7 @@ void main() {
         licenciaCodigo: '3304',
         id: '7665',
         identificador: '45',
-        serverHost: 'https://tecerp.nunsys.com:4331',
+        serverHost: 'https://servidor.cliente.com:8443',
         serverApi: 'TECMICRO_PRUEBAS_AD_AVANZADO',
       );
 
@@ -206,6 +211,99 @@ void main() {
       expect(lic.id, '7665', reason: 'El ID (app_ent) configurado no debe sobreescribirse con 45');
       expect(lic.identificador, '45');
       expect(lic.entM, '7665');
+    });
+
+    test('comprobarBajaSiProcede detecta baja y notifica onLicenciaRevocada', () async {
+      final fakeClient = _FakeHttpClient((request) async {
+        return http.Response('''
+{
+  "app_ent": [
+    {
+      "id": 45,
+      "licencia": 3304,
+      "ent_m": 7665,
+      "contraclave": "CLAVE-123",
+      "baj": true
+    }
+  ]
+}
+''', 200, headers: {'content-type': 'application/json'});
+      });
+
+      final service = LicenciaService(httpClient: fakeClient);
+      final lic = Licencia(
+        licenciaCodigo: '3304',
+        id: '7665',
+        identificador: '45',
+        serverHost: 'https://servidor.cliente.com:8443',
+        serverApi: 'API_TEST',
+        validada: true,
+      );
+      await service.save(lic);
+      expect(service.isValida, isTrue);
+
+      String? motivoRevocacion;
+      service.onLicenciaRevocada = (motivo) {
+        motivoRevocacion = motivo;
+      };
+
+      await service.comprobarBajaSiProcede();
+
+      expect(service.isValida, isFalse);
+      expect(motivoRevocacion, contains('baja'));
+    });
+
+    test('LicenciaNavigationObserver dispara comprobarBajaSiProcede en didPush y didPop', () async {
+      var llamadas = 0;
+      final fakeClient = _FakeHttpClient((request) async {
+        llamadas++;
+        return http.Response('''
+{
+  "app_ent": [
+    {
+      "id": 45,
+      "licencia": 3304,
+      "ent_m": 7665,
+      "contraclave": "CLAVE-123",
+      "baj": false
+    }
+  ]
+}
+''', 200, headers: {'content-type': 'application/json'});
+      });
+
+      final service = LicenciaService(httpClient: fakeClient);
+      final lic = Licencia(
+        licenciaCodigo: '3304',
+        id: '7665',
+        identificador: '45',
+        serverHost: 'https://servidor.cliente.com:8443',
+        serverApi: 'API_TEST',
+        validada: true,
+      );
+      await service.save(lic);
+
+      final observer = LicenciaNavigationObserver(service);
+      final routePresupuestos = MaterialPageRoute(
+        settings: const RouteSettings(name: '/presupuestos'),
+        builder: (_) => const SizedBox(),
+      );
+      final routeHome = MaterialPageRoute(
+        settings: const RouteSettings(name: '/home'),
+        builder: (_) => const SizedBox(),
+      );
+
+      // 1. didPush a presupuestos
+      observer.didPush(routePresupuestos, routeHome);
+      await Future.delayed(const Duration(milliseconds: 50));
+      expect(llamadas, 1);
+
+      // 2. didPop saliendo de presupuestos
+      // Reiniciamos throttle para simular el paso del tiempo
+      await Future.delayed(const Duration(milliseconds: 1600));
+      observer.didPop(routePresupuestos, routeHome);
+      await Future.delayed(const Duration(milliseconds: 50));
+      expect(llamadas, 2);
     });
   });
 }

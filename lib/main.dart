@@ -39,6 +39,7 @@ import 'core/search/entity_search_repository.dart'; // Repositorio local-first.
 import 'core/search/local_cache_db.dart'; // Caché local (SQLite en escritorio/móvil).
 import 'core/licencia/licencia.dart';
 import 'core/licencia/licencia_service.dart';
+import 'core/licencia/licencia_navigation_observer.dart';
 import 'core/offline/offline_database.dart';
 import 'core/offline/offline_outbox_service.dart';
 import 'core/offline/connection_status_service.dart';
@@ -59,6 +60,8 @@ import 'screens/settings_screen.dart';
 import 'state/auth_state.dart'; // Estado global de la sesión (¿estamos conectados?).
 import 'state/theme_settings.dart';
 import 'theme/app_theme.dart'; // Colores y estilos de toda la app.
+
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// main() es la FUNCIÓN DE ARRANQUE: es lo PRIMERO que ejecuta Flutter.
 Future<void> main() async {
@@ -86,6 +89,38 @@ Future<void> main() async {
   final licenciaService = LicenciaService();
   await licenciaService.init();
 
+  final licenciaNavObserver = LicenciaNavigationObserver(licenciaService);
+
+  // Si en cualquier momento el servidor da de baja la licencia, cerramos sesión y volvemos a la raíz
+  licenciaService.onLicenciaRevocada = (motivo) {
+    authState.desconectar();
+    final nav = rootNavigatorKey.currentState;
+    if (nav != null) {
+      nav.popUntil((route) => route.isFirst);
+      final ctx = nav.context;
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.block, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Licencia no válida o dada de baja: $motivo',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red.shade800,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  };
+
   // runApp(...) = "enciende la app y muestra esto en la pantalla".
   runApp(
     MultiProvider(
@@ -97,8 +132,8 @@ Future<void> main() async {
         Provider(create: (_) => RepositorioPedidos()),
         Provider(create: (_) => EntitySearchRepository()),
       ],
-      child: const AppLifecycleManager(
-        child: PedidosVentaApp(),
+      child: AppLifecycleManager(
+        child: PedidosVentaApp(navObserver: licenciaNavObserver),
       ),
     ),
   );
@@ -108,13 +143,19 @@ Future<void> main() async {
 /// Es StatelessWidget (sin estado) porque su única misión es definir la
 /// estética general y las rutas; no guarda ninguna variable.
 class PedidosVentaApp extends StatelessWidget {
-  const PedidosVentaApp({super.key});
+  final LicenciaNavigationObserver? navObserver;
+  const PedidosVentaApp({super.key, this.navObserver});
 
   @override
   Widget build(BuildContext context) {
     // MaterialApp = el "caparazón" de la app. Configura título, tema y rutas.
     final themeSettings = context.watch<ThemeSettings>();
+    final licService = context.read<LicenciaService>();
+    final observer = navObserver ?? LicenciaNavigationObserver(licService);
+
     return MaterialApp(
+      navigatorKey: rootNavigatorKey,
+      navigatorObservers: [observer],
       title: 'Pedidos de Venta', // Título (visible en la barra del navegador o Task Switcher).
       debugShowCheckedModeBanner: false, // Oculta la cinta roja "DEBUG" en la esquina.
       theme: AppTheme.light(), // Tema claro con los colores definidos en theme/app_theme.dart.

@@ -22,11 +22,11 @@
 // ============================================================================
 
 class AppConfig {
-  static const String defaultHost = 'https://tecerp.nunsys.com:4331';
+  static const String defaultHost = '';
   static const String datName = 'TecERPv7_dat_dat';
   static const String defaultVersion = 'v1';
 
-  static String serverHost = defaultHost;
+  static String serverHost = '';
   static String serverInstance = '';
   static String serverVersion = defaultVersion;
 
@@ -34,8 +34,7 @@ class AppConfig {
   // Dirección base del servidor. NO llevará la parte del endpoint, solo el
   // dominio + raíz del API: {host}/{instancia}/TecERPv7_dat_dat/{versión}
   // --------------------------------------------------------------------------
-  static String baseUrl =
-      'https://tecerp.nunsys.com:XXXX/NOMBRE_API/';
+  static String baseUrl = '';
 
   // Clave API para autenticarse contra VELNEO. Se rellena en el login y se
   // añade automáticamente como parámetro "api_key" en TODAS las peticiones.

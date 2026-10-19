@@ -25,7 +25,7 @@ class Licencia {
     this.identificador = '',
     this.licenciaCodigo = '',
     this.uuid = '',
-    this.serverHost = defaultBaseHost,
+    this.serverHost = '',
     this.serverApi = '',
     this.version = 'v1',
     this.validada = false,
@@ -42,7 +42,7 @@ class Licencia {
 
   /// Constante de ofuscación usada para calcular el identificador en app_ent.
   static const int constantesSuma = 3259;
-  static const String defaultBaseHost = 'https://tecerp.nunsys.com:4331';
+  static const String defaultBaseHost = '';
 
   /// Calcula el identificador de la licencia a partir del código numérico:
   /// identificador = codigo - 3259
@@ -101,7 +101,7 @@ class Licencia {
         'identificador': identificador,
         'licencia_codigo': licenciaCodigo,
         'uuid': uuid,
-        'server_host': serverHost.isNotEmpty ? serverHost : defaultBaseHost,
+        'server_host': serverHost,
         'server_api': serverApi,
         'version': version,
         'validada': validada ? 1 : 0,
@@ -113,8 +113,7 @@ class Licencia {
 
   factory Licencia.fromDbMap(Map<String, dynamic> map) {
     final sHost = (map['server_host'] as String?) ?? '';
-    final sApiRaw = (map['server_api'] as String?) ?? '';
-    final sApi = sApiRaw == Licencia.defaultBaseHost ? '' : sApiRaw;
+    final sApi = (map['server_api'] as String?) ?? '';
 
     return Licencia(
       tecnico: (map['tecnico'] as String?) ?? '',
@@ -122,7 +121,7 @@ class Licencia {
       identificador: (map['identificador'] as String?) ?? '',
       licenciaCodigo: (map['licencia_codigo'] as String?) ?? '',
       uuid: (map['uuid'] as String?) ?? '',
-      serverHost: sHost.isNotEmpty ? sHost : Licencia.defaultBaseHost,
+      serverHost: sHost,
       serverApi: sApi,
       version: (map['version'] as String?) ?? 'v1',
       validada: (map['validada'] == 1 || map['validada'] == true),
@@ -155,15 +154,15 @@ class Licencia {
       };
 
   factory Licencia.fromJson(Map<String, dynamic> json) {
-    final sApiRaw = (json['serverApi'] as String?) ?? '';
-    final sApi = sApiRaw == Licencia.defaultBaseHost ? '' : sApiRaw;
+    final sHost = (json['serverHost'] as String?) ?? '';
+    final sApi = (json['serverApi'] as String?) ?? '';
     return Licencia(
         tecnico: (json['tecnico'] as String?) ?? '',
         id: (json['id'] as String?) ?? '',
         identificador: (json['identificador'] as String?) ?? '',
         licenciaCodigo: (json['licenciaCodigo'] as String?) ?? '',
         uuid: (json['uuid'] as String?) ?? '',
-        serverHost: (json['serverHost'] as String?) ?? Licencia.defaultBaseHost,
+        serverHost: sHost,
         serverApi: sApi,
         version: (json['version'] as String?) ?? 'v1',
         validada: (json['validada'] as bool?) ?? false,

@@ -22,6 +22,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../state/auth_state.dart'; // Para llamar a auth.conectar(...).
 import '../core/config.dart'; // Para rellenar los campos con los valores actuales.
@@ -52,9 +53,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _hostCtrl = TextEditingController(
-      text: AppConfig.serverHost.isNotEmpty ? AppConfig.serverHost : AppConfig.defaultHost,
-    );
+    String initialHost = AppConfig.serverHost.isNotEmpty ? AppConfig.serverHost : AppConfig.defaultHost;
+    // Si aún no hay host de datos configurado, heredar el host ya configurado en la licencia
+    if (initialHost.isEmpty) {
+      final licHost = context.read<LicenciaService>().licencia?.serverHost;
+      if (licHost != null && licHost.isNotEmpty) {
+        initialHost = licHost;
+        AppConfig.serverHost = licHost;
+      }
+    }
+    _hostCtrl = TextEditingController(text: initialHost);
     _instanceCtrl = TextEditingController(text: AppConfig.serverInstance);
     _versionCtrl = TextEditingController(
       text: AppConfig.serverVersion.isNotEmpty ? AppConfig.serverVersion : AppConfig.defaultVersion,
@@ -65,8 +73,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final currentBase = AppConfig.baseUrl.trim();
 
-    // Si la URL por defecto tiene XXXX, o está vacía, o no hay instancia, mostramos la configuración de red.
-    if (currentBase.contains('XXXX') || currentBase.isEmpty || AppConfig.serverInstance.trim().isEmpty) {
+    // Si la URL por defecto tiene XXXX, o está vacía, o no hay instancia o host, mostramos la configuración de red.
+    if (currentBase.contains('XXXX') || currentBase.isEmpty || AppConfig.serverInstance.trim().isEmpty || initialHost.isEmpty) {
       _mostrarConfig = true;
     }
   }
@@ -93,21 +101,41 @@ class _LoginScreenState extends State<LoginScreen> {
   /// _conectar: lo que pasa al pulsar el botón "Conectar".
   Future<void> _conectar(AuthState auth) async {
     final finalUrl = _currentUrl;
-    if (_instanceCtrl.text.trim().isEmpty) {
+    final host = _hostCtrl.text.trim();
+    final instance = _instanceCtrl.text.trim();
+    final version = _versionCtrl.text.trim();
+    final apiKey = _apiKeyCtrl.text.trim();
+
+    if (instance.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor, indica la instancia de datos')),
       );
       return;
     }
 
+    // Persistir siempre la configuración de servidor elegida por el usuario
+    AppConfig.serverHost = host;
+    AppConfig.serverInstance = instance;
+    AppConfig.serverVersion = version;
+    AppConfig.apiKey = apiKey;
+    AppConfig.baseUrl = finalUrl;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_serverHost', host);
+      await prefs.setString('auth_serverInstance', instance);
+      await prefs.setString('auth_serverVersion', version);
+      await prefs.setString('auth_apiKey', apiKey);
+      await prefs.setString('auth_baseUrl', finalUrl);
+    } catch (_) {}
+
     final ok = await auth.conectar(
       baseUrl: finalUrl,
-      apiKey: _apiKeyCtrl.text.trim(),
+      apiKey: apiKey,
       username: _usernameCtrl.text.trim(),
       password: _passwordCtrl.text,
-      host: _hostCtrl.text.trim(),
-      instance: _instanceCtrl.text.trim(),
-      version: _versionCtrl.text.trim(),
+      host: host,
+      instance: instance,
+      version: version,
     );
 
     // Si falló y la pantalla sigue viva (mounted), enseñamos el error.
@@ -121,10 +149,8 @@ class _LoginScreenState extends State<LoginScreen> {
   /// build: DIBUJA la pantalla. Se llama cada vez que el estado cambia.
   @override
   Widget build(BuildContext context) {
-    // watch: nos suscribimos al estado de sesión y de licencia.
+    // watch: nos suscribimos al estado de sesión.
     final auth = context.watch<AuthState>();
-    final licService = context.watch<LicenciaService>();
-    final licHost = licService.licencia?.serverHost.trim();
 
     return Scaffold(
       body: SafeArea( // Evita que el contenido choque con los bordes/navegación.
@@ -137,21 +163,32 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch, // Hijos a lo ancho.
                 children: [
-                  // ---- Logo "PV" (Pedidos de Venta) ----
-                  Container(
-                    width: 68,
-                    height: 68,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
+                  // ---- Logo de la App ----
+                  Center(
+                    child: ClipRRect(
                       borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Text(
-                      'TecERP',
-                      style: TextStyle(
-                        color: AppColors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
+                      child: Image.asset(
+                        'assets/icon/TecPED.jpg',
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 72,
+                          height: 72,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: const Text(
+                            'TecERP',
+                            style: TextStyle(
+                              color: AppColors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -203,41 +240,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               key: const ValueKey('serverHost'),
                               label: 'Servidor (Host)',
                               controller: _hostCtrl,
-                              placeholder: 'Server API (URL base)',
+                              placeholder: 'https://servidor:puerto',
                               keyboardType: TextInputType.url,
                             ),
-                            if (licHost != null && licHost.isNotEmpty && licHost != _hostCtrl.text) ...[
-                              const SizedBox(height: 4),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      _hostCtrl.text = licHost;
-                                    });
-                                  },
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.copy, size: 13, color: Theme.of(context).colorScheme.primary),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Usar host de licencia ($licHost)',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Theme.of(context).colorScheme.primary,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
                             const SizedBox(height: 12),
 
                             // Instancia

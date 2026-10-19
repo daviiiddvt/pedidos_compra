@@ -527,7 +527,7 @@ void main() {
 
   test('Licencia.buildValidateUrl construye la URL correcta según especificación', () {
     final lic = Licencia(
-      serverHost: 'https://tecerp.nunsys.com:4331',
+      serverHost: 'https://servidor.cliente.com:8443',
       serverApi: 'TECERPV7_TECPASS',
       version: 'v1',
       identificador: '55',
@@ -537,7 +537,7 @@ void main() {
     final url = lic.buildValidateUrl();
     expect(
       url,
-      'https://tecerp.nunsys.com:4331/TECERPV7_TECPASS/TecERPv7_dat_dat/v1/app_ent/55?api_key=test-api-key',
+      'https://servidor.cliente.com:8443/TECERPV7_TECPASS/TecERPv7_dat_dat/v1/app_ent/55?api_key=test-api-key',
     );
   });
 
@@ -603,14 +603,14 @@ void main() {
   // ------ Tests de AppConfig Parametrizada ------
   test('AppConfig.buildBaseUrl construye URL con DAT fijo TecERPv7_dat_dat', () {
     final url = AppConfig.buildBaseUrl(
-      host: 'https://tecerp.nunsys.com:4331',
+      host: 'https://servidor.cliente.com:8443',
       instance: 'TECMICRO_PRUEBAS_AD_AVANZADO',
       version: 'v1',
     );
 
     expect(
       url,
-      'https://tecerp.nunsys.com:4331/TECMICRO_PRUEBAS_AD_AVANZADO/TecERPv7_dat_dat/v1',
+      'https://servidor.cliente.com:8443/TECMICRO_PRUEBAS_AD_AVANZADO/TecERPv7_dat_dat/v1',
     );
     expect(AppConfig.datName, 'TecERPv7_dat_dat');
   });
