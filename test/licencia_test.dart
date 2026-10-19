@@ -147,13 +147,15 @@ void main() {
       expect(row['api_key'], 'key_abc');
     });
 
-    test('resetLicencia restablece los valores por defecto manteniendo UUID', () async {
+    test('resetLicencia restablece los valores por defecto manteniendo UUID y servidor configurado', () async {
       final lic = Licencia(
         tecnico: 'Empresa Test',
         id: '8597',
         identificador: '53',
         licenciaCodigo: '3314',
         uuid: 'UUID-CONSERVADO',
+        serverHost: 'https://servidor-personalizado.com:8443',
+        serverApi: 'INSTANCIA_CLIENTE',
         validada: true,
       );
       await OfflineDatabase.instance.saveLicencia(lic.toDbMap());
@@ -166,6 +168,8 @@ void main() {
       expect(row['licencia_codigo'], '');
       expect(row['id_licencia'], '');
       expect(row['uuid'], 'UUID-CONSERVADO');
+      expect(row['server_host'], 'https://servidor-personalizado.com:8443');
+      expect(row['server_api'], 'INSTANCIA_CLIENTE');
     });
 
     test('LicenciaService.validate preserva el id (7665) y no lo sobrescribe con apiId (45)', () async {

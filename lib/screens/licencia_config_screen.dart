@@ -547,7 +547,7 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
             controller: _serverHostCtrl,
             decoration: const InputDecoration(
               labelText: 'Server API (URL base)',
-              hintText: 'https://tecerp.nunsys.com:4331',
+              hintText: 'Servidor API de Licencia',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.cloud_outlined),
             ),
@@ -559,7 +559,7 @@ class _LicenciaConfigScreenState extends State<LicenciaConfigScreen> {
             controller: _serverApiCtrl,
             decoration: const InputDecoration(
               labelText: 'Instancia / Subruta API',
-              hintText: 'Ej: Instancia de servidor',
+              hintText: 'Instancia de servidor',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.dns),
             ),

@@ -10,6 +10,7 @@ import '../../models/articulo.dart';
 import '../../models/models.dart';
 import '../../models/movimiento.dart';
 import '../api_service.dart';
+import '../licencia/licencia.dart';
 
 /// Gestor de base de datos SQLite para soporte sin conexión (Offline-first).
 ///
@@ -1798,7 +1799,26 @@ class OfflineDatabase {
   }
 
   /// Resetea la configuración de licencia en SQLite a sus valores por defecto.
-  Future<void> resetLicencia({String uuid = ''}) async {
+  /// Si ya existía un servidor configurado (server_host / server_api), se conserva para
+  /// no sobreescribir la infraestructura del cliente a menos que se especifique uno nuevo.
+  Future<void> resetLicencia({
+    String uuid = '',
+    String? serverHost,
+    String? serverApi,
+  }) async {
+    String currentHost = serverHost ?? '';
+    String currentApi = serverApi ?? '';
+    if (currentHost.isEmpty || currentApi.isEmpty) {
+      final actual = await getLicencia();
+      if (actual != null) {
+        if (currentHost.isEmpty) currentHost = (actual['server_host'] as String?) ?? '';
+        if (currentApi.isEmpty) currentApi = (actual['server_api'] as String?) ?? '';
+      }
+    }
+    if (currentHost.isEmpty) {
+      currentHost = Licencia.defaultBaseHost;
+    }
+
     await db.update(
       'licencia',
       {
@@ -1807,7 +1827,8 @@ class OfflineDatabase {
         'identificador': '',
         'licencia_codigo': '',
         'uuid': uuid,
-        'server_api': 'https://tecerp.nunsys.com:4331',
+        'server_host': currentHost,
+        'server_api': currentApi,
         'version': 'v1',
         'validada': 0,
         'ent_m': '',
